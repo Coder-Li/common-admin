@@ -40,7 +40,7 @@ export interface UpdateUserRequest {
 
 interface RequestConfig {
   headers?: Record<string, string>
-  params?: Record<string, unknown>
+  params?: object
 }
 
 interface HttpClient {
