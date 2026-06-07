@@ -12,7 +12,6 @@ import { ListQueryDto } from '../../common/dto/list-query.dto';
 import { Role } from '../role.enum';
 
 const USER_SORT_FIELDS = [
-  'id',
   'email',
   'username',
   'firstName',

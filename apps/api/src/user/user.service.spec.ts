@@ -67,6 +67,12 @@ describe('UserListQueryDto', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('rejects sorting by id', async () => {
+    await expect(transformQuery({ sort: 'id:asc' })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
   it('rejects invalid sort directions', async () => {
     await expect(
       transformQuery({ sort: 'createdAt:sideways' }),
