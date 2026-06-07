@@ -12,3 +12,17 @@ export interface UserProfile {
 export interface JwtUserPayload extends UserProfile {
   sub: string;
 }
+
+export interface PublicUser extends UserProfile {
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateUserInput = Omit<
+  PublicUser,
+  'id' | 'createdAt' | 'updatedAt'
+> & {
+  password: string;
+};
+
+export type UpdateUserInput = Partial<Omit<CreateUserInput, 'password'>>;

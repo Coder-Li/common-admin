@@ -1,5 +1,5 @@
 import { Role } from './role.enum';
-import { UserProfile } from './user.types';
+import { PublicUser, UserProfile } from './user.types';
 
 interface PersistedUser {
   id: string;
@@ -8,6 +8,8 @@ interface PersistedUser {
   firstName: string;
   lastName: string;
   role: Role | string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
 export function toUserProfile(user: PersistedUser): UserProfile {
@@ -18,5 +20,19 @@ export function toUserProfile(user: PersistedUser): UserProfile {
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role as Role,
+  };
+}
+
+function toIsoString(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+export function toUserResponse(
+  user: PersistedUser & { createdAt: Date | string; updatedAt: Date | string },
+): PublicUser {
+  return {
+    ...toUserProfile(user),
+    createdAt: toIsoString(user.createdAt),
+    updatedAt: toIsoString(user.updatedAt),
   };
 }
