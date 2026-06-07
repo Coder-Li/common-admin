@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 
 interface DataTableToolbarProps {
   searchValue: string
+  searchLabel?: string
   searchPlaceholder?: string
   onSearchChange: (value: string) => void
   filters?: ReactNode
@@ -11,6 +12,7 @@ interface DataTableToolbarProps {
 
 export function DataTableToolbar({
   searchValue,
+  searchLabel = 'Search table',
   searchPlaceholder = 'Search',
   onSearchChange,
   filters,
@@ -25,6 +27,7 @@ export function DataTableToolbar({
             size={16}
           />
           <input
+            aria-label={searchLabel}
             className="h-9 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500"
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={searchPlaceholder}

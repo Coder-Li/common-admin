@@ -30,11 +30,6 @@ export function DataTablePagination({
   const canPreviousPage = pageIndex > 0
   const canNextPage = currentPage < pageCount
 
-  function handlePageSizeChange(nextPageSize: number) {
-    onPageSizeChange(nextPageSize)
-    onPageChange(0)
-  }
-
   return (
     <div className="flex min-h-14 flex-col gap-3 border-t border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-slate-500">
@@ -53,7 +48,7 @@ export function DataTablePagination({
                   : 'text-slate-600 hover:bg-slate-100',
               ].join(' ')}
               key={option}
-              onClick={() => handlePageSizeChange(option)}
+              onClick={() => onPageSizeChange(option)}
               type="button"
             >
               {option}
