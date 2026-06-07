@@ -212,16 +212,16 @@ export function UsersPage() {
       <DataTable
         columns={columns}
         data={usersQuery.data?.items ?? []}
-        emptyLabel="No users found"
+        emptyLabel={t('users.state.empty')}
         error={listError}
         errorLabel={t('users.error.load')}
         isLoading={usersQuery.isLoading}
-        loadingLabel="Loading users"
+        loadingLabel={t('users.state.loading')}
         onPaginationChange={handlePaginationChange}
         onRetry={() => usersQuery.refetch()}
         onSortingChange={handleSortingChange}
         pagination={pagination}
-        retryLabel="Retry"
+        retryLabel={t('users.state.retry')}
         sorting={sorting}
         toolbar={
           <DataTableToolbar
@@ -229,7 +229,7 @@ export function UsersPage() {
               <label className="flex items-center gap-2 text-sm text-slate-600">
                 <span>{t('users.form.role')}</span>
                 <select
-                  aria-label="Filter by role"
+                  aria-label={t('users.filter.role')}
                   className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
                   onChange={(event) =>
                     handleRoleChange(
@@ -238,7 +238,9 @@ export function UsersPage() {
                   }
                   value={role}
                 >
-                  <option value={allRoleFilter}>All</option>
+                  <option value={allRoleFilter}>
+                    {t('users.filter.allRoles')}
+                  </option>
                   <option value="ADMIN">{t('users.role.admin')}</option>
                   <option value="STANDARD">{t('users.role.standard')}</option>
                 </select>

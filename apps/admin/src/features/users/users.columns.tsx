@@ -56,6 +56,7 @@ export function createUserColumns(
     {
       id: 'fullName',
       header: labels.fullName,
+      enableSorting: false,
       cell: ({ row }) => formatFullName(row.original),
     },
     {

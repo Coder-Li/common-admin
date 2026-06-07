@@ -155,6 +155,21 @@ describe('UsersPage', () => {
     })
   })
 
+  it('does not send a sort query for synthetic full name column clicks', async () => {
+    const user = userEvent.setup()
+    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
+
+    renderUsersPage()
+    await screen.findByText('alice')
+
+    await user.click(screen.getByText('Full name'))
+
+    expect(usersApiMock.listUsers).toHaveBeenCalledTimes(1)
+    expect(usersApiMock.listUsers).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ sort: 'fullName:asc' }),
+    )
+  })
+
   it('refetches the users list and closes the form after create succeeds', async () => {
     const user = userEvent.setup()
     usersApiMock.listUsers.mockResolvedValue(listResponse([]))
