@@ -1,5 +1,12 @@
 import axios from 'axios'
-import type { AuthSession, Role, UserProfile } from '../types/auth'
+import type { AuthSession, UserProfile } from '../types/auth'
+import type {
+  CreateUserRequest,
+  UpdateUserRequest,
+  UserListQuery,
+  UserListResponse,
+  UserRecord,
+} from '../features/users/users.types'
 
 export interface LoginCredentials {
   usernameOrEmail: string
@@ -11,31 +18,6 @@ export interface ListResponse<TItem> {
   total: number
   page: number
   pageSize: number
-}
-
-export interface UserListQuery {
-  page?: number
-  pageSize?: number
-  search?: string
-  sort?: string
-  role?: Role
-}
-
-export interface CreateUserRequest {
-  email: string
-  username: string
-  firstName: string
-  lastName: string
-  password: string
-  role: Role
-}
-
-export interface UpdateUserRequest {
-  email?: string
-  username?: string
-  firstName?: string
-  lastName?: string
-  role?: Role
 }
 
 interface RequestConfig {
@@ -156,33 +138,36 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
     },
 
     users: {
-      async list(query: UserListQuery): Promise<ListResponse<UserProfile>> {
+      async list(query: UserListQuery): Promise<UserListResponse> {
         if (!client.get) {
           throw new Error('HTTP get client is not configured')
         }
         return request(() =>
-          client.get!<ListResponse<UserProfile>>(
+          client.get!<UserListResponse>(
             '/users',
             authenticatedConfig(undefined, query),
           ),
         )
       },
 
-      async create(payload: CreateUserRequest): Promise<UserProfile> {
+      async create(payload: CreateUserRequest): Promise<UserRecord> {
         if (!client.post) {
           throw new Error('HTTP post client is not configured')
         }
         return request(() =>
-          client.post!<UserProfile>('/users', payload, authenticatedConfig()),
+          client.post!<UserRecord>('/users', payload, authenticatedConfig()),
         )
       },
 
-      async update(id: string, payload: UpdateUserRequest): Promise<UserProfile> {
+      async update(
+        id: string,
+        payload: UpdateUserRequest,
+      ): Promise<UserRecord> {
         if (!client.patch) {
           throw new Error('HTTP patch client is not configured')
         }
         return request(() =>
-          client.patch!<UserProfile>(
+          client.patch!<UserRecord>(
             `/users/${id}`,
             payload,
             authenticatedConfig(),
