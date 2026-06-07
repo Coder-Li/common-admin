@@ -43,7 +43,7 @@ export function UserForm({
   const schema = useMemo(() => {
     const baseSchema = z.object({
       email: z.string().trim().email(t('users.validation.email')),
-      username: z.string().trim().min(1, t('users.validation.username')),
+      username: z.string().trim().min(3, t('users.validation.username')),
       firstName: z.string().trim().min(1, t('users.validation.firstName')),
       lastName: z.string().trim().min(1, t('users.validation.lastName')),
       role: z.enum(roles, {
