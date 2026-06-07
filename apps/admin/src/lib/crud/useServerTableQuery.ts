@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ListResponse } from '../api'
 import {
+  type ApiListQuery,
   createListQueryKey,
   toApiListQuery,
   type ServerListState,
@@ -8,14 +9,15 @@ import {
 
 export function useServerTableQuery<
   TItem,
-  TFilters extends Record<string, unknown> = Record<string, unknown>,
+  TFilters extends object = Record<string, unknown>,
+  TQuery extends ApiListQuery & TFilters = ApiListQuery & TFilters,
 >(options: {
   resource: string
   state: ServerListState<TFilters>
-  queryFn: (query: Record<string, unknown>) => Promise<ListResponse<TItem>>
+  queryFn: (query: TQuery) => Promise<ListResponse<TItem>>
 }) {
   return useQuery({
     queryKey: createListQueryKey(options.resource, options.state),
-    queryFn: () => options.queryFn(toApiListQuery(options.state)),
+    queryFn: () => options.queryFn(toApiListQuery<TFilters, TQuery>(options.state)),
   })
 }

@@ -1,5 +1,65 @@
 import { describe, expect, it } from 'vitest'
-import { createListQueryKey, toApiListQuery } from './list-query'
+import {
+  createListQueryKey,
+  toApiListQuery,
+  type ServerListState,
+} from './list-query'
+import { useServerTableQuery } from './useServerTableQuery'
+
+interface UserFilters {
+  role?: 'ADMIN' | 'STANDARD'
+}
+
+interface UserListQuery {
+  page: number
+  pageSize: number
+  search?: string
+  sort?: string
+  role?: 'ADMIN' | 'STANDARD'
+}
+
+interface UserRow {
+  id: string
+}
+
+const typedUserState: ServerListState<UserFilters> = {
+  pageIndex: 0,
+  pageSize: 20,
+  search: '',
+  filters: { role: 'ADMIN' },
+}
+
+const typedUserQuery: UserListQuery = toApiListQuery<UserFilters, UserListQuery>(
+  typedUserState,
+)
+
+function acceptsTypedUserListQuery(
+  query: UserListQuery,
+): Promise<{
+  items: UserRow[]
+  total: number
+  page: number
+  pageSize: number
+}> {
+  return Promise.resolve({
+    items: [{ id: query.role ?? 'none' }],
+    total: 1,
+    page: query.page,
+    pageSize: query.pageSize,
+  })
+}
+
+function TypeAssertionsOnly() {
+  useServerTableQuery<UserRow, UserFilters, UserListQuery>({
+    resource: 'users',
+    state: typedUserState,
+    queryFn: acceptsTypedUserListQuery,
+  })
+
+  return typedUserQuery
+}
+
+void TypeAssertionsOnly
 
 describe('list query helpers', () => {
   it('converts zero-based table page index to one-based API page', () => {

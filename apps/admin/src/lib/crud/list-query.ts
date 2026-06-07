@@ -1,5 +1,5 @@
 export interface ServerListState<
-  TFilters extends Record<string, unknown> = Record<string, unknown>,
+  TFilters extends object = Record<string, unknown>,
 > {
   pageIndex: number
   pageSize?: number
@@ -8,7 +8,7 @@ export interface ServerListState<
   filters: TFilters
 }
 
-export type ApiListQuery = Record<string, unknown> & {
+export interface ApiListQuery {
   page: number
   pageSize: number
   search?: string
@@ -34,7 +34,7 @@ function compactSearch(search: ServerListState['search']) {
   return trimmedSearch ? trimmedSearch : undefined
 }
 
-function stableFilters<TFilters extends Record<string, unknown>>(filters: TFilters) {
+function stableFilters<TFilters extends object>(filters: TFilters) {
   return Object.fromEntries(
     Object.entries(filters).sort(([leftKey], [rightKey]) =>
       leftKey.localeCompare(rightKey),
@@ -42,9 +42,12 @@ function stableFilters<TFilters extends Record<string, unknown>>(filters: TFilte
   ) as TFilters
 }
 
-export function toApiListQuery<TFilters extends Record<string, unknown>>(
+export function toApiListQuery<
+  TFilters extends object,
+  TQuery extends ApiListQuery & TFilters = ApiListQuery & TFilters,
+>(
   state: ServerListState<TFilters>,
-): ApiListQuery {
+): TQuery {
   const search = compactSearch(state.search)
 
   return {
@@ -53,10 +56,10 @@ export function toApiListQuery<TFilters extends Record<string, unknown>>(
     ...(search ? { search } : {}),
     ...(state.sort ? { sort: state.sort } : {}),
     ...state.filters,
-  }
+  } as TQuery
 }
 
-export function createListQueryKey<TFilters extends Record<string, unknown>>(
+export function createListQueryKey<TFilters extends object>(
   resource: string,
   state: ServerListState<TFilters>,
 ) {
