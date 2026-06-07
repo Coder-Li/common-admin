@@ -150,6 +150,16 @@ describe('UserService', () => {
     return { prisma, service };
   };
 
+  function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
+    const firstCall = mock.mock.calls[0];
+
+    if (!firstCall) {
+      throw new Error('Expected mock to have been called');
+    }
+
+    return firstCall[0] as TArg;
+  }
+
   const uniqueConstraintError = () =>
     new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
       code: 'P2002',
@@ -199,7 +209,9 @@ describe('UserService', () => {
         role: Role.ADMIN,
       });
 
-      const findManyWhere = prisma.user.findMany.mock.calls[0][0].where;
+      const findManyWhere = firstMockArg<{ where: Prisma.UserWhereInput }>(
+        prisma.user.findMany,
+      ).where;
 
       expect(prisma.user.count).toHaveBeenCalledWith({
         where: findManyWhere,
@@ -234,11 +246,15 @@ describe('UserService', () => {
 
       await service.listUsers({ page: 1, pageSize: 20, search: 'Ada' });
 
-      const findManyWhere = prisma.user.findMany.mock.calls[0][0].where;
-      const countWhere = prisma.user.count.mock.calls[0][0].where;
+      const findManyWhere = firstMockArg<{ where: Prisma.UserWhereInput }>(
+        prisma.user.findMany,
+      ).where;
+      const countWhere = firstMockArg<{ where: Prisma.UserWhereInput }>(
+        prisma.user.count,
+      ).where;
 
       expect(findManyWhere).toBe(countWhere);
-      expect(countWhere.OR[0]).toEqual({
+      expect(countWhere.OR?.[0]).toEqual({
         email: { contains: 'Ada', mode: 'insensitive' },
       });
     });
@@ -250,7 +266,10 @@ describe('UserService', () => {
 
       await service.listUsers({ page: 1, pageSize: 20, role: Role.STANDARD });
 
-      expect(prisma.user.findMany.mock.calls[0][0].where).toEqual({
+      expect(
+        firstMockArg<{ where: Prisma.UserWhereInput }>(prisma.user.findMany)
+          .where,
+      ).toEqual({
         role: Role.STANDARD,
       });
     });
@@ -282,7 +301,9 @@ describe('UserService', () => {
         role: Role.ADMIN,
       });
 
-      const createData = prisma.user.create.mock.calls[0][0].data;
+      const createData = firstMockArg<{
+        data: { passwordHash: string; password?: string };
+      }>(prisma.user.create).data;
 
       expect(createData).not.toHaveProperty('password');
       expect(createData.passwordHash).toEqual(expect.any(String));

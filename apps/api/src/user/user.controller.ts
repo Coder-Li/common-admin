@@ -47,9 +47,7 @@ export class UserController {
   @ApiForbiddenResponse({ description: 'Admin role required' })
   @Roles(Role.ADMIN)
   @Get()
-  listUsers(
-    @Query() query: UserListQueryDto,
-  ): Promise<UserListResponseDto> {
+  listUsers(@Query() query: UserListQueryDto): Promise<UserListResponseDto> {
     return this.userService.listUsers(query);
   }
 

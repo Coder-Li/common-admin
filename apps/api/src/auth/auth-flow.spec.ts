@@ -57,6 +57,16 @@ function userDetailBody(response: Response): UserDetailResponseBody {
   return response.body as UserDetailResponseBody;
 }
 
+function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
+  const firstCall = mock.mock.calls[0];
+
+  if (!firstCall) {
+    throw new Error('Expected mock to have been called');
+  }
+
+  return firstCall[0] as TArg;
+}
+
 describe('Auth flow', () => {
   let app: INestApplication;
   let httpServer: Server;
@@ -338,16 +348,25 @@ describe('Auth flow', () => {
         expect(userDetailBody(response).firstName).toBe('Renamed');
       });
 
-    expect(prisma.user.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        email: 'created@example.com',
-        username: 'created',
-        firstName: 'Created',
-        lastName: 'User',
-        role: Role.STANDARD,
-        passwordHash: expect.any(String),
-      }),
+    const createArgs = firstMockArg<{
+      data: {
+        email: string;
+        firstName: string;
+        lastName: string;
+        passwordHash: string;
+        role: Role;
+        username: string;
+      };
+    }>(prisma.user.create);
+
+    expect(createArgs.data).toMatchObject({
+      email: 'created@example.com',
+      username: 'created',
+      firstName: 'Created',
+      lastName: 'User',
+      role: Role.STANDARD,
     });
+    expect(createArgs.data.passwordHash).toEqual(expect.any(String));
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: 'detail-1' },
     });

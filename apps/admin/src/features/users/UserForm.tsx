@@ -79,7 +79,13 @@ export function UserForm({
   })
 
   function submitForm(value: UserFormValues) {
-    const { password: _password, ...updateValue } = value
+    const updateValue = {
+      email: value.email,
+      username: value.username,
+      firstName: value.firstName,
+      lastName: value.lastName,
+      role: value.role,
+    }
 
     if (isCreate) {
       onSubmit({
