@@ -29,6 +29,18 @@ interface UserProfileResponseBody {
   role: Role;
 }
 
+interface UserListResponseBody {
+  items: UserDetailResponseBody[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+interface UserDetailResponseBody extends UserProfileResponseBody {
+  createdAt: string;
+  updatedAt: string;
+}
+
 function loginBody(response: Response): LoginResponseBody {
   return response.body as LoginResponseBody;
 }
@@ -37,18 +49,57 @@ function userProfileBody(response: Response): UserProfileResponseBody {
   return response.body as UserProfileResponseBody;
 }
 
+function userListBody(response: Response): UserListResponseBody {
+  return response.body as UserListResponseBody;
+}
+
+function userDetailBody(response: Response): UserDetailResponseBody {
+  return response.body as UserDetailResponseBody;
+}
+
 describe('Auth flow', () => {
   let app: INestApplication;
   let httpServer: Server;
 
   const prisma = {
     user: {
+      count: jest.fn(),
+      create: jest.fn(),
+      delete: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
     $connect: jest.fn(),
     $disconnect: jest.fn(),
   };
+
+  function persistedUser(overrides: Partial<UserDetailResponseBody> = {}) {
+    return {
+      id: 'user-1',
+      email: 'admin@example.com',
+      username: 'admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      passwordHash: '$2a$04$test',
+      role: Role.ADMIN,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      ...overrides,
+    };
+  }
+
+  async function signIn(user: ReturnType<typeof persistedUser>) {
+    prisma.user.findFirst.mockResolvedValueOnce(user);
+
+    const loginResponse = await request(httpServer)
+      .post('/api/auth/login')
+      .send({ usernameOrEmail: user.email, password: 'Admin123!' })
+      .expect(201);
+
+    return loginBody(loginResponse).accessToken;
+  }
 
   beforeAll(async () => {
     process.env.JWT_ACCESS_TOKEN_SECRET = 'test-access-secret-change-me';
@@ -78,6 +129,9 @@ describe('Auth flow', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.values(prisma.user).forEach((mock) => {
+      mock.mockReset();
+    });
   });
 
   afterAll(async () => {
@@ -138,5 +192,209 @@ describe('Auth flow', () => {
 
   it('rejects current-user requests without a bearer token', async () => {
     await request(httpServer).get('/api/users/me').expect(401);
+  });
+
+  it('allows an authenticated standard user to fetch their current profile', async () => {
+    const standardUser = persistedUser({
+      id: 'standard-1',
+      email: 'standard@example.com',
+      username: 'standard',
+      firstName: 'Standard',
+      role: Role.STANDARD,
+    });
+    standardUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(standardUser);
+    prisma.user.findUnique.mockResolvedValueOnce(standardUser);
+
+    await request(httpServer)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(userProfileBody(response)).toEqual({
+          id: 'standard-1',
+          email: 'standard@example.com',
+          username: 'standard',
+          firstName: 'Standard',
+          lastName: 'User',
+          role: Role.STANDARD,
+        });
+      });
+  });
+
+  it('forbids a standard user from listing users', async () => {
+    const standardUser = persistedUser({
+      id: 'standard-1',
+      email: 'standard@example.com',
+      username: 'standard',
+      role: Role.STANDARD,
+    });
+    standardUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(standardUser);
+
+    await request(httpServer)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(403);
+
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('allows an admin user to list users with pagination metadata', async () => {
+    const adminUser = persistedUser();
+    adminUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const listedUser = persistedUser({
+      id: 'listed-1',
+      email: 'listed@example.com',
+      username: 'listed',
+    });
+    const accessToken = await signIn(adminUser);
+    prisma.user.findMany.mockResolvedValueOnce([listedUser]);
+    prisma.user.count.mockResolvedValueOnce(1);
+
+    await request(httpServer)
+      .get('/api/users')
+      .query({ page: 2, pageSize: 5, sort: 'email:asc' })
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(userListBody(response)).toEqual({
+          items: [
+            {
+              id: 'listed-1',
+              email: 'listed@example.com',
+              username: 'listed',
+              firstName: 'Admin',
+              lastName: 'User',
+              role: Role.ADMIN,
+              createdAt: '2026-01-01T00:00:00.000Z',
+              updatedAt: '2026-01-01T00:00:00.000Z',
+            },
+          ],
+          total: 1,
+          page: 2,
+          pageSize: 5,
+        });
+      });
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith({
+      skip: 5,
+      take: 5,
+      orderBy: { email: 'asc' },
+      where: {},
+    });
+    expect(prisma.user.count).toHaveBeenCalledWith({ where: {} });
+  });
+
+  it('routes admin create, detail, and update requests through user persistence', async () => {
+    const adminUser = persistedUser();
+    adminUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(adminUser);
+    const createdUser = persistedUser({
+      id: 'created-1',
+      email: 'created@example.com',
+      username: 'created',
+      role: Role.STANDARD,
+    });
+    const detailUser = persistedUser({ id: 'detail-1' });
+    const updatedUser = persistedUser({
+      id: 'detail-1',
+      firstName: 'Renamed',
+    });
+    prisma.user.create.mockResolvedValueOnce(createdUser);
+    prisma.user.findUnique.mockResolvedValueOnce(detailUser);
+    prisma.user.update.mockResolvedValueOnce(updatedUser);
+
+    await request(httpServer)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        email: 'created@example.com',
+        username: 'created',
+        firstName: 'Created',
+        lastName: 'User',
+        password: 'Created123!',
+        role: Role.STANDARD,
+      })
+      .expect(201)
+      .expect((response: Response) => {
+        expect(userDetailBody(response).id).toBe('created-1');
+      });
+
+    await request(httpServer)
+      .get('/api/users/detail-1')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(userDetailBody(response).id).toBe('detail-1');
+      });
+
+    await request(httpServer)
+      .patch('/api/users/detail-1')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ firstName: 'Renamed' })
+      .expect(200)
+      .expect((response: Response) => {
+        expect(userDetailBody(response).firstName).toBe('Renamed');
+      });
+
+    expect(prisma.user.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        email: 'created@example.com',
+        username: 'created',
+        firstName: 'Created',
+        lastName: 'User',
+        role: Role.STANDARD,
+        passwordHash: expect.any(String),
+      }),
+    });
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 'detail-1' },
+    });
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'detail-1' },
+      data: { firstName: 'Renamed' },
+    });
+  });
+
+  it('keeps GET /users/me ahead of GET /users/:id routing', async () => {
+    const adminUser = persistedUser();
+    adminUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(adminUser);
+    prisma.user.findUnique.mockResolvedValueOnce(adminUser);
+
+    await request(httpServer)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(userProfileBody(response).id).toBe('user-1');
+      });
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+    });
+    expect(prisma.user.findUnique).not.toHaveBeenCalledWith({
+      where: { id: 'me' },
+    });
+  });
+
+  it('returns 204 when an admin deletes a user', async () => {
+    const adminUser = persistedUser();
+    adminUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(adminUser);
+    prisma.user.delete.mockResolvedValueOnce(persistedUser({ id: 'delete-1' }));
+
+    await request(httpServer)
+      .delete('/api/users/delete-1')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(204)
+      .expect((response: Response) => {
+        expect(response.text).toBe('');
+      });
+
+    expect(prisma.user.delete).toHaveBeenCalledWith({
+      where: { id: 'delete-1' },
+    });
   });
 });
