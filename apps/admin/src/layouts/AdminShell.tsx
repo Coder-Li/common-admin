@@ -5,6 +5,7 @@ import { clearQueryCache } from '../app/query-client'
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher'
 import { useI18n } from '../i18n/useI18n'
 import { navigateTo } from '../lib/navigation'
+import { UsersPage } from '../features/users/UsersPage'
 import { DashboardContent } from '../pages/DashboardContent'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { useAuthStore } from '../stores/auth-store'
@@ -149,11 +150,7 @@ export function AdminShell({ currentPath }: AdminShellProps) {
         </header>
 
         {currentPath === '/users' ? (
-          <PlaceholderPage
-            icon={<Users size={20} />}
-            title={t('nav.users')}
-            description={t('page.usersDescription')}
-          />
+          <UsersPage />
         ) : currentPath === '/settings' ? (
           <PlaceholderPage
             icon={<Settings size={20} />}
