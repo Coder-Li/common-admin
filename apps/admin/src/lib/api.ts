@@ -1,16 +1,63 @@
 import axios from 'axios'
-import type { AuthSession, UserProfile } from '../types/auth'
+import type { AuthSession, Role, UserProfile } from '../types/auth'
 
 export interface LoginCredentials {
   usernameOrEmail: string
   password: string
 }
 
+export interface ListResponse<TItem> {
+  items: TItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface UserListQuery {
+  page?: number
+  pageSize?: number
+  search?: string
+  sort?: string
+  role?: Role
+}
+
+export interface CreateUserRequest {
+  email: string
+  username: string
+  firstName: string
+  lastName: string
+  password: string
+  role: Role
+}
+
+export interface UpdateUserRequest {
+  email?: string
+  username?: string
+  firstName?: string
+  lastName?: string
+  role?: Role
+}
+
+interface RequestConfig {
+  headers?: Record<string, string>
+  params?: Record<string, unknown>
+}
+
 interface HttpClient {
-  post?<T = unknown>(url: string, data?: unknown): Promise<{ data: T }>
+  post?<T = unknown>(
+    url: string,
+    data?: unknown,
+    config?: RequestConfig,
+  ): Promise<{ data: T }>
+  patch?<T = unknown>(
+    url: string,
+    data?: unknown,
+    config?: RequestConfig,
+  ): Promise<{ data: T }>
+  delete?<T = unknown>(url: string, config?: RequestConfig): Promise<{ data: T }>
   get?<T = unknown>(
     url: string,
-    config?: { headers?: Record<string, string> },
+    config?: RequestConfig,
   ): Promise<{ data: T }>
 }
 
@@ -77,6 +124,20 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
     }
   }
 
+  function authenticatedConfig(
+    accessToken = getAccessToken?.(),
+    params?: RequestConfig['params'],
+  ): RequestConfig {
+    if (!accessToken) {
+      throw new Error('Access token is required')
+    }
+
+    return {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      ...(params ? { params } : {}),
+    }
+  }
+
   return {
     async login(credentials: LoginCredentials): Promise<AuthSession> {
       if (!client.post) {
@@ -89,14 +150,54 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
       if (!client.get) {
         throw new Error('HTTP get client is not configured')
       }
-      if (!accessToken) {
-        throw new Error('Access token is required')
-      }
       return request(() =>
-        client.get!<UserProfile>('/users/me', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }),
+        client.get!<UserProfile>('/users/me', authenticatedConfig(accessToken)),
       )
+    },
+
+    users: {
+      async list(query: UserListQuery): Promise<ListResponse<UserProfile>> {
+        if (!client.get) {
+          throw new Error('HTTP get client is not configured')
+        }
+        return request(() =>
+          client.get!<ListResponse<UserProfile>>(
+            '/users',
+            authenticatedConfig(undefined, query),
+          ),
+        )
+      },
+
+      async create(payload: CreateUserRequest): Promise<UserProfile> {
+        if (!client.post) {
+          throw new Error('HTTP post client is not configured')
+        }
+        return request(() =>
+          client.post!<UserProfile>('/users', payload, authenticatedConfig()),
+        )
+      },
+
+      async update(id: string, payload: UpdateUserRequest): Promise<UserProfile> {
+        if (!client.patch) {
+          throw new Error('HTTP patch client is not configured')
+        }
+        return request(() =>
+          client.patch!<UserProfile>(
+            `/users/${id}`,
+            payload,
+            authenticatedConfig(),
+          ),
+        )
+      },
+
+      async delete(id: string): Promise<void> {
+        if (!client.delete) {
+          throw new Error('HTTP delete client is not configured')
+        }
+        return request(() =>
+          client.delete!<void>(`/users/${id}`, authenticatedConfig()),
+        )
+      },
     },
   }
 }
