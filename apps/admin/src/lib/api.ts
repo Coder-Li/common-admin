@@ -7,6 +7,11 @@ import type {
   UserListResponse,
   UserRecord,
 } from '../features/users/users.types'
+import type {
+  DictionaryBadgeVariant,
+  DictionaryOptionsMapResponse,
+  DictionaryOptionsResponse,
+} from './dictionaries/dictionaries.types'
 
 export interface LoginCredentials {
   usernameOrEmail: string
@@ -18,6 +23,95 @@ export interface ListResponse<TItem> {
   total: number
   page: number
   pageSize: number
+}
+
+interface DictionaryTypeListQuery {
+  page: number
+  pageSize: number
+  search?: string
+  sort?: string
+  status?: DictionaryStatus
+  isSystem?: boolean
+}
+
+interface DictionaryTypeRecord {
+  id: string
+  code: string
+  name: string
+  status: DictionaryStatus
+  isSystem: boolean
+  description?: string
+  createdAt: string
+  updatedAt: string
+}
+
+type DictionaryTypeListResponse = ListResponse<DictionaryTypeRecord>
+type DictionaryStatus = 'ACTIVE' | 'DISABLED'
+
+interface CreateDictionaryTypeRequest {
+  code: string
+  name: string
+  status?: DictionaryStatus
+  description?: string
+}
+
+interface UpdateDictionaryTypeRequest {
+  name?: string
+  status?: DictionaryStatus
+  description?: string
+}
+
+interface DictionaryItemListQuery {
+  page: number
+  pageSize: number
+  search?: string
+  sort?: string
+  typeId?: string
+  typeCode?: string
+  status?: DictionaryStatus
+  isDefault?: boolean
+}
+
+interface DictionaryItemRecord {
+  id: string
+  typeId: string
+  typeCode: string
+  typeName: string
+  value: string
+  label: string
+  sortOrder: number
+  status: DictionaryStatus
+  isSystem: boolean
+  isDefault: boolean
+  badgeVariant?: DictionaryBadgeVariant
+  metadata?: Record<string, unknown>
+  description?: string
+  createdAt: string
+  updatedAt: string
+}
+
+type DictionaryItemListResponse = ListResponse<DictionaryItemRecord>
+
+interface CreateDictionaryItemRequest {
+  typeId: string
+  value: string
+  label: string
+  sortOrder?: number
+  status?: DictionaryStatus
+  isDefault?: boolean
+  badgeVariant?: DictionaryBadgeVariant
+  metadata?: Record<string, unknown>
+  description?: string
+}
+
+interface UpdateDictionaryItemRequest {
+  label?: string
+  sortOrder?: number
+  status?: DictionaryStatus
+  isDefault?: boolean
+  badgeVariant?: DictionaryBadgeVariant
+  metadata?: Record<string, unknown>
+  description?: string
 }
 
 interface RequestConfig {
@@ -182,6 +276,176 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
         return request(() =>
           client.delete!<void>(`/users/${id}`, authenticatedConfig()),
         )
+      },
+    },
+
+    dictionaries: {
+      async options(typeCode: string): Promise<DictionaryOptionsResponse> {
+        if (!client.get) {
+          throw new Error('HTTP get client is not configured')
+        }
+        return request(() =>
+          client.get!<DictionaryOptionsResponse>(
+            `/dictionaries/${typeCode}/options`,
+            authenticatedConfig(),
+          ),
+        )
+      },
+
+      async optionsMap(
+        typeCodes: string[],
+      ): Promise<DictionaryOptionsMapResponse> {
+        if (!client.get) {
+          throw new Error('HTTP get client is not configured')
+        }
+        return request(() =>
+          client.get!<DictionaryOptionsMapResponse>(
+            '/dictionaries/options',
+            authenticatedConfig(undefined, { types: typeCodes.join(',') }),
+          ),
+        )
+      },
+
+      types: {
+        async list(
+          query: DictionaryTypeListQuery,
+        ): Promise<DictionaryTypeListResponse> {
+          if (!client.get) {
+            throw new Error('HTTP get client is not configured')
+          }
+          return request(() =>
+            client.get!<DictionaryTypeListResponse>(
+              '/dictionary-types',
+              authenticatedConfig(undefined, query),
+            ),
+          )
+        },
+
+        async get(id: string): Promise<DictionaryTypeRecord> {
+          if (!client.get) {
+            throw new Error('HTTP get client is not configured')
+          }
+          return request(() =>
+            client.get!<DictionaryTypeRecord>(
+              `/dictionary-types/${id}`,
+              authenticatedConfig(),
+            ),
+          )
+        },
+
+        async create(
+          payload: CreateDictionaryTypeRequest,
+        ): Promise<DictionaryTypeRecord> {
+          if (!client.post) {
+            throw new Error('HTTP post client is not configured')
+          }
+          return request(() =>
+            client.post!<DictionaryTypeRecord>(
+              '/dictionary-types',
+              payload,
+              authenticatedConfig(),
+            ),
+          )
+        },
+
+        async update(
+          id: string,
+          payload: UpdateDictionaryTypeRequest,
+        ): Promise<DictionaryTypeRecord> {
+          if (!client.patch) {
+            throw new Error('HTTP patch client is not configured')
+          }
+          return request(() =>
+            client.patch!<DictionaryTypeRecord>(
+              `/dictionary-types/${id}`,
+              payload,
+              authenticatedConfig(),
+            ),
+          )
+        },
+
+        async delete(id: string): Promise<void> {
+          if (!client.delete) {
+            throw new Error('HTTP delete client is not configured')
+          }
+          return request(() =>
+            client.delete!<void>(
+              `/dictionary-types/${id}`,
+              authenticatedConfig(),
+            ),
+          )
+        },
+      },
+
+      items: {
+        async list(
+          query: DictionaryItemListQuery,
+        ): Promise<DictionaryItemListResponse> {
+          if (!client.get) {
+            throw new Error('HTTP get client is not configured')
+          }
+          return request(() =>
+            client.get!<DictionaryItemListResponse>(
+              '/dictionary-items',
+              authenticatedConfig(undefined, query),
+            ),
+          )
+        },
+
+        async get(id: string): Promise<DictionaryItemRecord> {
+          if (!client.get) {
+            throw new Error('HTTP get client is not configured')
+          }
+          return request(() =>
+            client.get!<DictionaryItemRecord>(
+              `/dictionary-items/${id}`,
+              authenticatedConfig(),
+            ),
+          )
+        },
+
+        async create(
+          payload: CreateDictionaryItemRequest,
+        ): Promise<DictionaryItemRecord> {
+          if (!client.post) {
+            throw new Error('HTTP post client is not configured')
+          }
+          return request(() =>
+            client.post!<DictionaryItemRecord>(
+              '/dictionary-items',
+              payload,
+              authenticatedConfig(),
+            ),
+          )
+        },
+
+        async update(
+          id: string,
+          payload: UpdateDictionaryItemRequest,
+        ): Promise<DictionaryItemRecord> {
+          if (!client.patch) {
+            throw new Error('HTTP patch client is not configured')
+          }
+          return request(() =>
+            client.patch!<DictionaryItemRecord>(
+              `/dictionary-items/${id}`,
+              payload,
+              authenticatedConfig(),
+            ),
+          )
+        },
+
+        async delete(id: string): Promise<void> {
+          if (!client.delete) {
+            throw new Error('HTTP delete client is not configured')
+          }
+          return request(() =>
+            client.delete!<void>(
+              `/dictionary-items/${id}`,
+              authenticatedConfig(),
+            ),
+          )
+        },
       },
     },
   }
