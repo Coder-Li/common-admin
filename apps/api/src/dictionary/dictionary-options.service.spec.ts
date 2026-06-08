@@ -21,7 +21,14 @@ describe('DictionaryOptionsQueryDto', () => {
     ['missing types', {}],
     ['empty entry', { types: 'user_role,,common_status' }],
     ['invalid code', { types: 'User Role' }],
-    ['more than 30 codes', { types: Array.from({ length: 31 }, (_, index) => `code_${index}`).join(',') }],
+    [
+      'more than 30 codes',
+      {
+        types: Array.from({ length: 31 }, (_, index) => `code_${index}`).join(
+          ',',
+        ),
+      },
+    ],
   ])('rejects %s', async (_name, query) => {
     await expect(transformQuery(query)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -134,6 +141,16 @@ describe('DictionaryOptionsService', () => {
     return { prisma, service };
   };
 
+  function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
+    const firstCall = mock.mock.calls[0];
+
+    if (!firstCall) {
+      throw new Error('Expected mock to have been called');
+    }
+
+    return firstCall[0] as TArg;
+  }
+
   it('returns an empty item list for unknown, disabled, or empty types', async () => {
     const { prisma, service } = createService();
     prisma.dictionaryType.findFirst.mockResolvedValueOnce(null);
@@ -241,14 +258,16 @@ describe('DictionaryOptionsService', () => {
 
     await service.getOptions('user_role');
 
-    expect(prisma.dictionaryType.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        include: {
-          items: expect.objectContaining({
-            orderBy: [{ sortOrder: 'asc' }, { value: 'asc' }],
-          }),
-        },
-      }),
-    );
+    const query = firstMockArg<{
+      include: {
+        items: {
+          orderBy: Array<Record<string, string>>;
+        };
+      };
+    }>(prisma.dictionaryType.findFirst);
+    expect(query.include.items.orderBy).toEqual([
+      { sortOrder: 'asc' },
+      { value: 'asc' },
+    ]);
   });
 });

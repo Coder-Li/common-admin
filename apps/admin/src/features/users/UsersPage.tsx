@@ -14,6 +14,11 @@ import type {
 } from '../../components/data-table/DataTable'
 import { useI18n } from '../../i18n/useI18n'
 import { useServerTableQuery } from '../../lib/crud/useServerTableQuery'
+import {
+  getDictionaryLabel,
+  mergeRoleFallbackOptions,
+} from '../../lib/dictionaries/dictionary-label'
+import { useDictionary } from '../../lib/dictionaries/useDictionary'
 import { UserForm } from './UserForm'
 import {
   createUser,
@@ -63,6 +68,23 @@ export function UsersPage() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [formState, setFormState] = useState<FormState>(null)
   const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null)
+  const roleDictionary = useDictionary('user_role')
+
+  const roleFallbackLabels = useMemo(
+    () => ({
+      ADMIN: t('users.role.admin'),
+      STANDARD: t('users.role.standard'),
+    }),
+    [t],
+  )
+  const roleOptions = useMemo(
+    () =>
+      mergeRoleFallbackOptions(
+        roleDictionary.options,
+        roleFallbackLabels,
+      ),
+    [roleDictionary.options, roleFallbackLabels],
+  )
 
   const usersQuery = useServerTableQuery<UserRecord, { role?: Role }, UserListQuery>({
     resource: 'users',
@@ -128,10 +150,7 @@ export function UsersPage() {
           email: t('users.column.email'),
           fullName: t('users.column.fullName'),
           role: t('users.column.role'),
-          roles: {
-            ADMIN: t('users.role.admin'),
-            STANDARD: t('users.role.standard'),
-          },
+          formatRole: (role) => getDictionaryLabel(roleOptions, role, role),
           username: t('users.column.username'),
         },
         {
@@ -139,7 +158,7 @@ export function UsersPage() {
           onEdit: (user) => setFormState({ mode: 'edit', user }),
         },
       ),
-    [t],
+    [roleOptions, t],
   )
 
   const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {
@@ -241,8 +260,11 @@ export function UsersPage() {
                   <option value={allRoleFilter}>
                     {t('users.filter.allRoles')}
                   </option>
-                  <option value="ADMIN">{t('users.role.admin')}</option>
-                  <option value="STANDARD">{t('users.role.standard')}</option>
+                  {roleOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </label>
             }
@@ -275,6 +297,7 @@ export function UsersPage() {
                 createMutation.isPending || updateMutation.isPending
               }
               mode={formState.mode}
+              roleOptions={roleOptions}
               onCancel={() => setFormState(null)}
               onSubmit={handleSubmit}
             />

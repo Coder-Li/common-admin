@@ -9,7 +9,7 @@ export const DICTIONARY_CODE_PATTERN = /^[a-z0-9_]{2,80}$/;
 
 export function transformOptionalBoolean({
   value,
-}: TransformFnParams): boolean | unknown {
+}: TransformFnParams): unknown {
   if (value === true || value === false || value === undefined) {
     return value;
   }
@@ -27,7 +27,7 @@ export function transformOptionalBoolean({
 
 export function transformDictionaryTypes({
   value,
-}: TransformFnParams): string[] | unknown {
+}: TransformFnParams): unknown {
   if (typeof value !== 'string') {
     return value;
   }
@@ -45,11 +45,15 @@ export function IsPlainRecord(validationOptions?: ValidationOptions) {
       options: validationOptions,
       validator: {
         validate(value: unknown) {
-          if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+          if (
+            value === null ||
+            typeof value !== 'object' ||
+            Array.isArray(value)
+          ) {
             return false;
           }
 
-          const prototype = Object.getPrototypeOf(value);
+          const prototype: unknown = Object.getPrototypeOf(value);
 
           return prototype === Object.prototype || prototype === null;
         },

@@ -47,18 +47,18 @@ describe('DictionaryItemListQueryDto', () => {
       isDefault: false,
     });
 
-    await expect(transformQuery({ typeId: 'not-a-uuid' })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    await expect(transformQuery({ typeCode: 'User Role' })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      transformQuery({ typeId: 'not-a-uuid' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      transformQuery({ typeCode: 'User Role' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
     await expect(transformQuery({ status: 'ARCHIVED' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
-    await expect(transformQuery({ isDefault: 'sometimes' })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      transformQuery({ isDefault: 'sometimes' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects disallowed sort fields and accepts allowed sort fields', async () => {
@@ -66,13 +66,28 @@ describe('DictionaryItemListQueryDto', () => {
       BadRequestException,
     );
 
-    await expect(transformQuery({ sort: 'sortOrder:asc' })).resolves.toMatchObject({
+    await expect(
+      transformQuery({ sort: 'sortOrder:asc' }),
+    ).resolves.toMatchObject({
       sort: 'sortOrder:asc',
     });
   });
 });
 
 describe('DictionaryItemController', () => {
+  function controllerMethod(name: keyof DictionaryItemController) {
+    const descriptor = Object.getOwnPropertyDescriptor(
+      DictionaryItemController.prototype,
+      name,
+    );
+
+    if (!descriptor?.value) {
+      throw new Error(`Expected ${String(name)} controller method`);
+    }
+
+    return descriptor.value as unknown;
+  }
+
   it('delegates delete requests, uses 204, and requires admin role', async () => {
     const service = {
       deleteItem: jest.fn().mockResolvedValue(undefined),
@@ -83,29 +98,29 @@ describe('DictionaryItemController', () => {
 
     expect(service.deleteItem).toHaveBeenCalledWith('item-1');
     expect(
-      Reflect.getMetadata(HTTP_CODE_METADATA, controller.deleteItem),
+      Reflect.getMetadata(HTTP_CODE_METADATA, controllerMethod('deleteItem')),
     ).toBe(204);
-    expect(Reflect.getMetadata(ROLES_KEY, controller.deleteItem)).toEqual([
-      Role.ADMIN,
-    ]);
+    expect(
+      Reflect.getMetadata(ROLES_KEY, controllerMethod('deleteItem')),
+    ).toEqual([Role.ADMIN]);
   });
 
   it('requires admin role on every management method', () => {
-    expect(Reflect.getMetadata(ROLES_KEY, DictionaryItemController.prototype.listItems)).toEqual([
-      Role.ADMIN,
-    ]);
-    expect(Reflect.getMetadata(ROLES_KEY, DictionaryItemController.prototype.getItem)).toEqual([
-      Role.ADMIN,
-    ]);
-    expect(Reflect.getMetadata(ROLES_KEY, DictionaryItemController.prototype.createItem)).toEqual([
-      Role.ADMIN,
-    ]);
-    expect(Reflect.getMetadata(ROLES_KEY, DictionaryItemController.prototype.updateItem)).toEqual([
-      Role.ADMIN,
-    ]);
-    expect(Reflect.getMetadata(ROLES_KEY, DictionaryItemController.prototype.deleteItem)).toEqual([
-      Role.ADMIN,
-    ]);
+    expect(
+      Reflect.getMetadata(ROLES_KEY, controllerMethod('listItems')),
+    ).toEqual([Role.ADMIN]);
+    expect(Reflect.getMetadata(ROLES_KEY, controllerMethod('getItem'))).toEqual(
+      [Role.ADMIN],
+    );
+    expect(
+      Reflect.getMetadata(ROLES_KEY, controllerMethod('createItem')),
+    ).toEqual([Role.ADMIN]);
+    expect(
+      Reflect.getMetadata(ROLES_KEY, controllerMethod('updateItem')),
+    ).toEqual([Role.ADMIN]);
+    expect(
+      Reflect.getMetadata(ROLES_KEY, controllerMethod('deleteItem')),
+    ).toEqual([Role.ADMIN]);
   });
 });
 
@@ -118,8 +133,9 @@ describe('CreateDictionaryItemDto', () => {
 
   const transformBody = (
     body: Record<string, unknown>,
-    metatype: typeof CreateDictionaryItemDto | typeof UpdateDictionaryItemDto =
-      CreateDictionaryItemDto,
+    metatype:
+      | typeof CreateDictionaryItemDto
+      | typeof UpdateDictionaryItemDto = CreateDictionaryItemDto,
   ) =>
     pipe.transform(body, {
       type: 'body',
@@ -137,9 +153,9 @@ describe('CreateDictionaryItemDto', () => {
     ['array', ['red']],
     ['null', null],
   ])('rejects %s metadata', async (_name, metadata) => {
-    await expect(transformBody({ ...validBody, metadata })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      transformBody({ ...validBody, metadata }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('accepts plain object metadata', async () => {
@@ -152,14 +168,20 @@ describe('CreateDictionaryItemDto', () => {
 
   it.each([
     ['Date', new Date('2026-06-08T00:00:00.000Z')],
-    ['class instance', new (class BadgeMetadata {
-      tone = 'critical';
-    })()],
-  ])('rejects %s metadata because it is not a plain object', async (_name, metadata) => {
-    await expect(transformBody({ ...validBody, metadata })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-  });
+    [
+      'class instance',
+      new (class BadgeMetadata {
+        tone = 'critical';
+      })(),
+    ],
+  ])(
+    'rejects %s metadata because it is not a plain object',
+    async (_name, metadata) => {
+      await expect(
+        transformBody({ ...validBody, metadata }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    },
+  );
 
   it('validates badgeVariant', async () => {
     await expect(
@@ -179,7 +201,10 @@ describe('CreateDictionaryItemDto', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     await expect(
-      transformBody({ label: 'Admin', isSystem: false }, UpdateDictionaryItemDto),
+      transformBody(
+        { label: 'Admin', isSystem: false },
+        UpdateDictionaryItemDto,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
@@ -396,9 +421,9 @@ describe('DictionaryItemService', () => {
       const findManyWhere = firstMockArg<{
         where: Prisma.DictionaryItemWhereInput;
       }>(prisma.dictionaryItem.findMany).where;
-      const countWhere = firstMockArg<{ where: Prisma.DictionaryItemWhereInput }>(
-        prisma.dictionaryItem.count,
-      ).where;
+      const countWhere = firstMockArg<{
+        where: Prisma.DictionaryItemWhereInput;
+      }>(prisma.dictionaryItem.count).where;
 
       expect(findManyWhere).toBe(countWhere);
       expect(prisma.dictionaryItem.count).toHaveBeenCalledWith({
@@ -413,7 +438,11 @@ describe('DictionaryItemService', () => {
         service.listItems({ page: 1, pageSize: 20, sort: 'typeId:asc' }),
       ).rejects.toBeInstanceOf(BadRequestException);
       await expect(
-        service.listItems({ page: 1, pageSize: 20, sort: 'sortOrder:sideways' }),
+        service.listItems({
+          page: 1,
+          pageSize: 20,
+          sort: 'sortOrder:sideways',
+        }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
@@ -465,7 +494,9 @@ describe('DictionaryItemService', () => {
       const { prisma, service } = createService();
       const createdItem = makeItem({ isDefault: true });
       prisma.dictionaryType.findUnique.mockResolvedValue(makeType());
-      prisma.dictionaryItem.updateMany.mockReturnValue({ op: 'clear-defaults' });
+      prisma.dictionaryItem.updateMany.mockReturnValue({
+        op: 'clear-defaults',
+      });
       prisma.dictionaryItem.create.mockReturnValue(createdItem);
       prisma.$transaction.mockResolvedValue([{ count: 1 }, createdItem]);
 
@@ -480,13 +511,17 @@ describe('DictionaryItemService', () => {
         where: { typeId: 'type-1', isDefault: true },
         data: { isDefault: false },
       });
-      expect(prisma.dictionaryItem.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          typeId: 'type-1',
-          value: Role.ADMIN,
-          label: 'Admin',
-          isDefault: true,
-        }),
+      const createArg = firstMockArg<{
+        data: Record<string, unknown>;
+        include: { type: true };
+      }>(prisma.dictionaryItem.create);
+      expect(createArg.data).toMatchObject({
+        typeId: 'type-1',
+        value: Role.ADMIN,
+        label: 'Admin',
+        isDefault: true,
+      });
+      expect(createArg).toMatchObject({
         include: { type: true },
       });
       expect(prisma.$transaction).toHaveBeenCalledWith([
@@ -499,7 +534,9 @@ describe('DictionaryItemService', () => {
   describe('updateItem', () => {
     it('rejects disabling a system item', async () => {
       const { prisma, service } = createService();
-      prisma.dictionaryItem.findUnique.mockResolvedValue(makeItem({ isSystem: true }));
+      prisma.dictionaryItem.findUnique.mockResolvedValue(
+        makeItem({ isSystem: true }),
+      );
 
       await expect(
         service.updateItem('item-1', { status: DictionaryStatus.DISABLED }),
@@ -571,7 +608,9 @@ describe('DictionaryItemService', () => {
       const existingItem = makeItem({ isDefault: false });
       const updatedItem = makeItem({ isDefault: true });
       prisma.dictionaryItem.findUnique.mockResolvedValue(existingItem);
-      prisma.dictionaryItem.updateMany.mockReturnValue({ op: 'clear-defaults' });
+      prisma.dictionaryItem.updateMany.mockReturnValue({
+        op: 'clear-defaults',
+      });
       prisma.dictionaryItem.update.mockReturnValue(updatedItem);
       prisma.$transaction.mockResolvedValue([{ count: 1 }, updatedItem]);
 
@@ -591,16 +630,18 @@ describe('DictionaryItemService', () => {
       const { prisma, service } = createService();
       prisma.dictionaryItem.findUnique.mockResolvedValue(null);
 
-      await expect(service.updateItem('missing-item', { label: 'Missing' })).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.updateItem('missing-item', { label: 'Missing' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
   describe('deleteItem', () => {
     it('rejects deleting a system item', async () => {
       const { prisma, service } = createService();
-      prisma.dictionaryItem.findUnique.mockResolvedValue(makeItem({ isSystem: true }));
+      prisma.dictionaryItem.findUnique.mockResolvedValue(
+        makeItem({ isSystem: true }),
+      );
 
       await expect(service.deleteItem('item-1')).rejects.toBeInstanceOf(
         ConflictException,
@@ -609,7 +650,9 @@ describe('DictionaryItemService', () => {
 
     it('maps missing item to NotFoundException', async () => {
       const { prisma, service } = createService();
-      prisma.dictionaryItem.findUnique.mockResolvedValue(makeItem({ isSystem: false }));
+      prisma.dictionaryItem.findUnique.mockResolvedValue(
+        makeItem({ isSystem: false }),
+      );
       prisma.dictionaryItem.delete.mockRejectedValue(notFoundError());
 
       await expect(service.deleteItem('missing-item')).rejects.toBeInstanceOf(

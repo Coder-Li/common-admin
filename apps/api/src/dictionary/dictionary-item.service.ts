@@ -102,7 +102,9 @@ export class DictionaryItemService {
       ...(dto.metadata !== undefined
         ? { metadata: dto.metadata as Prisma.InputJsonValue }
         : {}),
-      ...(dto.description !== undefined ? { description: dto.description } : {}),
+      ...(dto.description !== undefined
+        ? { description: dto.description }
+        : {}),
     };
 
     try {
@@ -164,7 +166,9 @@ export class DictionaryItemService {
       ...(dto.metadata !== undefined
         ? { metadata: dto.metadata as Prisma.InputJsonValue }
         : {}),
-      ...(dto.description !== undefined ? { description: dto.description } : {}),
+      ...(dto.description !== undefined
+        ? { description: dto.description }
+        : {}),
     };
 
     try {

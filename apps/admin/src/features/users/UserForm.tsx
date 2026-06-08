@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { useI18n } from '../../i18n/useI18n'
+import type { RoleDictionaryOption } from '../../lib/dictionaries/dictionary-label'
 import type {
   CreateUserRequest,
   Role,
@@ -17,6 +18,7 @@ interface UserFormProps {
   mode: 'create' | 'edit'
   initialValue?: UserRecord
   isSubmitting: boolean
+  roleOptions: RoleDictionaryOption[]
   onSubmit: (value: CreateUserRequest | UpdateUserRequest) => void
   onCancel: () => void
 }
@@ -34,6 +36,7 @@ export function UserForm({
   mode,
   initialValue,
   isSubmitting,
+  roleOptions,
   onSubmit,
   onCancel,
 }: UserFormProps) {
@@ -171,8 +174,11 @@ export function UserForm({
             className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
             {...register('role')}
           >
-            <option value="STANDARD">{t('users.role.standard')}</option>
-            <option value="ADMIN">{t('users.role.admin')}</option>
+            {roleOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </Field>
       </div>

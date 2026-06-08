@@ -157,11 +157,7 @@ export class DictionaryTypeService {
         mode: 'insensitive' as const,
       };
 
-      where.OR = [
-        { code: search },
-        { name: search },
-        { description: search },
-      ];
+      where.OR = [{ code: search }, { name: search }, { description: search }];
     }
 
     return where;

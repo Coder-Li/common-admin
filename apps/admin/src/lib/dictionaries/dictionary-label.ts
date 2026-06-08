@@ -5,6 +5,7 @@ const roleValues = ['ADMIN', 'STANDARD'] as const satisfies readonly Role[]
 const roleValueSet = new Set<string>(roleValues)
 
 export type RoleFallbackLabels = Record<Role, string>
+export type RoleDictionaryOption = DictionaryOption & { value: Role }
 
 export function getDictionaryOption(
   options: DictionaryOption[],
@@ -22,7 +23,7 @@ export function getDictionaryLabel(
 }
 
 export function filterRoleOptions(options: DictionaryOption[]) {
-  return options.filter((option): option is DictionaryOption & { value: Role } =>
+  return options.filter((option): option is RoleDictionaryOption =>
     roleValueSet.has(option.value),
   )
 }
@@ -30,12 +31,12 @@ export function filterRoleOptions(options: DictionaryOption[]) {
 export function mergeRoleFallbackOptions(
   options: DictionaryOption[],
   fallbackLabels: RoleFallbackLabels,
-) {
+): RoleDictionaryOption[] {
   const filteredOptions = filterRoleOptions(options)
   const existingValues = new Set(filteredOptions.map((option) => option.value))
   const fallbackOptions = roleValues
     .filter((role) => !existingValues.has(role))
-    .map((role): DictionaryOption => ({
+    .map((role): RoleDictionaryOption => ({
       value: role,
       label: fallbackLabels[role],
       isDefault: false,

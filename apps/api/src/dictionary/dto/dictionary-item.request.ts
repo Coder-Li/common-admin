@@ -60,10 +60,13 @@ export class DictionaryItemListQueryDto extends ListQueryDto {
   })
   @IsOptional()
   @IsString()
-  @Matches(new RegExp(`^(${DICTIONARY_ITEM_SORT_FIELDS.join('|')}):(asc|desc)$`), {
-    message:
-      'sort must use an allowed dictionary item field and asc or desc direction',
-  })
+  @Matches(
+    new RegExp(`^(${DICTIONARY_ITEM_SORT_FIELDS.join('|')}):(asc|desc)$`),
+    {
+      message:
+        'sort must use an allowed dictionary item field and asc or desc direction',
+    },
+  )
   declare sort?: string;
 }
 

@@ -102,7 +102,10 @@ describe('CreateDictionaryTypeDto', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     await expect(
-      transformBody({ name: 'Common status', isSystem: false }, UpdateDictionaryTypeDto),
+      transformBody(
+        { name: 'Common status', isSystem: false },
+        UpdateDictionaryTypeDto,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
@@ -338,10 +341,12 @@ describe('DictionaryTypeService', () => {
         firstMockArg<{ data: Record<string, unknown> }>(
           prisma.dictionaryType.update,
         ).data,
-      ).not.toMatchObject({
-        code: expect.anything(),
-        isSystem: expect.anything(),
-      });
+      ).not.toHaveProperty('code');
+      expect(
+        firstMockArg<{ data: Record<string, unknown> }>(
+          prisma.dictionaryType.update,
+        ).data,
+      ).not.toHaveProperty('isSystem');
     });
   });
 
@@ -416,6 +421,19 @@ describe('DictionaryTypeService', () => {
 });
 
 describe('DictionaryTypeController', () => {
+  function controllerMethod(name: keyof DictionaryTypeController) {
+    const descriptor = Object.getOwnPropertyDescriptor(
+      DictionaryTypeController.prototype,
+      name,
+    );
+
+    if (!descriptor?.value) {
+      throw new Error(`Expected ${String(name)} controller method`);
+    }
+
+    return descriptor.value as unknown;
+  }
+
   it('uses 204 status for successful delete responses', async () => {
     const service = {
       deleteType: jest.fn().mockResolvedValue(undefined),
@@ -426,7 +444,7 @@ describe('DictionaryTypeController', () => {
 
     expect(service.deleteType).toHaveBeenCalledWith('type-1');
     expect(
-      Reflect.getMetadata(HTTP_CODE_METADATA, controller.deleteType),
+      Reflect.getMetadata(HTTP_CODE_METADATA, controllerMethod('deleteType')),
     ).toBe(204);
   });
 });

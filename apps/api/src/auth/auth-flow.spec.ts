@@ -88,7 +88,9 @@ function dictionaryTypeListBody(
   return response.body as DictionaryTypeListResponseBody;
 }
 
-function dictionaryOptionsBody(response: Response): DictionaryOptionsResponseBody {
+function dictionaryOptionsBody(
+  response: Response,
+): DictionaryOptionsResponseBody {
   return response.body as DictionaryOptionsResponseBody;
 }
 

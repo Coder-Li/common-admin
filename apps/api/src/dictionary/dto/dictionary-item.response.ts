@@ -49,9 +49,7 @@ export class DictionaryItemResponseDto {
   updatedAt!: string;
 }
 
-export class DictionaryItemListResponseDto
-  implements ListResponse<DictionaryItemResponseDto>
-{
+export class DictionaryItemListResponseDto implements ListResponse<DictionaryItemResponseDto> {
   @ApiProperty({ type: [DictionaryItemResponseDto] })
   items!: DictionaryItemResponseDto[];
 

@@ -84,7 +84,9 @@ export class DictionaryItemController {
 
   @ApiNoContentResponse({ description: 'Dictionary item deleted' })
   @ApiForbiddenResponse({ description: 'Admin role required' })
-  @ApiConflictResponse({ description: 'System dictionary item cannot be deleted' })
+  @ApiConflictResponse({
+    description: 'System dictionary item cannot be deleted',
+  })
   @ApiNotFoundResponse({ description: 'Dictionary item not found' })
   @Roles(Role.ADMIN)
   @HttpCode(204)

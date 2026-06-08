@@ -10,7 +10,7 @@ export interface UserColumnLabels {
   actions: string
   edit: string
   delete: string
-  roles: Record<Role, string>
+  formatRole: (role: Role) => string
 }
 
 export interface UserRowActions {
@@ -62,7 +62,7 @@ export function createUserColumns(
     {
       accessorKey: 'role',
       header: labels.role,
-      cell: ({ row }) => labels.roles[row.original.role],
+      cell: ({ row }) => labels.formatRole(row.original.role),
       size: 120,
     },
     {
