@@ -5,12 +5,50 @@
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   color-scheme: light;
-  background: #f1f5f9;
-  color: #020617;
+  --color-app: #f1f5f9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-surface-hover: #f1f5f9;
+  --color-surface-elevated: #ffffff;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-text: #020617;
+  --color-text-muted: #64748b;
+  --color-text-subtle: #94a3b8;
+  --color-accent: #0891b2;
+  --color-accent-hover: #0e7490;
+  --color-accent-soft: #cffafe;
+  --color-accent-foreground: #ffffff;
+  --color-danger: #dc2626;
+  --color-danger-muted: #fff1f2;
+  --color-overlay: rgb(15 23 42 / 40%);
+  background: var(--color-app);
+  color: var(--color-text);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-app: #0f172a;
+  --color-surface: #111827;
+  --color-surface-muted: #1e293b;
+  --color-surface-hover: #273449;
+  --color-surface-elevated: #172033;
+  --color-border: #334155;
+  --color-border-strong: #475569;
+  --color-text: #f8fafc;
+  --color-text-muted: #cbd5e1;
+  --color-text-subtle: #94a3b8;
+  --color-accent: #22d3ee;
+  --color-accent-hover: #67e8f9;
+  --color-accent-soft: #164e63;
+  --color-accent-foreground: #082f49;
+  --color-danger: #fb7185;
+  --color-danger-muted: #4c0519;
+  --color-overlay: rgb(2 6 23 / 70%);
 }
 
 * {
@@ -21,6 +59,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: var(--color-app);
+  color: var(--color-text);
 }
 
 button,
@@ -31,4 +71,130 @@ input {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+:root[data-theme='dark'] .bg-white {
+  background-color: var(--color-surface);
+}
+
+:root[data-theme='dark'] .bg-slate-50,
+:root[data-theme='dark'] .bg-slate-100 {
+  background-color: var(--color-surface-muted);
+}
+
+:root[data-theme='dark'] .bg-slate-900,
+:root[data-theme='dark'] .bg-slate-950 {
+  background-color: var(--color-surface-elevated);
+}
+
+:root[data-theme='dark'] .bg-cyan-400,
+:root[data-theme='dark'] .bg-cyan-500,
+:root[data-theme='dark'] .bg-cyan-600 {
+  background-color: var(--color-accent);
+}
+
+:root[data-theme='dark'] .bg-rose-50 {
+  background-color: var(--color-danger-muted);
+}
+
+:root[data-theme='dark'] .bg-rose-600,
+:root[data-theme='dark'] .bg-rose-700 {
+  background-color: var(--color-danger);
+}
+
+:root[data-theme='dark'] .bg-slate-950\/40 {
+  background-color: var(--color-overlay);
+}
+
+:root[data-theme='dark'] .bg-white\/15 {
+  background-color: rgb(255 255 255 / 12%);
+}
+
+:root[data-theme='dark'] .border-slate-200,
+:root[data-theme='dark'] .border-slate-300,
+:root[data-theme='dark'] .border-slate-700,
+:root[data-theme='dark'] .border-slate-800 {
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .border-rose-200 {
+  border-color: rgb(251 113 133 / 45%);
+}
+
+:root[data-theme='dark'] .divide-slate-100 > :not(:last-child) {
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .text-slate-950,
+:root[data-theme='dark'] .text-slate-900,
+:root[data-theme='dark'] .text-slate-700 {
+  color: var(--color-text);
+}
+
+:root[data-theme='dark'] .text-slate-600,
+:root[data-theme='dark'] .text-slate-500,
+:root[data-theme='dark'] .text-slate-400,
+:root[data-theme='dark'] .text-slate-300 {
+  color: var(--color-text-muted);
+}
+
+:root[data-theme='dark'] .text-white {
+  color: var(--color-accent-foreground);
+}
+
+:root[data-theme='dark'] .text-cyan-50 {
+  color: var(--color-accent-foreground);
+}
+
+:root[data-theme='dark'] .text-rose-600,
+:root[data-theme='dark'] .text-rose-700 {
+  color: var(--color-danger);
+}
+
+:root[data-theme='dark'] .placeholder\:text-slate-400::placeholder {
+  color: var(--color-text-subtle);
+}
+
+:root[data-theme='dark'] .disabled\:text-slate-300:disabled {
+  color: var(--color-text-subtle);
+}
+
+:root[data-theme='dark'] .disabled\:bg-slate-100:disabled {
+  background-color: var(--color-surface-muted);
+}
+
+:root[data-theme='dark'] .hover\:bg-slate-100:hover,
+:root[data-theme='dark'] .hover\:bg-slate-200:hover,
+:root[data-theme='dark'] .hover\:bg-slate-50:hover {
+  background-color: var(--color-surface-hover);
+}
+
+:root[data-theme='dark'] .hover\:bg-cyan-300:hover,
+:root[data-theme='dark'] .hover\:bg-cyan-600:hover {
+  background-color: var(--color-accent-hover);
+}
+
+:root[data-theme='dark'] .hover\:bg-rose-50:hover,
+:root[data-theme='dark'] .hover\:bg-rose-700:hover {
+  background-color: var(--color-danger-muted);
+}
+
+:root[data-theme='dark'] .hover\:bg-white\/15:hover {
+  background-color: rgb(255 255 255 / 14%);
+}
+
+:root[data-theme='dark'] .disabled\:hover\:bg-white:disabled:hover {
+  background-color: var(--color-surface);
+}
+
+:root[data-theme='dark'] .hover\:text-slate-950:hover,
+:root[data-theme='dark'] .hover\:text-slate-900:hover,
+:root[data-theme='dark'] .hover\:text-slate-700:hover,
+:root[data-theme='dark'] .hover\:text-slate-100:hover {
+  color: var(--color-text);
+}
+
+:root[data-theme='dark'] .focus\:border-cyan-400:focus,
+:root[data-theme='dark'] .focus\:border-cyan-500:focus {
+  border-color: var(--color-accent);
 }

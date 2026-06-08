@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -177,25 +178,58 @@ describe('DictionariesPage', () => {
     expect(await screen.findByText('No dictionary types found')).toBeInTheDocument()
   })
 
-  it('renders returned dictionary type rows', async () => {
+  it('renders returned dictionary types in a compact list', async () => {
     dictionariesApiMock.listDictionaryTypes.mockResolvedValue(
       typeListResponse([userRoleType, commonStatusType]),
     )
 
     renderDictionariesPage()
 
-    await waitFor(() => {
-      expect(
-        screen.getAllByRole('button', { name: 'Select user_role' }).length,
-      ).toBeGreaterThan(0)
+    const typeList = await screen.findByRole('list', {
+      name: 'Dictionary types',
     })
     expect(
-      screen.getByRole('button', { name: 'Select common_status' }),
+      within(typeList).getByRole('button', { name: 'Select user_role' }),
+    ).toHaveAttribute('aria-current', 'true')
+    expect(
+      within(typeList).getByRole('button', { name: 'Select common_status' }),
     ).toBeInTheDocument()
-    expect(screen.getAllByText('User role').length).toBeGreaterThan(0)
-    expect(screen.getByText('Common status')).toBeInTheDocument()
-    expect(screen.getByText('DISABLED')).toBeInTheDocument()
-    expect(screen.getByText('System')).toBeInTheDocument()
+    expect(within(typeList).getByText('User role')).toBeInTheDocument()
+    expect(within(typeList).getByText('Common status')).toBeInTheDocument()
+    expect(within(typeList).getByText('System')).toBeInTheDocument()
+  })
+
+  it('uses a compact type list with right-click edit and delete actions', async () => {
+    const user = userEvent.setup()
+    dictionariesApiMock.listDictionaryTypes.mockResolvedValue(
+      typeListResponse([userRoleType, commonStatusType]),
+    )
+
+    renderDictionariesPage()
+    const typeList = await screen.findByRole('list', {
+      name: 'Dictionary types',
+    })
+    const commonStatusButton = within(typeList).getByRole('button', {
+      name: 'Select common_status',
+    })
+
+    expect(within(typeList).getByText('User role')).toBeInTheDocument()
+    expect(within(typeList).getByText('user_role')).toBeInTheDocument()
+    expect(within(typeList).getByText('Common status')).toBeInTheDocument()
+    expect(within(typeList).getByText('common_status')).toBeInTheDocument()
+
+    fireEvent.contextMenu(commonStatusButton)
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }))
+
+    expect(screen.getByRole('dialog', { name: 'Edit' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    fireEvent.contextMenu(commonStatusButton)
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }))
+
+    expect(screen.getByRole('dialog', { name: 'Delete type' })).toHaveTextContent(
+      'common_status',
+    )
   })
 
   it('queries items by selected dictionary type and renders item columns', async () => {
@@ -230,7 +264,7 @@ describe('DictionariesPage', () => {
     expect(within(standardRow!).getByText('Default')).toBeInTheDocument()
   })
 
-  it('sends search and supported sort params without sorting by badge variant', async () => {
+  it('sends type search and does not sort items by badge variant', async () => {
     const user = userEvent.setup()
     dictionariesApiMock.listDictionaryTypes.mockResolvedValue(
       typeListResponse([userRoleType]),
@@ -247,20 +281,9 @@ describe('DictionariesPage', () => {
       expect(dictionariesApiMock.listDictionaryTypes).toHaveBeenLastCalledWith(
         expect.objectContaining<DictionaryTypeListQuery>({
           page: 1,
-          pageSize: 20,
+          pageSize: 100,
           search: 'role',
-        }),
-      )
-    })
-
-    await user.click(screen.getAllByRole('button', { name: 'Updated' })[0])
-    await waitFor(() => {
-      expect(dictionariesApiMock.listDictionaryTypes).toHaveBeenLastCalledWith(
-        expect.objectContaining<DictionaryTypeListQuery>({
-          page: 1,
-          pageSize: 20,
-          search: 'role',
-          sort: 'updatedAt:asc',
+          sort: 'updatedAt:desc',
         }),
       )
     })
@@ -335,8 +358,13 @@ describe('DictionariesPage', () => {
 
     renderDictionariesPage()
 
-    await screen.findByRole('button', { name: 'Select user_role' })
+    const typeButton = await screen.findByRole('button', {
+      name: 'Select user_role',
+    })
     await screen.findByText('ADMIN')
+
+    fireEvent.contextMenu(typeButton)
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeDisabled()
 
     screen
       .getAllByRole('button', { name: 'Delete' })
@@ -354,12 +382,12 @@ describe('DictionariesPage', () => {
     })
 
     renderDictionariesPage()
-    await screen.findByRole('button', { name: 'Select common_status' })
+    const typeButton = await screen.findByRole('button', {
+      name: 'Select common_status',
+    })
 
-    const typeRow = screen
-      .getByRole('button', { name: 'Select common_status' })
-      .closest('tr')
-    await user.click(within(typeRow!).getByRole('button', { name: 'Edit' }))
+    fireEvent.contextMenu(typeButton)
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }))
     await user.clear(screen.getByLabelText('Name'))
     await user.type(screen.getByLabelText('Name'), 'Status')
     await user.click(
@@ -415,12 +443,12 @@ describe('DictionariesPage', () => {
     dictionariesApiMock.deleteDictionaryType.mockResolvedValue(undefined)
 
     renderDictionariesPage()
-    await screen.findByRole('button', { name: 'Select common_status' })
-    const typeRow = screen
-      .getByRole('button', { name: 'Select common_status' })
-      .closest('tr')
+    const typeButton = await screen.findByRole('button', {
+      name: 'Select common_status',
+    })
 
-    await user.click(within(typeRow!).getByRole('button', { name: 'Delete' }))
+    fireEvent.contextMenu(typeButton)
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }))
 
     expect(screen.getByRole('dialog', { name: 'Delete type' })).toHaveTextContent(
       'common_status',

@@ -8,6 +8,7 @@ import { LanguageSwitcher } from '../../i18n/LanguageSwitcher'
 import { useI18n } from '../../i18n/useI18n'
 import { navigateTo } from '../../lib/navigation'
 import { useAuthStore } from '../../stores/auth-store'
+import { ThemeSwitcher } from '../../theme/ThemeSwitcher'
 
 export function LoginView() {
   const { t } = useI18n()
@@ -34,40 +35,47 @@ export function LoginView() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-slate-950 px-4 py-10 text-slate-100">
-      <section className="w-full max-w-sm rounded-lg border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-        <div className="mb-4 flex justify-end">
+    <main className="grid min-h-screen place-items-center bg-[var(--color-app)] px-4 py-10 text-[var(--color-text)]">
+      <section className="w-full max-w-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-6 shadow-2xl">
+        <div className="mb-4 flex justify-end gap-2">
+          <ThemeSwitcher />
           <LanguageSwitcher />
         </div>
 
         <div className="mb-6 flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-md bg-cyan-400 text-slate-950">
+          <div className="grid size-10 place-items-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-foreground)]">
             <ShieldCheck size={22} />
           </div>
           <div>
             <h1 className="text-xl font-semibold tracking-normal">
               Common Admin
             </h1>
-            <p className="text-sm text-slate-400">{t('auth.signInSubtitle')}</p>
+            <p className="text-sm text-[var(--color-text-muted)]">
+              {t('auth.signInSubtitle')}
+            </p>
           </div>
         </div>
 
         <form className="grid gap-4" onSubmit={handleSubmit}>
           <label className="grid gap-2 text-sm">
-            <span className="text-slate-300">{t('auth.usernameOrEmail')}</span>
+            <span className="text-[var(--color-text-muted)]">
+              {t('auth.usernameOrEmail')}
+            </span>
             <input
               aria-label={t('auth.usernameOrEmail')}
-              className="h-10 rounded-md border border-slate-700 bg-slate-950 px-3 text-sm outline-none transition focus:border-cyan-400"
+              className="h-10 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-accent)]"
               value={usernameOrEmail}
               onChange={(event) => setUsernameOrEmail(event.target.value)}
             />
           </label>
 
           <label className="grid gap-2 text-sm">
-            <span className="text-slate-300">{t('auth.password')}</span>
+            <span className="text-[var(--color-text-muted)]">
+              {t('auth.password')}
+            </span>
             <input
               aria-label={t('auth.password')}
-              className="h-10 rounded-md border border-slate-700 bg-slate-950 px-3 text-sm outline-none transition focus:border-cyan-400"
+              className="h-10 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-accent)]"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -75,7 +83,7 @@ export function LoginView() {
           </label>
 
           <button
-            className="mt-2 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-cyan-400 px-4 text-sm font-medium text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-70"
+            className="mt-2 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[var(--color-accent)] px-4 text-sm font-medium text-[var(--color-accent-foreground)] transition hover:bg-[var(--color-accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
             disabled={isSubmitting}
             type="submit"
           >

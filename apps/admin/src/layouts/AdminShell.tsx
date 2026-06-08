@@ -10,6 +10,7 @@ import { UsersPage } from '../features/users/UsersPage'
 import { DashboardContent } from '../pages/DashboardContent'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { useAuthStore } from '../stores/auth-store'
+import { ThemeSwitcher } from '../theme/ThemeSwitcher'
 
 interface AdminShellProps {
   currentPath: string
@@ -18,7 +19,9 @@ interface AdminShellProps {
 function navItemClass(isActive: boolean) {
   return [
     'inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition',
-    isActive ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-100',
+    isActive
+      ? 'bg-[var(--color-accent)] text-[var(--color-accent-foreground)]'
+      : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]',
   ].join(' ')
 }
 
@@ -55,15 +58,17 @@ export function AdminShell({ currentPath }: AdminShellProps) {
         : t('nav.dashboard')
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-950">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-200 bg-white px-4 py-5 md:block">
+    <main className="min-h-screen bg-[var(--color-app)] text-[var(--color-text)]">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-5 md:block">
         <div className="flex items-center gap-3">
-          <div className="grid size-9 place-items-center rounded-md bg-cyan-500 text-white">
+          <div className="grid size-9 place-items-center rounded-md bg-[var(--color-accent)] text-[var(--color-accent-foreground)]">
             <Lock size={18} />
           </div>
           <div>
             <p className="font-semibold">Common Admin</p>
-            <p className="text-xs text-slate-500">{t('app.subtitle')}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {t('app.subtitle')}
+            </p>
           </div>
         </div>
 
@@ -108,7 +113,7 @@ export function AdminShell({ currentPath }: AdminShellProps) {
       </aside>
 
       <section className="md:pl-64">
-        <nav className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-5 py-3 md:hidden">
+        <nav className="flex gap-2 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3 md:hidden">
           <button
             className={navItemClass(currentPath === '/dashboard')}
             data-testid="mobile-nav-dashboard"
@@ -147,20 +152,21 @@ export function AdminShell({ currentPath }: AdminShellProps) {
           </button>
         </nav>
 
-        <header className="flex h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5">
+        <header className="flex h-16 items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold">{pageTitle}</h1>
-            <p className="truncate text-xs text-slate-500">
+            <p className="truncate text-xs text-[var(--color-text-muted)]">
               {t('page.apiActive')}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <ThemeSwitcher />
             <LanguageSwitcher
-              className="border-slate-300 bg-white text-slate-600"
+              className="border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-muted)]"
               tone="light"
             />
             <button
-              className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm"
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--color-border-strong)] px-3 text-sm text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
               onClick={signOut}
               type="button"
             >

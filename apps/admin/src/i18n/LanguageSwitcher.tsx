@@ -16,14 +16,14 @@ export function LanguageSwitcher({
   const { locale, setLocale, t } = useI18n()
   const inactiveClass =
     tone === 'dark'
-      ? 'text-slate-400 hover:text-slate-100'
-      : 'text-slate-600 hover:text-slate-950'
+      ? 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
 
   return (
     <div
       aria-label={t('language.label')}
       className={[
-        'inline-flex h-8 shrink-0 items-center rounded-md border border-slate-700 p-0.5 text-xs',
+        'inline-flex h-8 shrink-0 items-center rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-0.5 text-xs',
         className,
       ].join(' ')}
       role="group"
@@ -37,7 +37,7 @@ export function LanguageSwitcher({
             className={[
               'grid h-7 min-w-11 place-items-center rounded px-2 transition',
               isActive
-                ? 'bg-cyan-400 font-medium text-slate-950'
+                ? 'bg-[var(--color-accent)] font-medium text-[var(--color-accent-foreground)]'
                 : inactiveClass,
             ].join(' ')}
             key={option.locale}

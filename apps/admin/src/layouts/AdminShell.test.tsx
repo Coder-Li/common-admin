@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { LOCALE_STORAGE_KEY } from '../i18n/locale-storage'
 import { useAuthStore } from '../stores/auth-store'
+import { ThemeProvider } from '../theme/ThemeProvider'
 import type { UserProfile } from '../types/auth'
 import { AdminShell } from './AdminShell'
 
@@ -50,9 +51,11 @@ function renderAdminShell(currentPath = '/dashboard') {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <I18nProvider>
-        <AdminShell currentPath={currentPath} />
-      </I18nProvider>
+      <ThemeProvider>
+        <I18nProvider>
+          <AdminShell currentPath={currentPath} />
+        </I18nProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   )
 }
@@ -60,6 +63,8 @@ function renderAdminShell(currentPath = '/dashboard') {
 describe('AdminShell i18n', () => {
   afterEach(() => {
     cleanup()
+    document.documentElement.removeAttribute('data-theme')
+    document.documentElement.style.colorScheme = ''
     useAuthStore.getState().reset()
   })
 
@@ -71,6 +76,9 @@ describe('AdminShell i18n', () => {
   it('renders English shell and dashboard copy by default', () => {
     renderAdminShell()
 
+    expect(
+      screen.getByRole('button', { name: 'Switch to dark theme' }),
+    ).toBeInTheDocument()
     expect(screen.getAllByText('Dashboard').length).toBeGreaterThan(0)
     expect(screen.getByText('API connection is active')).toBeInTheDocument()
     expect(screen.getByText('Starter template')).toBeInTheDocument()

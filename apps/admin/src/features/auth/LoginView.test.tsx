@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
 import { LOCALE_STORAGE_KEY } from '../../i18n/locale-storage'
+import { ThemeProvider } from '../../theme/ThemeProvider'
 import { LoginView } from './LoginView'
 
 vi.mock('../../app/api-client', () => ({
@@ -35,15 +36,19 @@ function mockBrowserLanguages(languages: readonly string[]) {
 
 function renderLoginView() {
   return render(
-    <I18nProvider>
-      <LoginView />
-    </I18nProvider>,
+    <ThemeProvider>
+      <I18nProvider>
+        <LoginView />
+      </I18nProvider>
+    </ThemeProvider>,
   )
 }
 
 describe('LoginView i18n', () => {
   afterEach(() => {
     cleanup()
+    document.documentElement.removeAttribute('data-theme')
+    document.documentElement.style.colorScheme = ''
   })
 
   beforeEach(() => {
@@ -54,6 +59,9 @@ describe('LoginView i18n', () => {
   it('renders English copy by default for a non-Chinese browser language', () => {
     renderLoginView()
 
+    expect(
+      screen.getByRole('button', { name: 'Switch to dark theme' }),
+    ).toBeInTheDocument()
     expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
     expect(screen.getByText('Username or email')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
@@ -68,5 +76,14 @@ describe('LoginView i18n', () => {
     expect(screen.getByText('登录后继续')).toBeInTheDocument()
     expect(screen.getByText('用户名或邮箱')).toBeInTheDocument()
     expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('zh-CN')
+  })
+
+  it('toggles the root theme from the login page', async () => {
+    const user = userEvent.setup()
+    renderLoginView()
+
+    await user.click(screen.getByRole('button', { name: 'Switch to dark theme' }))
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
   })
 })

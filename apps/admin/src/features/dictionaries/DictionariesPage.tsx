@@ -1,12 +1,23 @@
 import {
+  useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
 } from 'react'
-import type { ReactNode } from 'react'
+import type {
+  MouseEvent,
+  ReactNode,
+} from 'react'
 import type { OnChangeFn } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import {
+  Check,
+  MoreHorizontal,
+  Plus,
+  RefreshCw,
+  Search,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '../../components/data-table/DataTable'
 import { DataTableToolbar } from '../../components/data-table/DataTableToolbar'
@@ -29,7 +40,6 @@ import {
   updateDictionaryType,
 } from './dictionaries.api'
 import { createDictionaryItemColumns } from './dictionary-item.columns'
-import { createDictionaryTypeColumns } from './dictionary-type.columns'
 import type {
   CreateDictionaryItemRequest,
   CreateDictionaryTypeRequest,
@@ -55,6 +65,12 @@ type DeleteState =
   | { kind: 'type'; record: DictionaryTypeRecord }
   | { kind: 'item'; record: DictionaryItemRecord }
   | null
+
+type TypeContextMenuState = {
+  type: DictionaryTypeRecord
+  x: number
+  y: number
+} | null
 
 function mutationErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : undefined
@@ -85,19 +101,20 @@ export function DictionariesPage() {
   const [typeSearch, setTypeSearch] = useState('')
   const [itemSearch, setItemSearch] = useState('')
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null)
-  const [typePagination, setTypePagination] = useState<PaginationState>({
+  const typePagination: PaginationState = {
     pageIndex: 0,
-    pageSize: 20,
-  })
+    pageSize: 100,
+  }
   const [itemPagination, setItemPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 20,
   })
-  const [typeSorting, setTypeSorting] = useState<SortingState>([])
   const [itemSorting, setItemSorting] = useState<SortingState>([])
   const [typeFormState, setTypeFormState] = useState<TypeFormState>(null)
   const [itemFormState, setItemFormState] = useState<ItemFormState>(null)
   const [deleteState, setDeleteState] = useState<DeleteState>(null)
+  const [typeContextMenu, setTypeContextMenu] =
+    useState<TypeContextMenuState>(null)
 
   const typeQuery = useServerTableQuery<
     DictionaryTypeRecord,
@@ -110,7 +127,7 @@ export function DictionariesPage() {
       pageIndex: typePagination.pageIndex,
       pageSize: typePagination.pageSize,
       search: typeSearch,
-      sort: toSortParam(typeSorting),
+      sort: 'updatedAt:desc',
     },
     queryFn: listDictionaryTypes,
   })
@@ -228,38 +245,6 @@ export function DictionariesPage() {
     },
   })
 
-  const typeColumns = useMemo(
-    () =>
-      createDictionaryTypeColumns(
-        {
-          actions: t('dictionaries.column.actions'),
-          code: t('dictionaries.column.code'),
-          delete: t('dictionaries.action.delete'),
-          edit: t('dictionaries.action.edit'),
-          name: t('dictionaries.column.name'),
-          select: t('dictionaries.action.select'),
-          status: t('dictionaries.column.status'),
-          system: t('dictionaries.column.system'),
-          systemNo: t('dictionaries.system.no'),
-          systemYes: t('dictionaries.system.yes'),
-          updatedAt: t('dictionaries.column.updatedAt'),
-        },
-        {
-          onDelete: (type) => setDeleteState({ kind: 'type', record: type }),
-          onEdit: (type) => setTypeFormState({ mode: 'edit', type }),
-          onSelect: (type) => {
-            setSelectedTypeId(type.id)
-            setItemPagination((currentPagination) => ({
-              ...currentPagination,
-              pageIndex: 0,
-            }))
-          },
-          selectedTypeId: selectedType?.id,
-        },
-      ),
-    [selectedType?.id, t],
-  )
-
   const itemColumns = useMemo(
     () =>
       createDictionaryItemColumns(
@@ -285,25 +270,9 @@ export function DictionariesPage() {
     [t],
   )
 
-  const handleTypePaginationChange: OnChangeFn<PaginationState> = (updater) => {
-    setTypePagination((currentPagination) =>
-      typeof updater === 'function' ? updater(currentPagination) : updater,
-    )
-  }
-
   const handleItemPaginationChange: OnChangeFn<PaginationState> = (updater) => {
     setItemPagination((currentPagination) =>
       typeof updater === 'function' ? updater(currentPagination) : updater,
-    )
-  }
-
-  const handleTypeSortingChange: OnChangeFn<SortingState> = (updater) => {
-    setTypePagination((currentPagination) => ({
-      ...currentPagination,
-      pageIndex: 0,
-    }))
-    setTypeSorting((currentSorting) =>
-      typeof updater === 'function' ? updater(currentSorting) : updater,
     )
   }
 
@@ -319,10 +288,6 @@ export function DictionariesPage() {
 
   function handleTypeSearchChange(value: string) {
     setTypeSearch(value)
-    setTypePagination((currentPagination) => ({
-      ...currentPagination,
-      pageIndex: 0,
-    }))
   }
 
   function handleItemSearchChange(value: string) {
@@ -345,6 +310,27 @@ export function DictionariesPage() {
     }
 
     createTypeMutation.mutate(value as CreateDictionaryTypeRequest)
+  }
+
+  function handleTypeSelect(type: DictionaryTypeRecord) {
+    setSelectedTypeId(type.id)
+    setTypeContextMenu(null)
+    setItemPagination((currentPagination) => ({
+      ...currentPagination,
+      pageIndex: 0,
+    }))
+  }
+
+  function openTypeContextMenu(
+    event: MouseEvent,
+    type: DictionaryTypeRecord,
+  ) {
+    event.preventDefault()
+    setTypeContextMenu({
+      type,
+      x: event.clientX,
+      y: event.clientY,
+    })
   }
 
   function handleItemSubmit(
@@ -386,96 +372,136 @@ export function DictionariesPage() {
         : null
 
   return (
-    <section className="grid gap-5 p-5">
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-semibold text-slate-950">
-          {t('dictionaries.title')}
-        </h2>
-        <button
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-medium text-white transition hover:bg-cyan-600"
-          onClick={() => setTypeFormState({ mode: 'create' })}
-          type="button"
-        >
-          <Plus size={16} />
-          {t('dictionaries.action.createType')}
-        </button>
-      </div>
+    <section className="grid min-h-[calc(100vh-8rem)] gap-0 bg-white lg:grid-cols-[300px_minmax(0,1fr)]">
+      <aside className="flex min-h-[22rem] min-w-0 flex-col border-b border-slate-200 bg-white lg:border-b-0 lg:border-r">
+        <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-3">
+          <h2 className="truncate text-sm font-semibold text-slate-950">
+            {t('dictionaries.type.title')}
+          </h2>
+          <div className="flex items-center gap-1">
+            <button
+              aria-label={t('dictionaries.action.refresh')}
+              className="inline-flex size-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+              onClick={() => typeQuery.refetch()}
+              type="button"
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button
+              aria-label={t('dictionaries.action.createType')}
+              className="inline-flex size-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+              onClick={() => setTypeFormState({ mode: 'create' })}
+              type="button"
+            >
+              <Plus size={17} />
+            </button>
+          </div>
+        </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
-        <DataTable
-          columns={typeColumns}
-          data={typeQuery.data?.items ?? []}
+        <div className="border-b border-slate-200 p-3">
+          <label className="relative block">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              size={16}
+            />
+            <input
+              aria-label={t('dictionaries.search.types')}
+              className="h-9 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-cyan-500"
+              onChange={(event) => handleTypeSearchChange(event.target.value)}
+              placeholder={t('dictionaries.search.types')}
+              type="search"
+              value={typeSearch}
+            />
+          </label>
+        </div>
+
+        <DictionaryTypeList
+          deleteLabel={t('dictionaries.action.delete')}
+          editLabel={t('dictionaries.action.edit')}
           emptyLabel={t('dictionaries.state.emptyTypes')}
           error={typeError}
           errorLabel={t('dictionaries.error.loadTypes')}
           isLoading={typeQuery.isLoading}
+          items={typeItems}
           loadingLabel={t('dictionaries.state.loadingTypes')}
-          onPaginationChange={handleTypePaginationChange}
+          onContextMenu={openTypeContextMenu}
           onRetry={() => typeQuery.refetch()}
-          onSortingChange={handleTypeSortingChange}
-          pagination={typePagination}
+          onSelect={handleTypeSelect}
           retryLabel={t('dictionaries.state.retry')}
-          sorting={typeSorting}
+          selectLabel={t('dictionaries.action.select')}
+          selectedTypeId={selectedType?.id}
+          systemLabel={t('dictionaries.system.yes')}
+          title={t('dictionaries.type.listLabel')}
+        />
+      </aside>
+
+      <div className="grid min-w-0 content-start gap-3 p-4">
+        <div className="flex min-h-12 items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold text-slate-950">
+              {selectedType
+                ? `${t('dictionaries.item.title')} (${selectedType.name})`
+                : t('dictionaries.item.noTypeSelected')}
+            </h3>
+            <p className="truncate text-xs text-slate-500">
+              {selectedType?.code ?? t('dictionaries.item.selectType')}
+            </p>
+          </div>
+          <button
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-medium text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!selectedType}
+            onClick={() => setItemFormState({ mode: 'create' })}
+            type="button"
+          >
+            <Plus size={16} />
+            {t('dictionaries.action.createItem')}
+          </button>
+        </div>
+
+        <DataTable
+          columns={itemColumns}
+          data={itemQuery.data?.items ?? []}
+          emptyLabel={t('dictionaries.state.emptyItems')}
+          error={itemError}
+          errorLabel={t('dictionaries.error.loadItems')}
+          isLoading={itemQuery.isLoading}
+          loadingLabel={t('dictionaries.state.loadingItems')}
+          onPaginationChange={handleItemPaginationChange}
+          onRetry={() => itemQuery.refetch()}
+          onSortingChange={handleItemSortingChange}
+          pagination={itemPagination}
+          retryLabel={t('dictionaries.state.retry')}
+          sorting={itemSorting}
           toolbar={
             <DataTableToolbar
-              onSearchChange={handleTypeSearchChange}
-              searchLabel={t('dictionaries.search.types')}
-              searchPlaceholder={t('dictionaries.search.types')}
-              searchValue={typeSearch}
+              onSearchChange={handleItemSearchChange}
+              searchLabel={t('dictionaries.search.items')}
+              searchPlaceholder={t('dictionaries.search.items')}
+              searchValue={itemSearch}
             />
           }
-          total={typeQuery.data?.total ?? 0}
+          total={itemQuery.data?.total ?? 0}
         />
-
-        <div className="grid min-w-0 gap-3">
-          <div className="flex min-h-9 items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className="truncate text-base font-semibold text-slate-950">
-                {selectedType
-                  ? selectedType.name
-                  : t('dictionaries.item.noTypeSelected')}
-              </h3>
-              <p className="truncate text-xs text-slate-500">
-                {selectedType?.code ?? t('dictionaries.item.selectType')}
-              </p>
-            </div>
-            <button
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-medium text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!selectedType}
-              onClick={() => setItemFormState({ mode: 'create' })}
-              type="button"
-            >
-              <Plus size={16} />
-              {t('dictionaries.action.createItem')}
-            </button>
-          </div>
-
-          <DataTable
-            columns={itemColumns}
-            data={itemQuery.data?.items ?? []}
-            emptyLabel={t('dictionaries.state.emptyItems')}
-            error={itemError}
-            errorLabel={t('dictionaries.error.loadItems')}
-            isLoading={itemQuery.isLoading}
-            loadingLabel={t('dictionaries.state.loadingItems')}
-            onPaginationChange={handleItemPaginationChange}
-            onRetry={() => itemQuery.refetch()}
-            onSortingChange={handleItemSortingChange}
-            pagination={itemPagination}
-            retryLabel={t('dictionaries.state.retry')}
-            sorting={itemSorting}
-            toolbar={
-              <DataTableToolbar
-                onSearchChange={handleItemSearchChange}
-                searchLabel={t('dictionaries.search.items')}
-                searchPlaceholder={t('dictionaries.search.items')}
-                searchValue={itemSearch}
-              />
-            }
-            total={itemQuery.data?.total ?? 0}
-          />
-        </div>
       </div>
+
+      {typeContextMenu ? (
+        <DictionaryTypeContextMenu
+          deleteLabel={t('dictionaries.action.delete')}
+          editLabel={t('dictionaries.action.edit')}
+          isSystem={typeContextMenu.type.isSystem}
+          onDelete={() => {
+            setDeleteState({ kind: 'type', record: typeContextMenu.type })
+            setTypeContextMenu(null)
+          }}
+          onEdit={() => {
+            setTypeFormState({ mode: 'edit', type: typeContextMenu.type })
+            setTypeContextMenu(null)
+          }}
+          onRequestClose={() => setTypeContextMenu(null)}
+          x={typeContextMenu.x}
+          y={typeContextMenu.y}
+        />
+      ) : null}
 
       {typeFormState ? (
         <Modal
@@ -559,6 +585,222 @@ export function DictionariesPage() {
         </Modal>
       ) : null}
     </section>
+  )
+}
+
+function DictionaryTypeList({
+  deleteLabel,
+  editLabel,
+  emptyLabel,
+  error,
+  errorLabel,
+  isLoading,
+  items,
+  loadingLabel,
+  onContextMenu,
+  onRetry,
+  onSelect,
+  retryLabel,
+  selectLabel,
+  selectedTypeId,
+  systemLabel,
+  title,
+}: {
+  deleteLabel: string
+  editLabel: string
+  emptyLabel: string
+  error: Error | null
+  errorLabel: string
+  isLoading: boolean
+  items: DictionaryTypeRecord[]
+  loadingLabel: string
+  onContextMenu: (event: MouseEvent, type: DictionaryTypeRecord) => void
+  onRetry: () => void
+  onSelect: (type: DictionaryTypeRecord) => void
+  retryLabel: string
+  selectLabel: string
+  selectedTypeId?: string
+  systemLabel: string
+  title: string
+}) {
+  if (isLoading) {
+    return (
+      <div className="grid flex-1 place-items-center px-4 text-sm text-slate-500">
+        {loadingLabel}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="grid flex-1 place-items-center px-4 text-center text-sm text-slate-500">
+        <div className="grid justify-items-center gap-3">
+          <span>{error.message || errorLabel}</span>
+          <button
+            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            onClick={onRetry}
+            type="button"
+          >
+            <RefreshCw size={16} />
+            {retryLabel}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="grid flex-1 place-items-center px-4 text-sm text-slate-500">
+        {emptyLabel}
+      </div>
+    )
+  }
+
+  return (
+    <ul
+      aria-label={title}
+      className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2"
+    >
+      {items.map((type) => {
+        const isSelected = selectedTypeId === type.id
+
+        return (
+          <li key={type.id}>
+            <div
+              className={`group flex min-h-12 items-center gap-2 rounded-md transition ${
+                isSelected
+                  ? 'bg-cyan-500 text-white'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <button
+                aria-current={isSelected ? 'true' : undefined}
+                aria-label={`${selectLabel} ${type.code}`}
+                className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md px-3 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-1"
+                onClick={() => onSelect(type)}
+                onContextMenu={(event) => onContextMenu(event, type)}
+                type="button"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">
+                    {type.name}
+                  </span>
+                  <span
+                    className={`block truncate text-xs ${
+                      isSelected ? 'text-cyan-50' : 'text-slate-500'
+                    }`}
+                  >
+                    {type.code}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1">
+                  {type.isSystem ? (
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[11px] ${
+                        isSelected
+                          ? 'bg-white/15 text-white'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {systemLabel}
+                    </span>
+                  ) : null}
+                  {isSelected ? <Check size={16} /> : null}
+                </span>
+              </button>
+              <button
+                aria-label={`${editLabel} ${type.code}`}
+                className={`mr-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md transition ${
+                  isSelected
+                    ? 'text-white hover:bg-white/15'
+                    : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700'
+                } outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-1`}
+                onClick={(event) => onContextMenu(event, type)}
+                title={`${editLabel} / ${deleteLabel}`}
+                type="button"
+              >
+                <MoreHorizontal size={16} />
+              </button>
+            </div>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function DictionaryTypeContextMenu({
+  deleteLabel,
+  editLabel,
+  isSystem,
+  onDelete,
+  onEdit,
+  onRequestClose,
+  x,
+  y,
+}: {
+  deleteLabel: string
+  editLabel: string
+  isSystem: boolean
+  onDelete: () => void
+  onEdit: () => void
+  onRequestClose: () => void
+  x: number
+  y: number
+}) {
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        onRequestClose()
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onRequestClose()
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onRequestClose])
+
+  return (
+    <div
+      className="fixed z-30 min-w-32 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg"
+      ref={menuRef}
+      role="menu"
+      style={{
+        left: x,
+        top: y,
+      }}
+    >
+      <button
+        className="flex h-9 w-full items-center px-3 text-left text-sm text-slate-700 transition hover:bg-slate-100"
+        onClick={onEdit}
+        role="menuitem"
+        type="button"
+      >
+        {editLabel}
+      </button>
+      <button
+        className="flex h-9 w-full items-center px-3 text-left text-sm text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-white"
+        disabled={isSystem}
+        onClick={onDelete}
+        role="menuitem"
+        type="button"
+      >
+        {deleteLabel}
+      </button>
+    </div>
   )
 }
 

@@ -96,7 +96,7 @@ export function DataTable<TData>({
 
                   return (
                     <th
-                      className="h-11 border-b border-slate-200 px-4 font-semibold"
+                      className="h-11 whitespace-nowrap border-b border-slate-200 px-4 font-semibold"
                       key={header.id}
                       style={{
                         width:
