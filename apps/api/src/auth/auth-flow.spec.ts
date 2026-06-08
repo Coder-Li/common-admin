@@ -41,6 +41,31 @@ interface UserDetailResponseBody extends UserProfileResponseBody {
   updatedAt: string;
 }
 
+interface DictionaryTypeListResponseBody {
+  items: Array<{
+    id: string;
+    code: string;
+    name: string;
+    status: 'ACTIVE' | 'DISABLED';
+    isSystem: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+interface DictionaryOptionsResponseBody {
+  typeCode: string;
+  items: Array<{
+    value: string;
+    label: string;
+    isDefault: boolean;
+    badgeVariant?: string;
+  }>;
+}
+
 function loginBody(response: Response): LoginResponseBody {
   return response.body as LoginResponseBody;
 }
@@ -55,6 +80,16 @@ function userListBody(response: Response): UserListResponseBody {
 
 function userDetailBody(response: Response): UserDetailResponseBody {
   return response.body as UserDetailResponseBody;
+}
+
+function dictionaryTypeListBody(
+  response: Response,
+): DictionaryTypeListResponseBody {
+  return response.body as DictionaryTypeListResponseBody;
+}
+
+function dictionaryOptionsBody(response: Response): DictionaryOptionsResponseBody {
+  return response.body as DictionaryOptionsResponseBody;
 }
 
 function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
@@ -81,6 +116,25 @@ describe('Auth flow', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    dictionaryType: {
+      count: jest.fn(),
+      create: jest.fn(),
+      delete: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+    dictionaryItem: {
+      count: jest.fn(),
+      create: jest.fn(),
+      delete: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    $transaction: jest.fn(),
     $connect: jest.fn(),
     $disconnect: jest.fn(),
   };
@@ -139,9 +193,14 @@ describe('Auth flow', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    Object.values(prisma.user).forEach((mock) => {
-      mock.mockReset();
-    });
+    [prisma.user, prisma.dictionaryType, prisma.dictionaryItem].forEach(
+      (model) => {
+        Object.values(model).forEach((mock) => {
+          mock.mockReset();
+        });
+      },
+    );
+    prisma.$transaction.mockReset();
   });
 
   afterAll(async () => {
@@ -414,6 +473,161 @@ describe('Auth flow', () => {
 
     expect(prisma.user.delete).toHaveBeenCalledWith({
       where: { id: 'delete-1' },
+    });
+  });
+
+  it('forbids a standard user from listing dictionary types', async () => {
+    const standardUser = persistedUser({
+      id: 'standard-1',
+      email: 'standard@example.com',
+      username: 'standard',
+      role: Role.STANDARD,
+    });
+    standardUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(standardUser);
+
+    await request(httpServer)
+      .get('/api/dictionary-types')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(403);
+
+    expect(prisma.dictionaryType.findMany).not.toHaveBeenCalled();
+  });
+
+  it('allows an admin user to list dictionary types', async () => {
+    const adminUser = persistedUser();
+    adminUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(adminUser);
+    prisma.dictionaryType.findMany.mockResolvedValueOnce([
+      {
+        id: 'type-1',
+        code: 'user_role',
+        name: 'User role',
+        status: 'ACTIVE',
+        isSystem: true,
+        description: null,
+        createdAt: new Date('2026-06-08T01:02:03.000Z'),
+        updatedAt: new Date('2026-06-08T04:05:06.000Z'),
+      },
+    ]);
+    prisma.dictionaryType.count.mockResolvedValueOnce(1);
+
+    await request(httpServer)
+      .get('/api/dictionary-types')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(dictionaryTypeListBody(response)).toEqual({
+          items: [
+            {
+              id: 'type-1',
+              code: 'user_role',
+              name: 'User role',
+              status: 'ACTIVE',
+              isSystem: true,
+              createdAt: '2026-06-08T01:02:03.000Z',
+              updatedAt: '2026-06-08T04:05:06.000Z',
+            },
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+        });
+      });
+  });
+
+  it('allows an authenticated standard user to fetch dictionary options', async () => {
+    const standardUser = persistedUser({
+      id: 'standard-1',
+      email: 'standard@example.com',
+      username: 'standard',
+      role: Role.STANDARD,
+    });
+    standardUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(standardUser);
+    prisma.dictionaryType.findFirst.mockResolvedValueOnce({
+      id: 'type-1',
+      code: 'user_role',
+      name: 'User role',
+      status: 'ACTIVE',
+      isSystem: true,
+      description: null,
+      createdAt: new Date('2026-06-08T00:00:00.000Z'),
+      updatedAt: new Date('2026-06-08T00:00:00.000Z'),
+      items: [
+        {
+          id: 'item-1',
+          typeId: 'type-1',
+          value: Role.STANDARD,
+          label: 'Standard',
+          sortOrder: 20,
+          status: 'ACTIVE',
+          isSystem: true,
+          isDefault: true,
+          badgeVariant: 'NEUTRAL',
+          metadata: null,
+          description: null,
+          createdAt: new Date('2026-06-08T01:02:03.000Z'),
+          updatedAt: new Date('2026-06-08T04:05:06.000Z'),
+        },
+      ],
+    });
+
+    await request(httpServer)
+      .get('/api/dictionaries/user_role/options')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(dictionaryOptionsBody(response)).toEqual({
+          typeCode: 'user_role',
+          items: [
+            {
+              value: Role.STANDARD,
+              label: 'Standard',
+              isDefault: true,
+              badgeVariant: 'NEUTRAL',
+            },
+          ],
+        });
+      });
+  });
+
+  it('rejects unauthenticated dictionary option requests', async () => {
+    await request(httpServer)
+      .get('/api/dictionaries/user_role/options')
+      .expect(401);
+  });
+
+  it('returns 204 when an admin deletes a dictionary type', async () => {
+    const adminUser = persistedUser();
+    adminUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(adminUser);
+    prisma.dictionaryType.findUnique.mockResolvedValueOnce({
+      id: 'type-1',
+      code: 'custom_status',
+      name: 'Custom status',
+      status: 'ACTIVE',
+      isSystem: false,
+      description: null,
+      createdAt: new Date('2026-06-08T01:02:03.000Z'),
+      updatedAt: new Date('2026-06-08T04:05:06.000Z'),
+    });
+    prisma.dictionaryItem.count.mockResolvedValueOnce(0);
+    prisma.dictionaryType.delete.mockResolvedValueOnce({
+      id: 'type-1',
+      code: 'custom_status',
+    });
+
+    await request(httpServer)
+      .delete('/api/dictionary-types/type-1')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(204)
+      .expect((response: Response) => {
+        expect(response.text).toBe('');
+      });
+
+    expect(prisma.dictionaryType.delete).toHaveBeenCalledWith({
+      where: { id: 'type-1' },
     });
   });
 });

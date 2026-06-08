@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { validateEnv } from './config/env.config';
+import { DictionaryModule } from './dictionary/dictionary.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
@@ -27,6 +28,7 @@ import { UserModule } from './user/user.module';
     RedisModule,
     AuthModule,
     UserModule,
+    DictionaryModule,
     HealthModule,
   ],
   providers: [
