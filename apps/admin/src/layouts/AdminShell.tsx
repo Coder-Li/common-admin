@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { Lock, LogOut, Settings, Users } from 'lucide-react'
+import { BookOpen, Lock, LogOut, Settings, Users } from 'lucide-react'
 import { api } from '../app/api-client'
 import { clearQueryCache } from '../app/query-client'
+import { DictionariesPage } from '../features/dictionaries/DictionariesPage'
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher'
 import { useI18n } from '../i18n/useI18n'
 import { navigateTo } from '../lib/navigation'
@@ -47,6 +48,8 @@ export function AdminShell({ currentPath }: AdminShellProps) {
   const pageTitle =
     currentPath === '/users'
       ? t('nav.users')
+      : currentPath === '/dictionaries'
+        ? t('nav.dictionaries')
       : currentPath === '/settings'
         ? t('nav.settings')
         : t('nav.dashboard')
@@ -84,6 +87,15 @@ export function AdminShell({ currentPath }: AdminShellProps) {
             {t('nav.users')}
           </button>
           <button
+            className={navItemClass(currentPath === '/dictionaries')}
+            data-testid="nav-dictionaries"
+            onClick={() => navigateTo('/dictionaries')}
+            type="button"
+          >
+            <BookOpen size={16} />
+            {t('nav.dictionaries')}
+          </button>
+          <button
             className={navItemClass(currentPath === '/settings')}
             data-testid="nav-settings"
             onClick={() => navigateTo('/settings')}
@@ -114,6 +126,15 @@ export function AdminShell({ currentPath }: AdminShellProps) {
           >
             <Users size={16} />
             {t('nav.users')}
+          </button>
+          <button
+            className={navItemClass(currentPath === '/dictionaries')}
+            data-testid="mobile-nav-dictionaries"
+            onClick={() => navigateTo('/dictionaries')}
+            type="button"
+          >
+            <BookOpen size={16} />
+            {t('nav.dictionaries')}
           </button>
           <button
             className={navItemClass(currentPath === '/settings')}
@@ -151,6 +172,8 @@ export function AdminShell({ currentPath }: AdminShellProps) {
 
         {currentPath === '/users' ? (
           <UsersPage />
+        ) : currentPath === '/dictionaries' ? (
+          <DictionariesPage />
         ) : currentPath === '/settings' ? (
           <PlaceholderPage
             icon={<Settings size={20} />}

@@ -1,4 +1,9 @@
-const protectedPaths = new Set(['/dashboard', '/users', '/settings'])
+const protectedPaths = new Set([
+  '/dashboard',
+  '/users',
+  '/dictionaries',
+  '/settings',
+])
 
 export interface RouteResolution {
   path: string

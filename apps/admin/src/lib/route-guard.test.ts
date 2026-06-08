@@ -24,4 +24,18 @@ describe('route guard', () => {
       redirectTo: null,
     })
   })
+
+  it('allows authenticated users to visit dictionary management', () => {
+    expect(resolveRoute('/dictionaries', true)).toEqual({
+      path: '/dictionaries',
+      redirectTo: null,
+    })
+  })
+
+  it('redirects anonymous dictionary management visits to login', () => {
+    expect(resolveRoute('/dictionaries', false)).toEqual({
+      path: '/dictionaries',
+      redirectTo: '/login',
+    })
+  })
 })

@@ -8,10 +8,21 @@ import type {
   UserRecord,
 } from '../features/users/users.types'
 import type {
-  DictionaryBadgeVariant,
   DictionaryOptionsMapResponse,
   DictionaryOptionsResponse,
 } from './dictionaries/dictionaries.types'
+import type {
+  CreateDictionaryItemRequest,
+  CreateDictionaryTypeRequest,
+  DictionaryItemListQuery,
+  DictionaryItemListResponse,
+  DictionaryItemRecord,
+  DictionaryTypeListQuery,
+  DictionaryTypeListResponse,
+  DictionaryTypeRecord,
+  UpdateDictionaryItemRequest,
+  UpdateDictionaryTypeRequest,
+} from '../features/dictionaries/dictionaries.types'
 
 export interface LoginCredentials {
   usernameOrEmail: string
@@ -23,95 +34,6 @@ export interface ListResponse<TItem> {
   total: number
   page: number
   pageSize: number
-}
-
-interface DictionaryTypeListQuery {
-  page: number
-  pageSize: number
-  search?: string
-  sort?: string
-  status?: DictionaryStatus
-  isSystem?: boolean
-}
-
-interface DictionaryTypeRecord {
-  id: string
-  code: string
-  name: string
-  status: DictionaryStatus
-  isSystem: boolean
-  description?: string
-  createdAt: string
-  updatedAt: string
-}
-
-type DictionaryTypeListResponse = ListResponse<DictionaryTypeRecord>
-type DictionaryStatus = 'ACTIVE' | 'DISABLED'
-
-interface CreateDictionaryTypeRequest {
-  code: string
-  name: string
-  status?: DictionaryStatus
-  description?: string
-}
-
-interface UpdateDictionaryTypeRequest {
-  name?: string
-  status?: DictionaryStatus
-  description?: string
-}
-
-interface DictionaryItemListQuery {
-  page: number
-  pageSize: number
-  search?: string
-  sort?: string
-  typeId?: string
-  typeCode?: string
-  status?: DictionaryStatus
-  isDefault?: boolean
-}
-
-interface DictionaryItemRecord {
-  id: string
-  typeId: string
-  typeCode: string
-  typeName: string
-  value: string
-  label: string
-  sortOrder: number
-  status: DictionaryStatus
-  isSystem: boolean
-  isDefault: boolean
-  badgeVariant?: DictionaryBadgeVariant
-  metadata?: Record<string, unknown>
-  description?: string
-  createdAt: string
-  updatedAt: string
-}
-
-type DictionaryItemListResponse = ListResponse<DictionaryItemRecord>
-
-interface CreateDictionaryItemRequest {
-  typeId: string
-  value: string
-  label: string
-  sortOrder?: number
-  status?: DictionaryStatus
-  isDefault?: boolean
-  badgeVariant?: DictionaryBadgeVariant
-  metadata?: Record<string, unknown>
-  description?: string
-}
-
-interface UpdateDictionaryItemRequest {
-  label?: string
-  sortOrder?: number
-  status?: DictionaryStatus
-  isDefault?: boolean
-  badgeVariant?: DictionaryBadgeVariant
-  metadata?: Record<string, unknown>
-  description?: string
 }
 
 interface RequestConfig {
