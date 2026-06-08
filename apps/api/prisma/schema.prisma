@@ -12,6 +12,19 @@ enum Role {
   STANDARD
 }
 
+enum DictionaryStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum DictionaryBadgeVariant {
+  DEFAULT
+  SUCCESS
+  WARNING
+  DANGER
+  NEUTRAL
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique @db.VarChar(255)
@@ -25,4 +38,38 @@ model User {
 
   @@index([email])
   @@index([username])
+}
+
+model DictionaryType {
+  id          String           @id @default(uuid())
+  code        String           @unique @db.VarChar(80)
+  name        String           @db.VarChar(120)
+  status      DictionaryStatus @default(ACTIVE)
+  isSystem    Boolean          @default(false)
+  description String?          @db.VarChar(500)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  items       DictionaryItem[]
+}
+
+model DictionaryItem {
+  id           String                  @id @default(uuid())
+  typeId       String
+  value        String                  @db.VarChar(120)
+  label        String                  @db.VarChar(120)
+  sortOrder    Int                     @default(0)
+  status       DictionaryStatus        @default(ACTIVE)
+  isSystem     Boolean                 @default(false)
+  isDefault    Boolean                 @default(false)
+  badgeVariant DictionaryBadgeVariant?
+  metadata     Json?
+  description  String?                 @db.VarChar(500)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  type         DictionaryType          @relation(fields: [typeId], references: [id])
+
+  @@unique([typeId, value])
+  @@index([typeId, sortOrder])
 }
