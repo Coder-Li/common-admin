@@ -4,6 +4,7 @@ import type { Server } from 'node:http';
 import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcryptjs';
 import cookieParser from 'cookie-parser';
+import { decode } from 'jsonwebtoken';
 import request from 'supertest';
 import type { Response } from 'supertest';
 import { AppModule } from '../app.module';
@@ -58,6 +59,16 @@ function loginBody(response: Response): LoginResponseBody {
 
 function userListBody(response: Response): UserListResponseBody {
   return response.body as UserListResponseBody;
+}
+
+function decodeAccessToken(accessToken: string): { sid: string; sub: string } {
+  const payload = decode(accessToken);
+
+  if (!payload || typeof payload === 'string') {
+    throw new Error('Expected JWT object payload');
+  }
+
+  return payload as { sid: string; sub: string };
 }
 
 describe('Auth flow', () => {
@@ -232,18 +243,44 @@ describe('Auth flow', () => {
       },
     );
     prisma.userSession.findUnique.mockImplementation(
-      async ({ where }: { where: { id: string } }) => {
+      async ({
+        where,
+        include,
+        select,
+      }: {
+        where: { id: string };
+        include?: unknown;
+        select?: unknown;
+      }) => {
         const session = sessions.get(where.id);
 
         if (!session) {
           return null;
         }
 
+        const user =
+          session.user ??
+          (await prisma.user.findUnique({ where: { id: session.userId } }));
+
+        if (select) {
+          return {
+            id: session.id,
+            userId: session.userId,
+            expiresAt: session.expiresAt,
+            revokedAt: session.revokedAt,
+            user: user
+              ? {
+                  id: user.id,
+                  email: user.email,
+                  username: user.username,
+                }
+              : null,
+          };
+        }
+
         return {
           ...session,
-          user:
-            session.user ??
-            (await prisma.user.findUnique({ where: { id: session.userId } })),
+          user: include ? user : session.user,
         };
       },
     );
@@ -444,6 +481,160 @@ describe('Auth flow', () => {
     );
     expect(revokedSession.revokedAt).toBeInstanceOf(Date);
     expect(revokedSession.revokedReason).toBe('logout');
+  });
+
+  it('protected request fails after logout', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    prisma.user.findFirst.mockResolvedValue(user);
+    prisma.user.findUnique.mockResolvedValue(user);
+    const loginResponse = await request(httpServer)
+      .post('/api/auth/login')
+      .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
+      .expect(201);
+    const accessToken = loginBody(loginResponse).accessToken;
+
+    await request(httpServer)
+      .post('/api/auth/logout')
+      .set('Cookie', loginResponse.headers['set-cookie'])
+      .expect(201);
+
+    await request(httpServer)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(401);
+  });
+
+  it('protected request fails when session is revoked', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    const accessToken = await signIn(user);
+    const { sid } = decodeAccessToken(accessToken);
+    const session = sessions.get(sid);
+
+    sessions.set(sid, {
+      ...session!,
+      revokedAt: new Date('2026-01-02T00:00:00.000Z'),
+    });
+
+    await request(httpServer)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(401);
+  });
+
+  it('protected request fails when session is expired', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    const accessToken = await signIn(user);
+    const { sid } = decodeAccessToken(accessToken);
+    const session = sessions.get(sid);
+
+    sessions.set(sid, {
+      ...session!,
+      expiresAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+
+    await request(httpServer)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(401);
+  });
+
+  it('protected request fails when token sub and sid belong to different users', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    const accessToken = await signIn(user);
+    const { sid } = decodeAccessToken(accessToken);
+    const session = sessions.get(sid);
+
+    sessions.set(sid, {
+      ...session!,
+      userId: 'other-user',
+      user: persistedUser({
+        id: 'other-user',
+        email: 'other@example.com',
+        username: 'other',
+      }),
+    });
+
+    await request(httpServer)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(401);
+  });
+
+  it('users/me returns fresh email/username from database after token was signed', async () => {
+    const signedUser = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    const freshUser = persistedUser({
+      email: 'fresh@example.com',
+      username: 'fresh-admin',
+      passwordHash: signedUser.passwordHash,
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    const accessToken = await signIn(signedUser);
+    const { sid } = decodeAccessToken(accessToken);
+    const session = sessions.get(sid);
+
+    sessions.set(sid, { ...session!, user: freshUser });
+    prisma.user.findUnique.mockResolvedValue(freshUser);
+
+    await request(httpServer)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(response.body).toMatchObject({
+          email: 'fresh@example.com',
+          username: 'fresh-admin',
+        });
+      });
+    expect(prisma.userSession.findUnique).toHaveBeenLastCalledWith({
+      where: { id: sid },
+      select: {
+        id: true,
+        userId: true,
+        expiresAt: true,
+        revokedAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+          },
+        },
+      },
+    });
   });
 
   it('logout succeeds and clears cookie when refresh cookie is missing', async () => {
