@@ -291,9 +291,19 @@ export class UserService {
 
     const roles = await this.resolveExplicitRoles(roleCodes);
     await this.assertCanReplaceSuperAdminRoles(user, roles, actorUserId);
-    const beforeRoleCodes = this.toRoleCodes(user);
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      const before = await tx.user.findUnique({
+        where: { id },
+        include: { roles: { include: { role: true } } },
+      });
+
+      if (!before) {
+        throw new NotFoundException('User not found');
+      }
+
+      const beforeRoleCodes = this.toRoleCodes(before);
+
       await tx.userRole.deleteMany({ where: { userId: id } });
       await tx.userRole.createMany({
         data: roles.map((role) => ({ userId: id, roleId: role.id })),

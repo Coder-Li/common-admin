@@ -163,8 +163,9 @@ describe('UserService', () => {
 
   const createService = () => {
     const prisma = createPrismaMock();
+    const tx = createPrismaMock();
     prisma.$transaction.mockImplementation(async (callback: Function) =>
-      callback(prisma),
+      callback(tx),
     );
     const auditLogService = {
       record: jest.fn(),
@@ -175,7 +176,7 @@ describe('UserService', () => {
       auditLogService as never,
     );
 
-    return { auditLogService, prisma, service };
+    return { auditLogService, prisma, service, tx };
   };
 
   const auditActor: AuditActor = {
@@ -216,9 +217,9 @@ describe('UserService', () => {
   });
 
   it('create assigns active default role when role codes are omitted', async () => {
-    const { prisma, service } = createService();
+    const { prisma, service, tx } = createService();
     prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
-    prisma.user.create.mockResolvedValue(makeUser());
+    tx.user.create.mockResolvedValue(makeUser());
 
     await service.createUser({
       email: 'ada@example.com',
@@ -228,7 +229,7 @@ describe('UserService', () => {
       password: 'CorrectHorse123',
     });
 
-    expect(prisma.user.create).toHaveBeenCalledWith(
+    expect(tx.user.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           roles: { create: [{ roleId: 'role-standard' }] },
@@ -238,11 +239,11 @@ describe('UserService', () => {
   });
 
   it('create assigns explicit active role codes when provided', async () => {
-    const { prisma, service } = createService();
+    const { prisma, service, tx } = createService();
     prisma.role.findMany.mockResolvedValue([
       { id: 'role-admin', code: 'admin' },
     ]);
-    prisma.user.create.mockResolvedValue(makeUser());
+    tx.user.create.mockResolvedValue(makeUser());
 
     await service.createUser({
       email: 'ada@example.com',
@@ -253,7 +254,7 @@ describe('UserService', () => {
       roleCodes: ['admin'],
     });
 
-    expect(prisma.user.create).toHaveBeenCalledWith(
+    expect(tx.user.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           roles: { create: [{ roleId: 'role-admin' }] },
@@ -263,10 +264,10 @@ describe('UserService', () => {
   });
 
   it('createUser writes create user audit log with after snapshot', async () => {
-    const { auditLogService, prisma, service } = createService();
+    const { auditLogService, prisma, service, tx } = createService();
     const created = makeUser();
     prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
-    prisma.user.create.mockResolvedValue(created);
+    tx.user.create.mockResolvedValue(created);
 
     await service.createUser(
       {
@@ -281,6 +282,12 @@ describe('UserService', () => {
     );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.any(Object),
+      }),
+    );
+    expect(prisma.user.create).not.toHaveBeenCalled();
     expect(auditLogService.record).toHaveBeenCalledWith(
       {
         action: AUDIT_ACTIONS.CREATE,
@@ -290,7 +297,7 @@ describe('UserService', () => {
         requestMeta: auditRequestMeta,
         after: toUserResponse(created),
       },
-      prisma,
+      tx,
     );
   });
 
@@ -311,13 +318,13 @@ describe('UserService', () => {
   });
 
   it('update does not mutate roles', async () => {
-    const { prisma, service } = createService();
-    prisma.user.findUnique.mockResolvedValue(makeUser());
-    prisma.user.update.mockResolvedValue(makeUser({ firstName: 'Augusta' }));
+    const { service, tx } = createService();
+    tx.user.findUnique.mockResolvedValue(makeUser());
+    tx.user.update.mockResolvedValue(makeUser({ firstName: 'Augusta' }));
 
     await service.updateUser('user-1', { firstName: 'Augusta' });
 
-    expect(prisma.user.update).toHaveBeenCalledWith({
+    expect(tx.user.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
       data: { firstName: 'Augusta' },
       include: expect.any(Object),
@@ -325,11 +332,11 @@ describe('UserService', () => {
   });
 
   it('updateUser reads before, updates, and writes before and after audit in the same transaction', async () => {
-    const { auditLogService, prisma, service } = createService();
+    const { auditLogService, prisma, service, tx } = createService();
     const before = makeUser({ firstName: 'Ada' });
     const after = makeUser({ firstName: 'Augusta' });
-    prisma.user.findUnique.mockResolvedValue(before);
-    prisma.user.update.mockResolvedValue(after);
+    tx.user.findUnique.mockResolvedValue(before);
+    tx.user.update.mockResolvedValue(after);
 
     await service.updateUser(
       'user-1',
@@ -339,15 +346,17 @@ describe('UserService', () => {
     );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+    expect(tx.user.findUnique).toHaveBeenCalledWith({
       where: { id: 'user-1' },
       include: expect.any(Object),
     });
-    expect(prisma.user.update).toHaveBeenCalledWith({
+    expect(tx.user.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
       data: { firstName: 'Augusta' },
       include: expect.any(Object),
     });
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
     expect(auditLogService.record).toHaveBeenCalledWith(
       {
         action: AUDIT_ACTIONS.UPDATE,
@@ -358,20 +367,20 @@ describe('UserService', () => {
         before: toUserResponse(before),
         after: toUserResponse(after),
       },
-      prisma,
+      tx,
     );
   });
 
   it('resetPassword hashes the new password', async () => {
-    const { prisma, service } = createService();
-    prisma.user.update.mockResolvedValue(makeUser());
-    prisma.userSession.updateMany.mockResolvedValue({ count: 0 });
+    const { service, tx } = createService();
+    tx.user.update.mockResolvedValue(makeUser());
+    tx.userSession.updateMany.mockResolvedValue({ count: 0 });
 
     await service.resetPassword('user-1', 'NewSecure123!');
 
     const updateArgs = firstMockArg<{
       data: { passwordHash: string };
-    }>(prisma.user.update);
+    }>(tx.user.update);
     expect(updateArgs.data.passwordHash).not.toBe('NewSecure123!');
     await expect(
       bcrypt.compare('NewSecure123!', updateArgs.data.passwordHash),
@@ -379,13 +388,13 @@ describe('UserService', () => {
   });
 
   it('resetPassword revokes all target user sessions with admin_reset_password', async () => {
-    const { prisma, service } = createService();
-    prisma.user.update.mockResolvedValue(makeUser());
-    prisma.userSession.updateMany.mockResolvedValue({ count: 2 });
+    const { service, tx } = createService();
+    tx.user.update.mockResolvedValue(makeUser());
+    tx.userSession.updateMany.mockResolvedValue({ count: 2 });
 
     await service.resetPassword('user-1', 'NewSecure123!');
 
-    expect(prisma.userSession.updateMany).toHaveBeenCalledWith({
+    expect(tx.userSession.updateMany).toHaveBeenCalledWith({
       where: { userId: 'user-1', revokedAt: null },
       data: {
         revokedAt: expect.any(Date),
@@ -395,9 +404,9 @@ describe('UserService', () => {
   });
 
   it('resetPassword returns public user response without passwordHash', async () => {
-    const { prisma, service } = createService();
-    prisma.user.update.mockResolvedValue(makeUser());
-    prisma.userSession.updateMany.mockResolvedValue({ count: 0 });
+    const { service, tx } = createService();
+    tx.user.update.mockResolvedValue(makeUser());
+    tx.userSession.updateMany.mockResolvedValue({ count: 0 });
 
     const response = await service.resetPassword('user-1', 'NewSecure123!');
 
@@ -415,9 +424,9 @@ describe('UserService', () => {
   });
 
   it('resetPassword writes reset_password audit without password fields', async () => {
-    const { auditLogService, prisma, service } = createService();
-    prisma.user.update.mockResolvedValue(makeUser());
-    prisma.userSession.updateMany.mockResolvedValue({ count: 0 });
+    const { auditLogService, service, tx } = createService();
+    tx.user.update.mockResolvedValue(makeUser());
+    tx.userSession.updateMany.mockResolvedValue({ count: 0 });
 
     await service.resetPassword(
       'user-1',
@@ -433,8 +442,13 @@ describe('UserService', () => {
         resourceId: 'user-1',
         actor: auditActor,
         requestMeta: auditRequestMeta,
+        after: {
+          id: 'user-1',
+          email: 'ada@example.com',
+          username: 'ada',
+        },
       }),
-      prisma,
+      tx,
     );
     const auditInput = auditLogService.record.mock.calls[0][0];
     expect(
@@ -447,42 +461,52 @@ describe('UserService', () => {
   });
 
   it('resetPassword throws NotFoundException for missing user', async () => {
-    const { prisma, service } = createService();
-    prisma.user.update.mockRejectedValue(recordNotFoundError());
+    const { service, tx } = createService();
+    tx.user.update.mockRejectedValue(recordNotFoundError());
 
     await expect(
       service.resetPassword('missing-user', 'NewSecure123!'),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect(prisma.userSession.updateMany).not.toHaveBeenCalled();
+    expect(tx.userSession.updateMany).not.toHaveBeenCalled();
   });
 
   it('replaceRoles replaces full role set atomically', async () => {
-    const { prisma, service } = createService();
+    const { prisma, service, tx } = createService();
     prisma.user.findUnique.mockResolvedValue(makeUser());
     prisma.role.findMany.mockResolvedValue([
       { id: 'role-admin', code: 'admin' },
     ]);
+    tx.user.findUnique
+      .mockResolvedValueOnce(makeUser())
+      .mockResolvedValue(makeUser());
 
     await service.replaceRoles('user-1', ['admin'], 'actor-1');
 
-    expect(prisma.userRole.deleteMany).toHaveBeenCalledWith({
+    expect(tx.userRole.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'user-1' },
     });
-    expect(prisma.userRole.createMany).toHaveBeenCalledWith({
+    expect(tx.userRole.createMany).toHaveBeenCalledWith({
       data: [{ userId: 'user-1', roleId: 'role-admin' }],
       skipDuplicates: true,
     });
   });
 
   it('deleteUser writes delete user audit with before snapshot in the same transaction', async () => {
-    const { auditLogService, prisma, service } = createService();
+    const { auditLogService, prisma, service, tx } = createService();
     const before = makeUser();
-    prisma.user.findUnique.mockResolvedValue(before);
-    prisma.user.delete.mockResolvedValue(before);
+    tx.user.findUnique.mockResolvedValue(before);
+    tx.user.delete.mockResolvedValue(before);
 
     await service.deleteUser('user-1', auditActor, auditRequestMeta);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      include: expect.any(Object),
+    });
+    expect(tx.user.delete).toHaveBeenCalledWith({ where: { id: 'user-1' } });
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.user.delete).not.toHaveBeenCalled();
     expect(auditLogService.record).toHaveBeenCalledWith(
       {
         action: AUDIT_ACTIONS.DELETE,
@@ -492,21 +516,27 @@ describe('UserService', () => {
         requestMeta: auditRequestMeta,
         before: toUserResponse(before),
       },
-      prisma,
+      tx,
     );
   });
 
   it('replaceRoles writes before and after role code lists in the same transaction', async () => {
-    const { auditLogService, prisma, service } = createService();
-    const before = makeUser({
+    const { auditLogService, prisma, service, tx } = createService();
+    const validationUser = makeUser({
+      roles: [
+        { role: { code: 'old_root_snapshot', name: 'Old root snapshot' } },
+      ],
+    });
+    const transactionalBefore = makeUser({
       roles: [{ role: { code: 'standard', name: 'Standard' } }],
     });
     const after = makeUser({
       roles: [{ role: { code: 'admin', name: 'Admin' } }],
     });
-    prisma.user.findUnique
-      .mockResolvedValueOnce(before)
-      .mockResolvedValue(after);
+    prisma.user.findUnique.mockResolvedValue(validationUser);
+    tx.user.findUnique
+      .mockResolvedValueOnce(transactionalBefore)
+      .mockResolvedValueOnce(after);
     prisma.role.findMany.mockResolvedValue([
       { id: 'role-admin', code: 'admin' },
     ]);
@@ -520,6 +550,23 @@ describe('UserService', () => {
     );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.user.findUnique).toHaveBeenNthCalledWith(1, {
+      where: { id: 'user-1' },
+      include: expect.any(Object),
+    });
+    expect(tx.userRole.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+    });
+    expect(tx.userRole.createMany).toHaveBeenCalledWith({
+      data: [{ userId: 'user-1', roleId: 'role-admin' }],
+      skipDuplicates: true,
+    });
+    expect(tx.user.findUnique).toHaveBeenNthCalledWith(2, {
+      where: { id: 'user-1' },
+      include: expect.any(Object),
+    });
+    expect(prisma.userRole.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.userRole.createMany).not.toHaveBeenCalled();
     expect(auditLogService.record).toHaveBeenCalledWith(
       {
         action: AUDIT_ACTIONS.REPLACE_ROLES,
@@ -530,7 +577,7 @@ describe('UserService', () => {
         before: { roleCodes: ['standard'] },
         after: { roleCodes: ['admin'] },
       },
-      prisma,
+      tx,
     );
     expect(
       permissionService.invalidateUserPermissionContext,
@@ -538,9 +585,9 @@ describe('UserService', () => {
   });
 
   it('rejects the business request when audit recording fails inside a Prisma transaction', async () => {
-    const { auditLogService, prisma, service } = createService();
-    prisma.user.findUnique.mockResolvedValue(makeUser());
-    prisma.user.update.mockResolvedValue(makeUser({ firstName: 'Augusta' }));
+    const { auditLogService, service, tx } = createService();
+    tx.user.findUnique.mockResolvedValue(makeUser());
+    tx.user.update.mockResolvedValue(makeUser({ firstName: 'Augusta' }));
     auditLogService.record.mockRejectedValue(new Error('audit failed'));
 
     await expect(
@@ -613,9 +660,9 @@ describe('UserService', () => {
   });
 
   it('maps duplicate unique constraints to ConflictException', async () => {
-    const { prisma, service } = createService();
+    const { prisma, service, tx } = createService();
     prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
-    prisma.user.create.mockRejectedValue(uniqueConstraintError());
+    tx.user.create.mockRejectedValue(uniqueConstraintError());
 
     await expect(
       service.createUser({
