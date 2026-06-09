@@ -8,6 +8,11 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+} from '../audit-log/audit-log.constants';
+import type { AuditActor, AuditRequestMeta } from '../audit-log/audit-log.types';
 import { ListQueryDto } from '../common/dto/list-query.dto';
 import { UserListQueryDto } from './dto/user.request';
 import { toUserResponse } from './user.mapper';
@@ -140,6 +145,9 @@ describe('UserService', () => {
     userSession: {
       updateMany: jest.fn(),
     },
+    auditLog: {
+      create: jest.fn(),
+    },
     $transaction: jest.fn(async (callback: Function) =>
       callback(createPrismaMock()),
     ),
@@ -155,12 +163,27 @@ describe('UserService', () => {
     prisma.$transaction.mockImplementation(async (callback: Function) =>
       callback(prisma),
     );
+    const auditLogService = {
+      record: jest.fn(),
+    };
     const service = new UserService(
       prisma as never,
       permissionService as never,
+      auditLogService as never,
     );
 
-    return { prisma, service };
+    return { auditLogService, prisma, service };
+  };
+
+  const auditActor: AuditActor = {
+    userId: 'actor-1',
+    email: 'actor@example.com',
+    name: 'actor',
+  };
+
+  const auditRequestMeta: AuditRequestMeta = {
+    ipAddress: '127.0.0.1',
+    userAgent: 'jest',
   };
 
   function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
@@ -236,6 +259,38 @@ describe('UserService', () => {
     );
   });
 
+  it('createUser writes create user audit log with after snapshot', async () => {
+    const { auditLogService, prisma, service } = createService();
+    const created = makeUser();
+    prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
+    prisma.user.create.mockResolvedValue(created);
+
+    await service.createUser(
+      {
+        email: 'ada@example.com',
+        username: 'ada',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        password: 'CorrectHorse123',
+      },
+      auditActor,
+      auditRequestMeta,
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(auditLogService.record).toHaveBeenCalledWith(
+      {
+        action: AUDIT_ACTIONS.CREATE,
+        resourceType: AUDIT_RESOURCE_TYPES.USER,
+        resourceId: 'user-1',
+        actor: auditActor,
+        requestMeta: auditRequestMeta,
+        after: toUserResponse(created),
+      },
+      prisma,
+    );
+  });
+
   it('create rejects disabled role codes', async () => {
     const { prisma, service } = createService();
     prisma.role.findMany.mockResolvedValue([]);
@@ -254,6 +309,7 @@ describe('UserService', () => {
 
   it('update does not mutate roles', async () => {
     const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValue(makeUser());
     prisma.user.update.mockResolvedValue(makeUser({ firstName: 'Augusta' }));
 
     await service.updateUser('user-1', { firstName: 'Augusta' });
@@ -263,6 +319,44 @@ describe('UserService', () => {
       data: { firstName: 'Augusta' },
       include: expect.any(Object),
     });
+  });
+
+  it('updateUser reads before, updates, and writes before and after audit in the same transaction', async () => {
+    const { auditLogService, prisma, service } = createService();
+    const before = makeUser({ firstName: 'Ada' });
+    const after = makeUser({ firstName: 'Augusta' });
+    prisma.user.findUnique.mockResolvedValue(before);
+    prisma.user.update.mockResolvedValue(after);
+
+    await service.updateUser(
+      'user-1',
+      { firstName: 'Augusta' },
+      auditActor,
+      auditRequestMeta,
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      include: expect.any(Object),
+    });
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { firstName: 'Augusta' },
+      include: expect.any(Object),
+    });
+    expect(auditLogService.record).toHaveBeenCalledWith(
+      {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: AUDIT_RESOURCE_TYPES.USER,
+        resourceId: 'user-1',
+        actor: auditActor,
+        requestMeta: auditRequestMeta,
+        before: toUserResponse(before),
+        after: toUserResponse(after),
+      },
+      prisma,
+    );
   });
 
   it('resetPassword hashes the new password', async () => {
@@ -317,6 +411,38 @@ describe('UserService', () => {
     expect(response).not.toHaveProperty('passwordHash');
   });
 
+  it('resetPassword writes reset_password audit without password fields', async () => {
+    const { auditLogService, prisma, service } = createService();
+    prisma.user.update.mockResolvedValue(makeUser());
+    prisma.userSession.updateMany.mockResolvedValue({ count: 0 });
+
+    await service.resetPassword(
+      'user-1',
+      'NewSecure123!',
+      auditActor,
+      auditRequestMeta,
+    );
+
+    expect(auditLogService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AUDIT_ACTIONS.RESET_PASSWORD,
+        resourceType: AUDIT_RESOURCE_TYPES.USER,
+        resourceId: 'user-1',
+        actor: auditActor,
+        requestMeta: auditRequestMeta,
+      }),
+      prisma,
+    );
+    const auditInput = auditLogService.record.mock.calls[0][0];
+    expect(
+      JSON.stringify({
+        before: auditInput.before,
+        after: auditInput.after,
+        metadata: auditInput.metadata,
+      }),
+    ).not.toMatch(/password|newPassword|passwordHash/i);
+  });
+
   it('resetPassword throws NotFoundException for missing user', async () => {
     const { prisma, service } = createService();
     prisma.user.update.mockRejectedValue(recordNotFoundError());
@@ -343,6 +469,83 @@ describe('UserService', () => {
       data: [{ userId: 'user-1', roleId: 'role-admin' }],
       skipDuplicates: true,
     });
+  });
+
+  it('deleteUser writes delete user audit with before snapshot in the same transaction', async () => {
+    const { auditLogService, prisma, service } = createService();
+    const before = makeUser();
+    prisma.user.findUnique.mockResolvedValue(before);
+    prisma.user.delete.mockResolvedValue(before);
+
+    await service.deleteUser('user-1', auditActor, auditRequestMeta);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(auditLogService.record).toHaveBeenCalledWith(
+      {
+        action: AUDIT_ACTIONS.DELETE,
+        resourceType: AUDIT_RESOURCE_TYPES.USER,
+        resourceId: 'user-1',
+        actor: auditActor,
+        requestMeta: auditRequestMeta,
+        before: toUserResponse(before),
+      },
+      prisma,
+    );
+  });
+
+  it('replaceRoles writes before and after role code lists in the same transaction', async () => {
+    const { auditLogService, prisma, service } = createService();
+    const before = makeUser({
+      roles: [{ role: { code: 'standard', name: 'Standard' } }],
+    });
+    const after = makeUser({
+      roles: [{ role: { code: 'admin', name: 'Admin' } }],
+    });
+    prisma.user.findUnique.mockResolvedValueOnce(before).mockResolvedValue(after);
+    prisma.role.findMany.mockResolvedValue([
+      { id: 'role-admin', code: 'admin' },
+    ]);
+
+    await service.replaceRoles(
+      'user-1',
+      ['admin'],
+      'actor-1',
+      auditActor,
+      auditRequestMeta,
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(auditLogService.record).toHaveBeenCalledWith(
+      {
+        action: AUDIT_ACTIONS.REPLACE_ROLES,
+        resourceType: AUDIT_RESOURCE_TYPES.USER,
+        resourceId: 'user-1',
+        actor: auditActor,
+        requestMeta: auditRequestMeta,
+        before: { roleCodes: ['standard'] },
+        after: { roleCodes: ['admin'] },
+      },
+      prisma,
+    );
+    expect(permissionService.invalidateUserPermissionContext).toHaveBeenCalledWith(
+      'user-1',
+    );
+  });
+
+  it('rejects the business request when audit recording fails inside a Prisma transaction', async () => {
+    const { auditLogService, prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValue(makeUser());
+    prisma.user.update.mockResolvedValue(makeUser({ firstName: 'Augusta' }));
+    auditLogService.record.mockRejectedValue(new Error('audit failed'));
+
+    await expect(
+      service.updateUser(
+        'user-1',
+        { firstName: 'Augusta' },
+        auditActor,
+        auditRequestMeta,
+      ),
+    ).rejects.toThrow('audit failed');
   });
 
   it('replaceRoles rejects removing the last active super_admin', async () => {

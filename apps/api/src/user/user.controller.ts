@@ -9,7 +9,9 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -19,6 +21,10 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  buildAuditActor,
+  getAuditRequestMeta,
+} from '../audit-log/audit-log-request-meta';
 import { Permissions } from '../auth/permissions.decorator';
 import { CurrentUser } from './current-user.decorator';
 import {
@@ -66,8 +72,16 @@ export class UserController {
   @ApiForbiddenResponse({ description: 'Permission required' })
   @Permissions('user.create')
   @Post()
-  createUser(@Body() body: CreateUserDto): Promise<UserResponseDto> {
-    return this.userService.createUser(body);
+  createUser(
+    @Body() body: CreateUserDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
+  ): Promise<UserResponseDto> {
+    return this.userService.createUser(
+      body,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiOkResponse({ type: UserResponseDto })
@@ -78,8 +92,15 @@ export class UserController {
   updateUser(
     @Param('id') id: string,
     @Body() body: UpdateUserDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<UserResponseDto> {
-    return this.userService.updateUser(id, body);
+    return this.userService.updateUser(
+      id,
+      body,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiOkResponse({ type: UserResponseDto })
@@ -90,8 +111,15 @@ export class UserController {
   resetPassword(
     @Param('id') id: string,
     @Body() body: ResetUserPasswordDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<UserResponseDto> {
-    return this.userService.resetPassword(id, body.newPassword);
+    return this.userService.resetPassword(
+      id,
+      body.newPassword,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiOkResponse({ type: UserResponseDto })
@@ -103,8 +131,15 @@ export class UserController {
     @Param('id') id: string,
     @Body() body: ReplaceUserRolesDto,
     @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<UserResponseDto> {
-    return this.userService.replaceRoles(id, body.roleCodes, user.sub);
+    return this.userService.replaceRoles(
+      id,
+      body.roleCodes,
+      user.sub,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiNoContentResponse({ description: 'User deleted' })
@@ -113,7 +148,15 @@ export class UserController {
   @Permissions('user.delete')
   @HttpCode(204)
   @Delete(':id')
-  deleteUser(@Param('id') id: string): Promise<void> {
-    return this.userService.deleteUser(id);
+  deleteUser(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
+  ): Promise<void> {
+    return this.userService.deleteUser(
+      id,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 }

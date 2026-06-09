@@ -13,6 +13,12 @@ import {
 } from '../common/dto/list-response.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+} from '../audit-log/audit-log.constants';
+import { AuditLogService } from '../audit-log/audit-log.service';
+import type { AuditActor, AuditRequestMeta } from '../audit-log/audit-log.types';
+import {
   CreateUserDto,
   ReplaceUserRolesDto,
   UpdateUserDto,
@@ -38,6 +44,7 @@ export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissionService: PermissionService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async listUsers(
@@ -80,38 +87,87 @@ export class UserService {
     return toUserResponse(user);
   }
 
-  async createUser(dto: CreateUserDto): Promise<UserResponseDto> {
+  async createUser(
+    dto: CreateUserDto,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
+  ): Promise<UserResponseDto> {
     const { password, roleCodes, ...data } = dto;
     const passwordHash = await bcrypt.hash(password, 10);
     const roles = await this.resolveCreateRoles(roleCodes);
 
     try {
-      const user = await this.prisma.user.create({
-        data: {
-          ...data,
-          passwordHash,
-          roles: {
-            create: roles.map((role) => ({ roleId: role.id })),
+      return await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            ...data,
+            passwordHash,
+            roles: {
+              create: roles.map((role) => ({ roleId: role.id })),
+            },
           },
-        },
-        include: { roles: { include: { role: true } } },
-      });
+          include: { roles: { include: { role: true } } },
+        });
+        const response = toUserResponse(user);
 
-      return toUserResponse(user);
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.CREATE,
+            resourceType: AUDIT_RESOURCE_TYPES.USER,
+            resourceId: user.id,
+            actor,
+            requestMeta,
+            after: response,
+          },
+          tx,
+        );
+
+        return response;
+      });
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
   }
 
-  async updateUser(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
+  async updateUser(
+    id: string,
+    dto: UpdateUserDto,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
+  ): Promise<UserResponseDto> {
     try {
-      const user = await this.prisma.user.update({
-        where: { id },
-        data: dto,
-        include: { roles: { include: { role: true } } },
-      });
+      return await this.prisma.$transaction(async (tx) => {
+        const before = await tx.user.findUnique({
+          where: { id },
+          include: { roles: { include: { role: true } } },
+        });
 
-      return toUserResponse(user);
+        if (!before) {
+          throw new NotFoundException('User not found');
+        }
+
+        const user = await tx.user.update({
+          where: { id },
+          data: dto,
+          include: { roles: { include: { role: true } } },
+        });
+        const response = toUserResponse(user);
+
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.UPDATE,
+            resourceType: AUDIT_RESOURCE_TYPES.USER,
+            resourceId: id,
+            actor,
+            requestMeta,
+            before: toUserResponse(before),
+            after: response,
+          },
+          tx,
+        );
+
+        return response;
+      });
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
@@ -120,6 +176,8 @@ export class UserService {
   async resetPassword(
     id: string,
     newPassword: string,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
   ): Promise<UserResponseDto> {
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
@@ -137,16 +195,60 @@ export class UserService {
           data: { revokedAt: now, revokedReason: 'admin_reset_password' },
         });
 
-        return toUserResponse(user);
+        const response = toUserResponse(user);
+
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.RESET_PASSWORD,
+            resourceType: AUDIT_RESOURCE_TYPES.USER,
+            resourceId: id,
+            actor,
+            requestMeta,
+            after: {
+              id: response.id,
+              email: response.email,
+              username: response.username,
+            },
+          },
+          tx,
+        );
+
+        return response;
       });
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
   }
 
-  async deleteUser(id: string): Promise<void> {
+  async deleteUser(
+    id: string,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
+  ): Promise<void> {
     try {
-      await this.prisma.user.delete({ where: { id } });
+      await this.prisma.$transaction(async (tx) => {
+        const before = await tx.user.findUnique({
+          where: { id },
+          include: { roles: { include: { role: true } } },
+        });
+
+        if (!before) {
+          throw new NotFoundException('User not found');
+        }
+
+        await tx.user.delete({ where: { id } });
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.DELETE,
+            resourceType: AUDIT_RESOURCE_TYPES.USER,
+            resourceId: id,
+            actor,
+            requestMeta,
+            before: toUserResponse(before),
+          },
+          tx,
+        );
+      });
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
@@ -172,6 +274,8 @@ export class UserService {
     id: string,
     roleCodes: ReplaceUserRolesDto['roleCodes'],
     actorUserId: string,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
   ): Promise<UserResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -184,6 +288,7 @@ export class UserService {
 
     const roles = await this.resolveExplicitRoles(roleCodes);
     await this.assertCanReplaceSuperAdminRoles(user, roles, actorUserId);
+    const beforeRoleCodes = this.toRoleCodes(user);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.userRole.deleteMany({ where: { userId: id } });
@@ -192,15 +297,30 @@ export class UserService {
         skipDuplicates: true,
       });
 
-      return tx.user.findUnique({
+      const nextUser = await tx.user.findUnique({
         where: { id },
         include: { roles: { include: { role: true } } },
       });
-    });
 
-    if (!updated) {
-      throw new NotFoundException('User not found');
-    }
+      if (!nextUser) {
+        throw new NotFoundException('User not found');
+      }
+
+      await this.auditLogService.record(
+        {
+          action: AUDIT_ACTIONS.REPLACE_ROLES,
+          resourceType: AUDIT_RESOURCE_TYPES.USER,
+          resourceId: id,
+          actor,
+          requestMeta,
+          before: { roleCodes: beforeRoleCodes },
+          after: { roleCodes: this.toRoleCodes(nextUser) },
+        },
+        tx,
+      );
+
+      return nextUser;
+    });
 
     await this.permissionService.invalidateUserPermissionContext(id);
 
@@ -326,5 +446,9 @@ export class UserService {
         'Cannot remove the last active super_admin assignment',
       );
     }
+  }
+
+  private toRoleCodes(user: { roles: Array<{ role: { code: string } }> }) {
+    return user.roles.map((userRole) => userRole.role.code).sort();
   }
 }
