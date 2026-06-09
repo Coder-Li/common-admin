@@ -28,6 +28,7 @@ const user: UserProfile = {
     'role.read',
     'dictionary.read',
     'file.read',
+    'audit_log.read',
     'setting.read',
   ],
 }
@@ -49,6 +50,10 @@ vi.mock('../lib/navigation', () => ({
 
 vi.mock('../features/files/FilesPage', () => ({
   FilesPage: () => <div>Files page content</div>,
+}))
+
+vi.mock('../features/audit-logs/AuditLogsPage', () => ({
+  AuditLogsPage: () => <div>Audit logs page content</div>,
 }))
 
 function mockBrowserLanguages(languages: readonly string[]) {
@@ -139,10 +144,27 @@ describe('AdminShell i18n', () => {
     expect(screen.getByTestId('mobile-nav-files')).toHaveTextContent('Files')
   })
 
+  it('renders the Audit Logs nav item when audit log read permission is present', () => {
+    renderAdminShell('/audit-logs', ['audit_log.read'])
+
+    expect(screen.getByTestId('nav-audit-logs')).toHaveTextContent(
+      'Audit Logs',
+    )
+    expect(screen.getByTestId('mobile-nav-audit-logs')).toHaveTextContent(
+      'Audit Logs',
+    )
+  })
+
   it('renders FilesPage for the files route', () => {
     renderAdminShell('/files')
 
     expect(screen.getByText('Files page content')).toBeInTheDocument()
+  })
+
+  it('renders AuditLogsPage for the audit logs route', () => {
+    renderAdminShell('/audit-logs', ['audit_log.read'])
+
+    expect(screen.getByText('Audit logs page content')).toBeInTheDocument()
   })
 
   it('hides Users nav without user read permission', () => {
@@ -170,6 +192,7 @@ describe('AdminShell i18n', () => {
     renderAdminShell('/dashboard', ['dashboard.view', 'file.read'])
 
     expect(screen.getByTestId('nav-files')).toBeInTheDocument()
+    expect(screen.queryByTestId('nav-audit-logs')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-dictionaries')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument()
   })

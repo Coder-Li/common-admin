@@ -11,6 +11,7 @@ const admin = {
     'role.read',
     'dictionary.read',
     'file.read',
+    'audit_log.read',
     'setting.read',
   ],
 }
@@ -98,6 +99,27 @@ describe('route guard', () => {
       path: '/files',
       redirectTo: '/login',
       status: 'login',
+    })
+  })
+
+  it('allows authenticated users to visit audit logs', () => {
+    expect(resolveRoute('/audit-logs', admin)).toEqual({
+      path: '/audit-logs',
+      redirectTo: null,
+      status: 'ok',
+    })
+  })
+
+  it('redirects direct audit log visits without permission to forbidden', () => {
+    expect(
+      resolveRoute('/audit-logs', {
+        status: 'authenticated',
+        permissions: ['dashboard.view'],
+      }),
+    ).toEqual({
+      path: '/audit-logs',
+      redirectTo: '/403',
+      status: 'forbidden',
     })
   })
 

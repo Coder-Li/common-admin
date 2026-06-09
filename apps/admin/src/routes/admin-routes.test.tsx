@@ -17,18 +17,36 @@ describe('admin routes', () => {
       '/permissions',
       '/dictionaries',
       '/files',
+      '/audit-logs',
       '/settings',
     ])
     expect(findAdminRoute('/roles')?.requiredPermissions).toEqual(['role.read'])
     expect(findAdminRoute('/permissions')?.requiredPermissions).toEqual([
       'permission.read',
     ])
+    expect(findAdminRoute('/audit-logs')?.requiredPermissions).toEqual([
+      'audit_log.read',
+    ])
   })
 
   it('filters visible routes by required permissions', () => {
+    const routes = getVisibleAdminRoutes([
+      'dashboard.view',
+      'user.read',
+      'audit_log.read',
+    ])
+
+    expect(routes.map((route) => route.path)).toEqual([
+      '/dashboard',
+      '/users',
+      '/audit-logs',
+    ])
+  })
+
+  it('hides the audit logs route without audit log read permission', () => {
     const routes = getVisibleAdminRoutes(['dashboard.view', 'user.read'])
 
-    expect(routes.map((route) => route.path)).toEqual(['/dashboard', '/users'])
+    expect(routes.map((route) => route.path)).not.toContain('/audit-logs')
   })
 
   it('returns the first visible route for login redirects', () => {

@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import {
   BookOpen,
+  ClipboardList,
   Folder,
   KeyRound,
   Lock,
@@ -10,6 +11,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { PermissionsPage } from '../features/permissions/PermissionsPage'
+import { AuditLogsPage } from '../features/audit-logs/AuditLogsPage'
 import { DictionariesPage } from '../features/dictionaries/DictionariesPage'
 import { FilesPage } from '../features/files/FilesPage'
 import { RolesPage } from '../features/roles/RolesPage'
@@ -75,6 +77,13 @@ export const adminRoutes: AdminRoute[] = [
     requiredPermissions: ['file.read'],
     icon: Folder,
     component: FilesPage,
+  },
+  {
+    path: '/audit-logs',
+    labelKey: 'nav.auditLogs',
+    requiredPermissions: ['audit_log.read'],
+    icon: ClipboardList,
+    component: AuditLogsPage,
   },
   {
     path: '/settings',
