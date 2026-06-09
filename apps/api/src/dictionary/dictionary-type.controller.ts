@@ -8,7 +8,9 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -19,7 +21,13 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  buildAuditActor,
+  getAuditRequestMeta,
+} from '../audit-log/audit-log-request-meta';
 import { Permissions } from '../auth/permissions.decorator';
+import { CurrentUser } from '../user/current-user.decorator';
+import type { JwtUserPayload } from '../user/user.types';
 import {
   CreateDictionaryTypeDto,
   DictionaryTypeListQueryDto,
@@ -63,8 +71,14 @@ export class DictionaryTypeController {
   @Post()
   createType(
     @Body() body: CreateDictionaryTypeDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<DictionaryTypeResponseDto> {
-    return this.dictionaryTypeService.createType(body);
+    return this.dictionaryTypeService.createType(
+      body,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiOkResponse({ type: DictionaryTypeResponseDto })
@@ -75,8 +89,15 @@ export class DictionaryTypeController {
   updateType(
     @Param('id') id: string,
     @Body() body: UpdateDictionaryTypeDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<DictionaryTypeResponseDto> {
-    return this.dictionaryTypeService.updateType(id, body);
+    return this.dictionaryTypeService.updateType(
+      id,
+      body,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiNoContentResponse({ description: 'Dictionary type deleted' })
@@ -86,7 +107,15 @@ export class DictionaryTypeController {
   @Permissions('dictionary.delete')
   @HttpCode(204)
   @Delete(':id')
-  deleteType(@Param('id') id: string): Promise<void> {
-    return this.dictionaryTypeService.deleteType(id);
+  deleteType(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
+  ): Promise<void> {
+    return this.dictionaryTypeService.deleteType(
+      id,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 }

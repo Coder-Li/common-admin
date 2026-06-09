@@ -11,6 +11,15 @@ import {
 } from '../common/dto/list-response.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+} from '../audit-log/audit-log.constants';
+import { AuditLogService } from '../audit-log/audit-log.service';
+import type {
+  AuditActor,
+  AuditRequestMeta,
+} from '../audit-log/audit-log.types';
+import {
   CreateDictionaryTypeDto,
   DictionaryTypeListQueryDto,
   UpdateDictionaryTypeDto,
@@ -29,7 +38,10 @@ const DICTIONARY_TYPE_SORT_FIELDS = new Set([
 
 @Injectable()
 export class DictionaryTypeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   async listTypes(
     query: DictionaryTypeListQueryDto,
@@ -69,11 +81,28 @@ export class DictionaryTypeService {
 
   async createType(
     dto: CreateDictionaryTypeDto,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
   ): Promise<DictionaryTypeResponseDto> {
     try {
-      const type = await this.prisma.dictionaryType.create({ data: dto });
+      return await this.prisma.$transaction(async (tx) => {
+        const type = await tx.dictionaryType.create({ data: dto });
+        const response = toDictionaryTypeResponse(type);
 
-      return toDictionaryTypeResponse(type);
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.CREATE,
+            resourceType: AUDIT_RESOURCE_TYPES.DICTIONARY_TYPE,
+            resourceId: type.id,
+            actor,
+            requestMeta,
+            after: response,
+          },
+          tx,
+        );
+
+        return response;
+      });
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
@@ -82,20 +111,48 @@ export class DictionaryTypeService {
   async updateType(
     id: string,
     dto: UpdateDictionaryTypeDto,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
   ): Promise<DictionaryTypeResponseDto> {
     try {
-      const type = await this.prisma.dictionaryType.update({
-        where: { id },
-        data: dto,
-      });
+      return await this.prisma.$transaction(async (tx) => {
+        const before = await tx.dictionaryType.findUnique({ where: { id } });
 
-      return toDictionaryTypeResponse(type);
+        if (!before) {
+          throw new NotFoundException('Dictionary type not found');
+        }
+
+        const type = await tx.dictionaryType.update({
+          where: { id },
+          data: dto,
+        });
+        const response = toDictionaryTypeResponse(type);
+
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.UPDATE,
+            resourceType: AUDIT_RESOURCE_TYPES.DICTIONARY_TYPE,
+            resourceId: id,
+            actor,
+            requestMeta,
+            before: toDictionaryTypeResponse(before),
+            after: response,
+          },
+          tx,
+        );
+
+        return response;
+      });
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
   }
 
-  async deleteType(id: string): Promise<void> {
+  async deleteType(
+    id: string,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
+  ): Promise<void> {
     const type = await this.prisma.dictionaryType.findUnique({ where: { id } });
 
     if (!type) {
@@ -115,7 +172,21 @@ export class DictionaryTypeService {
     }
 
     try {
-      await this.prisma.dictionaryType.delete({ where: { id } });
+      await this.prisma.$transaction(async (tx) => {
+        const deleted = await tx.dictionaryType.delete({ where: { id } });
+
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.DELETE,
+            resourceType: AUDIT_RESOURCE_TYPES.DICTIONARY_TYPE,
+            resourceId: id,
+            actor,
+            requestMeta,
+            before: toDictionaryTypeResponse(deleted),
+          },
+          tx,
+        );
+      });
     } catch (error) {
       this.handlePrismaWriteError(error);
     }

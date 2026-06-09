@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuditLogModule } from '../audit-log/audit-log.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { DictionaryItemController } from './dictionary-item.controller';
 import { DictionaryItemService } from './dictionary-item.service';
@@ -8,7 +9,7 @@ import { DictionaryTypeController } from './dictionary-type.controller';
 import { DictionaryTypeService } from './dictionary-type.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuditLogModule],
   controllers: [
     DictionaryTypeController,
     DictionaryItemController,

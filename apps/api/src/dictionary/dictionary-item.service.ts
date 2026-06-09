@@ -10,6 +10,15 @@ import {
   createListResponse,
 } from '../common/dto/list-response.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+} from '../audit-log/audit-log.constants';
+import { AuditLogService } from '../audit-log/audit-log.service';
+import type {
+  AuditActor,
+  AuditRequestMeta,
+} from '../audit-log/audit-log.types';
 import { toDictionaryItemResponse } from './dictionary-item.mapper';
 import {
   CreateDictionaryItemDto,
@@ -30,7 +39,10 @@ const DICTIONARY_ITEM_SORT_FIELDS = new Set([
 
 @Injectable()
 export class DictionaryItemService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   async listItems(
     query: DictionaryItemListQueryDto,
@@ -74,6 +86,8 @@ export class DictionaryItemService {
 
   async createItem(
     dto: CreateDictionaryItemDto,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
   ): Promise<DictionaryItemResponseDto> {
     const type = await this.prisma.dictionaryType.findUnique({
       where: { id: dto.typeId },
@@ -102,27 +116,34 @@ export class DictionaryItemService {
     };
 
     try {
-      if (dto.isDefault) {
-        const [, item] = await this.prisma.$transaction([
-          this.prisma.dictionaryItem.updateMany({
+      return await this.prisma.$transaction(async (tx) => {
+        if (dto.isDefault) {
+          await tx.dictionaryItem.updateMany({
             where: { typeId: dto.typeId, isDefault: true },
             data: { isDefault: false },
-          }),
-          this.prisma.dictionaryItem.create({
-            data,
-            include: { type: true },
-          }),
-        ]);
+          });
+        }
 
-        return toDictionaryItemResponse(item);
-      }
+        const item = await tx.dictionaryItem.create({
+          data,
+          include: { type: true },
+        });
+        const response = toDictionaryItemResponse(item);
 
-      const item = await this.prisma.dictionaryItem.create({
-        data,
-        include: { type: true },
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.CREATE,
+            resourceType: AUDIT_RESOURCE_TYPES.DICTIONARY_ITEM,
+            resourceId: item.id,
+            actor,
+            requestMeta,
+            after: response,
+          },
+          tx,
+        );
+
+        return response;
       });
-
-      return toDictionaryItemResponse(item);
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
@@ -131,6 +152,8 @@ export class DictionaryItemService {
   async updateItem(
     id: string,
     dto: UpdateDictionaryItemDto,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
   ): Promise<DictionaryItemResponseDto> {
     const existingItem = await this.prisma.dictionaryItem.findUnique({
       where: { id },
@@ -162,41 +185,53 @@ export class DictionaryItemService {
     };
 
     try {
-      if (dto.isDefault) {
-        const [, item] = await this.prisma.$transaction([
-          this.prisma.dictionaryItem.updateMany({
+      return await this.prisma.$transaction(async (tx) => {
+        if (dto.isDefault) {
+          await tx.dictionaryItem.updateMany({
             where: {
               typeId: existingItem.typeId,
               isDefault: true,
               id: { not: id },
             },
             data: { isDefault: false },
-          }),
-          this.prisma.dictionaryItem.update({
-            where: { id },
-            data,
-            include: { type: true },
-          }),
-        ]);
+          });
+        }
 
-        return toDictionaryItemResponse(item);
-      }
+        const item = await tx.dictionaryItem.update({
+          where: { id },
+          data,
+          include: { type: true },
+        });
+        const response = toDictionaryItemResponse(item);
 
-      const item = await this.prisma.dictionaryItem.update({
-        where: { id },
-        data,
-        include: { type: true },
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.UPDATE,
+            resourceType: AUDIT_RESOURCE_TYPES.DICTIONARY_ITEM,
+            resourceId: id,
+            actor,
+            requestMeta,
+            before: toDictionaryItemResponse(existingItem),
+            after: response,
+          },
+          tx,
+        );
+
+        return response;
       });
-
-      return toDictionaryItemResponse(item);
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
   }
 
-  async deleteItem(id: string): Promise<void> {
+  async deleteItem(
+    id: string,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
+  ): Promise<void> {
     const existingItem = await this.prisma.dictionaryItem.findUnique({
       where: { id },
+      include: { type: true },
     });
 
     if (!existingItem) {
@@ -208,7 +243,24 @@ export class DictionaryItemService {
     }
 
     try {
-      await this.prisma.dictionaryItem.delete({ where: { id } });
+      await this.prisma.$transaction(async (tx) => {
+        await tx.dictionaryItem.delete({
+          where: { id },
+          include: { type: true },
+        });
+
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.DELETE,
+            resourceType: AUDIT_RESOURCE_TYPES.DICTIONARY_ITEM,
+            resourceId: id,
+            actor,
+            requestMeta,
+            before: toDictionaryItemResponse(existingItem),
+          },
+          tx,
+        );
+      });
     } catch (error) {
       this.handlePrismaWriteError(error);
     }

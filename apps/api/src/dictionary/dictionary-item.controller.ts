@@ -8,7 +8,9 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -19,7 +21,13 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  buildAuditActor,
+  getAuditRequestMeta,
+} from '../audit-log/audit-log-request-meta';
 import { Permissions } from '../auth/permissions.decorator';
+import { CurrentUser } from '../user/current-user.decorator';
+import type { JwtUserPayload } from '../user/user.types';
 import { DictionaryItemService } from './dictionary-item.service';
 import {
   CreateDictionaryItemDto,
@@ -64,8 +72,14 @@ export class DictionaryItemController {
   @Post()
   createItem(
     @Body() body: CreateDictionaryItemDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<DictionaryItemResponseDto> {
-    return this.dictionaryItemService.createItem(body);
+    return this.dictionaryItemService.createItem(
+      body,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiOkResponse({ type: DictionaryItemResponseDto })
@@ -77,8 +91,15 @@ export class DictionaryItemController {
   updateItem(
     @Param('id') id: string,
     @Body() body: UpdateDictionaryItemDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<DictionaryItemResponseDto> {
-    return this.dictionaryItemService.updateItem(id, body);
+    return this.dictionaryItemService.updateItem(
+      id,
+      body,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiNoContentResponse({ description: 'Dictionary item deleted' })
@@ -90,7 +111,15 @@ export class DictionaryItemController {
   @Permissions('dictionary.delete')
   @HttpCode(204)
   @Delete(':id')
-  deleteItem(@Param('id') id: string): Promise<void> {
-    return this.dictionaryItemService.deleteItem(id);
+  deleteItem(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
+  ): Promise<void> {
+    return this.dictionaryItemService.deleteItem(
+      id,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 }

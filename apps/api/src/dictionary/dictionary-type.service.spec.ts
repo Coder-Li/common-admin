@@ -7,6 +7,14 @@ import {
 import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import { DictionaryStatus, Prisma } from '@prisma/client';
 import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+} from '../audit-log/audit-log.constants';
+import type {
+  AuditActor,
+  AuditRequestMeta,
+} from '../audit-log/audit-log.types';
+import {
   CreateDictionaryTypeDto,
   DictionaryTypeListQueryDto,
   UpdateDictionaryTypeDto,
@@ -176,13 +184,25 @@ describe('DictionaryTypeService', () => {
     dictionaryItem: {
       count: jest.fn(),
     },
+    $transaction: jest.fn(),
   });
 
   const createService = () => {
     const prisma = createPrismaMock();
-    const service = new DictionaryTypeService(prisma as never);
+    const tx = createPrismaMock();
+    prisma.$transaction.mockImplementation(
+      async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx),
+    );
+    const auditLogService = {
+      record: jest.fn(),
+    };
+    const ServiceCtor = DictionaryTypeService as unknown as new (
+      prisma: never,
+      auditLogService: never,
+    ) => DictionaryTypeService;
+    const service = new ServiceCtor(prisma as never, auditLogService as never);
 
-    return { prisma, service };
+    return { auditLogService, prisma, service, tx };
   };
 
   function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
@@ -212,6 +232,17 @@ describe('DictionaryTypeService', () => {
       code: 'P2003',
       clientVersion: 'test',
     });
+
+  const auditActor: AuditActor = {
+    userId: 'actor-1',
+    email: 'actor@example.com',
+    name: 'Actor',
+  };
+
+  const auditRequestMeta: AuditRequestMeta = {
+    ipAddress: '127.0.0.1',
+    userAgent: 'jest',
+  };
 
   beforeEach(() => {
     jest.restoreAllMocks();
@@ -283,9 +314,46 @@ describe('DictionaryTypeService', () => {
   });
 
   describe('createType', () => {
+    it('creates a type and writes create audit with after snapshot in one transaction', async () => {
+      const { auditLogService, prisma, service, tx } = createService();
+      const createdType = makeType();
+      tx.dictionaryType.create.mockResolvedValue(createdType);
+
+      await expect(
+        service.createType(
+          {
+            code: 'user_role',
+            name: 'User role',
+          },
+          auditActor,
+          auditRequestMeta,
+        ),
+      ).resolves.toEqual(toDictionaryTypeResponse(createdType));
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.dictionaryType.create).toHaveBeenCalledWith({
+        data: {
+          code: 'user_role',
+          name: 'User role',
+        },
+      });
+      expect(prisma.dictionaryType.create).not.toHaveBeenCalled();
+      expect(auditLogService.record).toHaveBeenCalledWith(
+        {
+          action: AUDIT_ACTIONS.CREATE,
+          resourceType: AUDIT_RESOURCE_TYPES.DICTIONARY_TYPE,
+          resourceId: 'type-1',
+          actor: auditActor,
+          requestMeta: auditRequestMeta,
+          after: toDictionaryTypeResponse(createdType),
+        },
+        tx,
+      );
+    });
+
     it('maps duplicate code writes to ConflictException', async () => {
-      const { prisma, service } = createService();
-      prisma.dictionaryType.create.mockRejectedValue(uniqueConstraintError());
+      const { service, tx } = createService();
+      tx.dictionaryType.create.mockRejectedValue(uniqueConstraintError());
 
       await expect(
         service.createType({
@@ -309,8 +377,8 @@ describe('DictionaryTypeService', () => {
 
   describe('updateType', () => {
     it('maps missing records to NotFoundException', async () => {
-      const { prisma, service } = createService();
-      prisma.dictionaryType.update.mockRejectedValue(notFoundError());
+      const { service, tx } = createService();
+      tx.dictionaryType.findUnique.mockResolvedValue(null);
 
       await expect(
         service.updateType('missing-type', { name: 'Missing' }),
@@ -318,8 +386,9 @@ describe('DictionaryTypeService', () => {
     });
 
     it('updates only DTO fields and cannot change code or isSystem', async () => {
-      const { prisma, service } = createService();
-      prisma.dictionaryType.update.mockResolvedValue(
+      const { service, tx } = createService();
+      tx.dictionaryType.findUnique.mockResolvedValue(makeType());
+      tx.dictionaryType.update.mockResolvedValue(
         makeType({ name: 'User roles', status: DictionaryStatus.DISABLED }),
       );
 
@@ -329,7 +398,7 @@ describe('DictionaryTypeService', () => {
         description: 'Updated labels',
       });
 
-      expect(prisma.dictionaryType.update).toHaveBeenCalledWith({
+      expect(tx.dictionaryType.update).toHaveBeenCalledWith({
         where: { id: 'type-1' },
         data: {
           name: 'User roles',
@@ -339,14 +408,53 @@ describe('DictionaryTypeService', () => {
       });
       expect(
         firstMockArg<{ data: Record<string, unknown> }>(
-          prisma.dictionaryType.update,
+          tx.dictionaryType.update,
         ).data,
       ).not.toHaveProperty('code');
       expect(
         firstMockArg<{ data: Record<string, unknown> }>(
-          prisma.dictionaryType.update,
+          tx.dictionaryType.update,
         ).data,
       ).not.toHaveProperty('isSystem');
+    });
+
+    it('reads before, updates, and writes update audit with before and after snapshots in one transaction', async () => {
+      const { auditLogService, prisma, service, tx } = createService();
+      const before = makeType({ name: 'User role' });
+      const after = makeType({ name: 'User roles' });
+      tx.dictionaryType.findUnique.mockResolvedValue(before);
+      tx.dictionaryType.update.mockResolvedValue(after);
+
+      await expect(
+        service.updateType(
+          'type-1',
+          { name: 'User roles' },
+          auditActor,
+          auditRequestMeta,
+        ),
+      ).resolves.toEqual(toDictionaryTypeResponse(after));
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.dictionaryType.findUnique).toHaveBeenCalledWith({
+        where: { id: 'type-1' },
+      });
+      expect(tx.dictionaryType.update).toHaveBeenCalledWith({
+        where: { id: 'type-1' },
+        data: { name: 'User roles' },
+      });
+      expect(prisma.dictionaryType.update).not.toHaveBeenCalled();
+      expect(auditLogService.record).toHaveBeenCalledWith(
+        {
+          action: AUDIT_ACTIONS.UPDATE,
+          resourceType: AUDIT_RESOURCE_TYPES.DICTIONARY_TYPE,
+          resourceId: 'type-1',
+          actor: auditActor,
+          requestMeta: auditRequestMeta,
+          before: toDictionaryTypeResponse(before),
+          after: toDictionaryTypeResponse(after),
+        },
+        tx,
+      );
     });
   });
 
@@ -361,7 +469,7 @@ describe('DictionaryTypeService', () => {
     });
 
     it('rejects system dictionary types', async () => {
-      const { prisma, service } = createService();
+      const { auditLogService, prisma, service } = createService();
       prisma.dictionaryType.findUnique.mockResolvedValue(
         makeType({ isSystem: true }),
       );
@@ -370,10 +478,12 @@ describe('DictionaryTypeService', () => {
         ConflictException,
       );
       expect(prisma.dictionaryType.delete).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(auditLogService.record).not.toHaveBeenCalled();
     });
 
     it('rejects non-system dictionary types with existing items', async () => {
-      const { prisma, service } = createService();
+      const { auditLogService, prisma, service } = createService();
       prisma.dictionaryType.findUnique.mockResolvedValue(makeType());
       prisma.dictionaryItem.count.mockResolvedValue(2);
 
@@ -381,26 +491,42 @@ describe('DictionaryTypeService', () => {
         ConflictException,
       );
       expect(prisma.dictionaryType.delete).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(auditLogService.record).not.toHaveBeenCalled();
     });
 
     it('deletes non-system dictionary types without items', async () => {
-      const { prisma, service } = createService();
-      prisma.dictionaryType.findUnique.mockResolvedValue(makeType());
+      const { auditLogService, prisma, service, tx } = createService();
+      const before = makeType();
+      prisma.dictionaryType.findUnique.mockResolvedValue(before);
       prisma.dictionaryItem.count.mockResolvedValue(0);
-      prisma.dictionaryType.delete.mockResolvedValue(makeType());
+      tx.dictionaryType.delete.mockResolvedValue(before);
 
-      await service.deleteType('type-1');
+      await service.deleteType('type-1', auditActor, auditRequestMeta);
 
-      expect(prisma.dictionaryType.delete).toHaveBeenCalledWith({
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.dictionaryType.delete).toHaveBeenCalledWith({
         where: { id: 'type-1' },
       });
+      expect(prisma.dictionaryType.delete).not.toHaveBeenCalled();
+      expect(auditLogService.record).toHaveBeenCalledWith(
+        {
+          action: AUDIT_ACTIONS.DELETE,
+          resourceType: AUDIT_RESOURCE_TYPES.DICTIONARY_TYPE,
+          resourceId: 'type-1',
+          actor: auditActor,
+          requestMeta: auditRequestMeta,
+          before: toDictionaryTypeResponse(before),
+        },
+        tx,
+      );
     });
 
     it('maps delete P2025 to NotFoundException', async () => {
-      const { prisma, service } = createService();
+      const { prisma, service, tx } = createService();
       prisma.dictionaryType.findUnique.mockResolvedValue(makeType());
       prisma.dictionaryItem.count.mockResolvedValue(0);
-      prisma.dictionaryType.delete.mockRejectedValue(notFoundError());
+      tx.dictionaryType.delete.mockRejectedValue(notFoundError());
 
       await expect(service.deleteType('missing-type')).rejects.toBeInstanceOf(
         NotFoundException,
@@ -408,10 +534,10 @@ describe('DictionaryTypeService', () => {
     });
 
     it('maps delete P2003 races to ConflictException', async () => {
-      const { prisma, service } = createService();
+      const { prisma, service, tx } = createService();
       prisma.dictionaryType.findUnique.mockResolvedValue(makeType());
       prisma.dictionaryItem.count.mockResolvedValue(0);
-      prisma.dictionaryType.delete.mockRejectedValue(foreignKeyError());
+      tx.dictionaryType.delete.mockRejectedValue(foreignKeyError());
 
       await expect(service.deleteType('type-1')).rejects.toBeInstanceOf(
         ConflictException,
@@ -439,10 +565,33 @@ describe('DictionaryTypeController', () => {
       deleteType: jest.fn().mockResolvedValue(undefined),
     };
     const controller = new DictionaryTypeController(service as never);
+    const user = {
+      sub: 'actor-1',
+      sid: 'session-1',
+      email: 'actor@example.com',
+      username: 'Actor',
+    };
+    const request = {
+      ip: '127.0.0.1',
+      headers: { 'user-agent': 'jest' },
+    };
 
-    await expect(controller.deleteType('type-1')).resolves.toBeUndefined();
+    await expect(
+      controller.deleteType('type-1', user, request as never),
+    ).resolves.toBeUndefined();
 
-    expect(service.deleteType).toHaveBeenCalledWith('type-1');
+    expect(service.deleteType).toHaveBeenCalledWith(
+      'type-1',
+      {
+        userId: 'actor-1',
+        email: 'actor@example.com',
+        name: 'Actor',
+      },
+      {
+        ipAddress: '127.0.0.1',
+        userAgent: 'jest',
+      },
+    );
     expect(
       Reflect.getMetadata(HTTP_CODE_METADATA, controllerMethod('deleteType')),
     ).toBe(204);
