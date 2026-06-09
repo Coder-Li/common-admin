@@ -16,6 +16,28 @@ const envSchema = z.object({
     .min(16)
     .default('local-access-secret-change-me'),
   JWT_ACCESS_TOKEN_EXPIRES_IN: z.string().default('15m'),
+  FILE_STORAGE_DRIVER: z.enum(['local']).default('local'),
+  LOCAL_STORAGE_ROOT: z.string().min(1).default('./storage/uploads'),
+  FILE_MAX_SIZE_MB: z.coerce.number().int().positive().default(20),
+  FILE_ALLOWED_MIME_TYPES: z
+    .string()
+    .default('image/jpeg,image/png,image/webp,application/pdf,text/plain')
+    .transform((value, ctx) => {
+      const mimeTypes = value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (mimeTypes.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'FILE_ALLOWED_MIME_TYPES must include at least one MIME type',
+        });
+        return z.NEVER;
+      }
+
+      return mimeTypes.join(',');
+    }),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
