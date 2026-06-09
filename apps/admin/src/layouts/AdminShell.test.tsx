@@ -17,7 +17,15 @@ const user: UserProfile = {
   username: 'admin',
   firstName: 'Admin',
   lastName: 'User',
-  role: 'ADMIN',
+  roles: [{ code: 'admin', name: 'Admin' }],
+  permissions: [
+    'dashboard.view',
+    'user.read',
+    'role.read',
+    'dictionary.read',
+    'file.read',
+    'setting.read',
+  ],
 }
 
 vi.mock('../app/api-client', () => ({
@@ -41,7 +49,10 @@ function mockBrowserLanguages(languages: readonly string[]) {
   })
 }
 
-function renderAdminShell(currentPath = '/dashboard') {
+function renderAdminShell(
+  currentPath = '/dashboard',
+  permissions = user.permissions,
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -50,7 +61,7 @@ function renderAdminShell(currentPath = '/dashboard') {
 
   useAuthStore.getState().setSession({
     accessToken: 'access-token',
-    user,
+    user: { ...user, permissions },
   })
 
   return render(
@@ -115,5 +126,34 @@ describe('AdminShell i18n', () => {
     renderAdminShell('/files')
 
     expect(screen.getByText('Files page content')).toBeInTheDocument()
+  })
+
+  it('hides Users nav without user read permission', () => {
+    renderAdminShell('/dashboard', ['dashboard.view', 'role.read'])
+
+    expect(screen.queryByTestId('nav-users')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('mobile-nav-users')).not.toBeInTheDocument()
+  })
+
+  it('shows Users nav with user read permission', () => {
+    renderAdminShell('/dashboard', ['dashboard.view', 'user.read'])
+
+    expect(screen.getByTestId('nav-users')).toHaveTextContent('Users')
+    expect(screen.getByTestId('mobile-nav-users')).toHaveTextContent('Users')
+  })
+
+  it('includes Roles nav when role read permission is present', () => {
+    renderAdminShell('/roles', ['role.read'])
+
+    expect(screen.getByTestId('nav-roles')).toHaveTextContent('Roles')
+    expect(screen.getByTestId('mobile-nav-roles')).toHaveTextContent('Roles')
+  })
+
+  it('does not render links to unauthorized routes', () => {
+    renderAdminShell('/dashboard', ['dashboard.view', 'file.read'])
+
+    expect(screen.getByTestId('nav-files')).toBeInTheDocument()
+    expect(screen.queryByTestId('nav-dictionaries')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument()
   })
 })

@@ -29,6 +29,14 @@ import type {
   FileRecord,
   UpdateFileRequest,
 } from '../features/files/files.types'
+import type {
+  CreateRoleRequest,
+  PermissionModule,
+  RoleListQuery,
+  RoleListResponse,
+  RoleRecord,
+  UpdateRoleRequest,
+} from '../features/roles/roles.types'
 
 export interface LoginCredentials {
   usernameOrEmail: string
@@ -55,6 +63,11 @@ interface HttpClient {
     config?: RequestConfig,
   ): Promise<{ data: T }>
   patch?<T = unknown>(
+    url: string,
+    data?: unknown,
+    config?: RequestConfig,
+  ): Promise<{ data: T }>
+  put?<T = unknown>(
     url: string,
     data?: unknown,
     config?: RequestConfig,
@@ -204,6 +217,100 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
         }
         return request(() =>
           client.delete!<void>(`/users/${id}`, authenticatedConfig()),
+        )
+      },
+
+      async replaceRoles(
+        id: string,
+        roleCodes: string[],
+      ): Promise<UserRecord> {
+        if (!client.put) {
+          throw new Error('HTTP put client is not configured')
+        }
+        return request(() =>
+          client.put!<UserRecord>(
+            `/users/${id}/roles`,
+            { roleCodes },
+            authenticatedConfig(),
+          ),
+        )
+      },
+    },
+
+    roles: {
+      async list(query: RoleListQuery): Promise<RoleListResponse> {
+        if (!client.get) {
+          throw new Error('HTTP get client is not configured')
+        }
+        return request(() =>
+          client.get!<RoleListResponse>(
+            '/roles',
+            authenticatedConfig(undefined, query),
+          ),
+        )
+      },
+
+      async create(payload: CreateRoleRequest): Promise<RoleRecord> {
+        if (!client.post) {
+          throw new Error('HTTP post client is not configured')
+        }
+        return request(() =>
+          client.post!<RoleRecord>('/roles', payload, authenticatedConfig()),
+        )
+      },
+
+      async update(
+        id: string,
+        payload: UpdateRoleRequest,
+      ): Promise<RoleRecord> {
+        if (!client.patch) {
+          throw new Error('HTTP patch client is not configured')
+        }
+        return request(() =>
+          client.patch!<RoleRecord>(
+            `/roles/${id}`,
+            payload,
+            authenticatedConfig(),
+          ),
+        )
+      },
+
+      async delete(id: string): Promise<void> {
+        if (!client.delete) {
+          throw new Error('HTTP delete client is not configured')
+        }
+        return request(() =>
+          client.delete!<void>(`/roles/${id}`, authenticatedConfig()),
+        )
+      },
+
+      async replacePermissions(
+        id: string,
+        permissionCodes: string[],
+      ): Promise<RoleRecord> {
+        if (!client.put) {
+          throw new Error('HTTP put client is not configured')
+        }
+        return request(() =>
+          client.put!<RoleRecord>(
+            `/roles/${id}/permissions`,
+            { permissionCodes },
+            authenticatedConfig(),
+          ),
+        )
+      },
+    },
+
+    permissions: {
+      async modules(): Promise<PermissionModule[]> {
+        if (!client.get) {
+          throw new Error('HTTP get client is not configured')
+        }
+        return request(() =>
+          client.get!<PermissionModule[]>(
+            '/permissions/modules',
+            authenticatedConfig(),
+          ),
         )
       },
     },

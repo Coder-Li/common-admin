@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DictionaryOption } from './dictionaries.types'
-import {
-  filterRoleOptions,
-  getDictionaryLabel,
-  mergeRoleFallbackOptions,
-} from './dictionary-label'
+import { getDictionaryLabel } from './dictionary-label'
 
 const options: DictionaryOption[] = [
   {
@@ -28,47 +24,5 @@ describe('dictionary label helpers', () => {
 
   it('returns the fallback when the dictionary value is missing', () => {
     expect(getDictionaryLabel(options, 'MISSING', 'MISSING')).toBe('MISSING')
-  })
-
-  it('filters role options to values supported by the local role union', () => {
-    expect([
-      ...filterRoleOptions([
-        ...options,
-        {
-          value: 'MANAGER',
-          label: 'Manager',
-          isDefault: false,
-        },
-      ]),
-    ]).toEqual(options)
-  })
-
-  it('merges missing role fallback options without replacing dictionary labels', () => {
-    expect(
-      mergeRoleFallbackOptions(
-        [
-          {
-            value: 'ADMIN',
-            label: 'Administrator',
-            isDefault: false,
-          },
-        ],
-        {
-          ADMIN: 'Admin',
-          STANDARD: 'Standard',
-        },
-      ),
-    ).toEqual([
-      {
-        value: 'ADMIN',
-        label: 'Administrator',
-        isDefault: false,
-      },
-      {
-        value: 'STANDARD',
-        label: 'Standard',
-        isDefault: false,
-      },
-    ])
   })
 })

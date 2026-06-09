@@ -13,6 +13,7 @@ export interface UsersApiClient {
     create(payload: CreateUserRequest): Promise<UserRecord>
     update(id: string, payload: UpdateUserRequest): Promise<UserRecord>
     delete(id: string): Promise<void>
+    replaceRoles(id: string, roleCodes: string[]): Promise<UserRecord>
   }
 }
 
@@ -40,4 +41,12 @@ export function updateUser(
 
 export function deleteUser(id: string, api: UsersApiClient = defaultApi) {
   return api.users.delete(id)
+}
+
+export function replaceUserRoles(
+  id: string,
+  roleCodes: string[],
+  api: UsersApiClient = defaultApi,
+) {
+  return api.users.replaceRoles(id, roleCodes)
 }

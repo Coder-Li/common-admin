@@ -4,21 +4,19 @@ import type { ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { useI18n } from '../../i18n/useI18n'
-import type { RoleDictionaryOption } from '../../lib/dictionaries/dictionary-label'
 import type {
   CreateUserRequest,
-  Role,
   UpdateUserRequest,
   UserRecord,
+  UserRoleSummary,
 } from './users.types'
-
-const roles = ['ADMIN', 'STANDARD'] as const satisfies readonly Role[]
 
 interface UserFormProps {
   mode: 'create' | 'edit'
   initialValue?: UserRecord
   isSubmitting: boolean
-  roleOptions: RoleDictionaryOption[]
+  canAssignRoles: boolean
+  roleOptions: UserRoleSummary[]
   onSubmit: (value: CreateUserRequest | UpdateUserRequest) => void
   onCancel: () => void
 }
@@ -29,13 +27,14 @@ type UserFormValues = {
   firstName: string
   lastName: string
   password?: string
-  role: Role
+  roleCodes: string[]
 }
 
 export function UserForm({
   mode,
   initialValue,
   isSubmitting,
+  canAssignRoles,
   roleOptions,
   onSubmit,
   onCancel,
@@ -49,9 +48,7 @@ export function UserForm({
       username: z.string().trim().min(3, t('users.validation.username')),
       firstName: z.string().trim().min(1, t('users.validation.firstName')),
       lastName: z.string().trim().min(1, t('users.validation.lastName')),
-      role: z.enum(roles, {
-        error: t('users.validation.role'),
-      }),
+      roleCodes: z.array(z.string()),
     })
 
     return isCreate
@@ -77,7 +74,7 @@ export function UserForm({
       firstName: initialValue?.firstName ?? '',
       lastName: initialValue?.lastName ?? '',
       password: '',
-      role: initialValue?.role ?? 'STANDARD',
+      roleCodes: initialValue?.roles.map((role) => role.code) ?? [],
     },
   })
 
@@ -87,13 +84,13 @@ export function UserForm({
       username: value.username,
       firstName: value.firstName,
       lastName: value.lastName,
-      role: value.role,
     }
 
     if (isCreate) {
       onSubmit({
         ...updateValue,
         password: value.password ?? '',
+        roleCodes: canAssignRoles ? value.roleCodes : undefined,
       })
       return
     }
@@ -168,19 +165,25 @@ export function UserForm({
           </Field>
         ) : null}
 
-        <Field error={errors.role?.message} label={t('users.form.role')}>
-          <select
-            aria-invalid={Boolean(errors.role)}
-            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-            {...register('role')}
+        {canAssignRoles ? (
+          <Field
+            error={errors.roleCodes?.message}
+            label={t('users.form.role')}
           >
-            {roleOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+            <select
+              aria-invalid={Boolean(errors.roleCodes)}
+              className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+              multiple
+              {...register('roleCodes')}
+            >
+              {roleOptions.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

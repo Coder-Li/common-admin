@@ -15,6 +15,9 @@ export interface FileColumnLabels {
 }
 
 export interface FileRowActions {
+  canDelete: boolean
+  canDownload: boolean
+  canUpdate: boolean
   onDelete: (file: FileRecord) => void
   onDownload: (file: FileRecord) => void
   onEdit: (file: FileRecord) => void
@@ -94,33 +97,39 @@ export function createFileColumns(
       size: 160,
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-1.5">
-          <button
-            aria-label={labels.download}
-            className="inline-flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-100"
-            onClick={() => actions.onDownload(row.original)}
-            title={labels.download}
-            type="button"
-          >
-            <Download size={16} />
-          </button>
-          <button
-            aria-label={labels.edit}
-            className="inline-flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-100"
-            onClick={() => actions.onEdit(row.original)}
-            title={labels.edit}
-            type="button"
-          >
-            <Pencil size={16} />
-          </button>
-          <button
-            aria-label={labels.delete}
-            className="inline-flex size-8 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-700 transition hover:bg-rose-50"
-            onClick={() => actions.onDelete(row.original)}
-            title={labels.delete}
-            type="button"
-          >
-            <Trash2 size={16} />
-          </button>
+          {actions.canDownload ? (
+            <button
+              aria-label={labels.download}
+              className="inline-flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-100"
+              onClick={() => actions.onDownload(row.original)}
+              title={labels.download}
+              type="button"
+            >
+              <Download size={16} />
+            </button>
+          ) : null}
+          {actions.canUpdate ? (
+            <button
+              aria-label={labels.edit}
+              className="inline-flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-100"
+              onClick={() => actions.onEdit(row.original)}
+              title={labels.edit}
+              type="button"
+            >
+              <Pencil size={16} />
+            </button>
+          ) : null}
+          {actions.canDelete ? (
+            <button
+              aria-label={labels.delete}
+              className="inline-flex size-8 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-700 transition hover:bg-rose-50"
+              onClick={() => actions.onDelete(row.original)}
+              title={labels.delete}
+              type="button"
+            >
+              <Trash2 size={16} />
+            </button>
+          ) : null}
         </div>
       ),
     },

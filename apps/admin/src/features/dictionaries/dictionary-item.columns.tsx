@@ -17,6 +17,8 @@ export interface DictionaryItemColumnLabels {
 }
 
 export interface DictionaryItemRowActions {
+  canDelete: boolean
+  canUpdate: boolean
   onDelete: (item: DictionaryItemRecord) => void
   onEdit: (item: DictionaryItemRecord) => void
 }
@@ -89,21 +91,25 @@ export function createDictionaryItemColumns(
       size: 160,
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-2">
-          <button
-            className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-            onClick={() => actions.onEdit(row.original)}
-            type="button"
-          >
-            {labels.edit}
-          </button>
-          <button
-            className="inline-flex h-8 items-center rounded-md border border-rose-200 bg-white px-3 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={row.original.isSystem}
-            onClick={() => actions.onDelete(row.original)}
-            type="button"
-          >
-            {labels.delete}
-          </button>
+          {actions.canUpdate ? (
+            <button
+              className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              onClick={() => actions.onEdit(row.original)}
+              type="button"
+            >
+              {labels.edit}
+            </button>
+          ) : null}
+          {actions.canDelete ? (
+            <button
+              className="inline-flex h-8 items-center rounded-md border border-rose-200 bg-white px-3 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={row.original.isSystem}
+              onClick={() => actions.onDelete(row.original)}
+              type="button"
+            >
+              {labels.delete}
+            </button>
+          ) : null}
         </div>
       ),
     },

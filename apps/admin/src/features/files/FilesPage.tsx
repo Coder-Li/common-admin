@@ -11,6 +11,8 @@ import type {
 } from '../../components/data-table/DataTable'
 import { useI18n } from '../../i18n/useI18n'
 import { useServerTableQuery } from '../../lib/crud/useServerTableQuery'
+import { can } from '../../lib/permissions'
+import { useAuthStore } from '../../stores/auth-store'
 import { FileForm } from './FileForm'
 import { FileUploadDialog } from './FileUploadDialog'
 import {
@@ -53,6 +55,7 @@ function downloadName(file: FileRecord) {
 export function FilesPage() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
+  const permissions = useAuthStore((state) => state.permissions)
   const [search, setSearch] = useState('')
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -62,6 +65,10 @@ export function FilesPage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<FileRecord | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FileRecord | null>(null)
+  const canUpload = can(permissions, 'file.upload')
+  const canUpdate = can(permissions, 'file.update')
+  const canDelete = can(permissions, 'file.delete')
+  const canDownload = can(permissions, 'file.download')
 
   const filesQuery = useServerTableQuery<FileRecord, object, FileTableQuery>({
     resource: 'files',
@@ -147,12 +154,15 @@ export function FilesPage() {
           storageDriver: t('files.column.storageDriver'),
         },
         {
+          canDelete,
+          canDownload,
+          canUpdate,
           onDelete: setDeleteTarget,
           onDownload: (file) => downloadMutation.mutate(file),
           onEdit: setEditTarget,
         },
       ),
-    [downloadMutation, t],
+    [canDelete, canDownload, canUpdate, downloadMutation, t],
   )
 
   const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {
@@ -192,14 +202,16 @@ export function FilesPage() {
         <h2 className="text-lg font-semibold text-slate-950">
           {t('files.title')}
         </h2>
-        <button
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-medium text-white transition hover:bg-cyan-600"
-          onClick={() => setIsUploadOpen(true)}
-          type="button"
-        >
-          <Upload size={16} />
-          {t('files.action.upload')}
-        </button>
+        {canUpload ? (
+          <button
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-medium text-white transition hover:bg-cyan-600"
+            onClick={() => setIsUploadOpen(true)}
+            type="button"
+          >
+            <Upload size={16} />
+            {t('files.action.upload')}
+          </button>
+        ) : null}
       </div>
 
       <DataTable

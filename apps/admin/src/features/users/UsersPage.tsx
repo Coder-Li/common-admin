@@ -3,7 +3,7 @@ import {
   useState,
 } from 'react'
 import type { OnChangeFn } from '@tanstack/react-table'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { DataTable } from '../../components/data-table/DataTable'
@@ -14,22 +14,20 @@ import type {
 } from '../../components/data-table/DataTable'
 import { useI18n } from '../../i18n/useI18n'
 import { useServerTableQuery } from '../../lib/crud/useServerTableQuery'
-import {
-  getDictionaryLabel,
-  mergeRoleFallbackOptions,
-} from '../../lib/dictionaries/dictionary-label'
-import { useDictionary } from '../../lib/dictionaries/useDictionary'
+import { can } from '../../lib/permissions'
+import { rolesApi } from '../roles/roles.api'
+import { useAuthStore } from '../../stores/auth-store'
 import { UserForm } from './UserForm'
 import {
   createUser,
   deleteUser,
   listUsers,
+  replaceUserRoles,
   updateUser,
 } from './users.api'
 import { createUserColumns } from './users.columns'
 import type {
   CreateUserRequest,
-  Role,
   UpdateUserRequest,
   UserListQuery,
   UserRecord,
@@ -59,8 +57,11 @@ function toSortParam(sorting: SortingState) {
 export function UsersPage() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
+  const permissions = useAuthStore((state) => state.permissions)
   const [search, setSearch] = useState('')
-  const [role, setRole] = useState<Role | typeof allRoleFilter>(allRoleFilter)
+  const [roleCode, setRoleCode] = useState<string | typeof allRoleFilter>(
+    allRoleFilter,
+  )
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 20,
@@ -68,28 +69,27 @@ export function UsersPage() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [formState, setFormState] = useState<FormState>(null)
   const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null)
-  const roleDictionary = useDictionary('user_role')
 
-  const roleFallbackLabels = useMemo(
-    () => ({
-      ADMIN: t('users.role.admin'),
-      STANDARD: t('users.role.standard'),
-    }),
-    [t],
-  )
-  const roleOptions = useMemo(
-    () =>
-      mergeRoleFallbackOptions(
-        roleDictionary.options,
-        roleFallbackLabels,
-      ),
-    [roleDictionary.options, roleFallbackLabels],
-  )
+  const canCreate = can(permissions, 'user.create')
+  const canUpdate = can(permissions, 'user.update')
+  const canDelete = can(permissions, 'user.delete')
+  const canAssignRoles = can(permissions, 'user.assign_roles')
 
-  const usersQuery = useServerTableQuery<UserRecord, { role?: Role }, UserListQuery>({
+  const rolesQuery = useQuery({
+    queryKey: ['roles', 'list', 'users-filter'],
+    queryFn: () =>
+      rolesApi.list({
+        page: 1,
+        pageSize: 100,
+        status: 'ACTIVE',
+      }),
+  })
+  const roleOptions = rolesQuery.data?.items ?? []
+
+  const usersQuery = useServerTableQuery<UserRecord, { roleCode?: string }, UserListQuery>({
     resource: 'users',
     state: {
-      filters: role === allRoleFilter ? {} : { role },
+      filters: roleCode === allRoleFilter ? {} : { roleCode },
       pageIndex: pagination.pageIndex,
       pageSize: pagination.pageSize,
       search,
@@ -115,8 +115,17 @@ export function UsersPage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { id: string; value: UpdateUserRequest }) =>
-      updateUser(payload.id, payload.value),
+    mutationFn: async (payload: {
+      id: string
+      roleCodes: string[]
+      value: UpdateUserRequest
+    }) => {
+      const updatedUser = await updateUser(payload.id, payload.value)
+      if (canAssignRoles) {
+        return replaceUserRoles(payload.id, payload.roleCodes)
+      }
+      return updatedUser
+    },
     onError: (error) => {
       toast.error(mutationErrorMessage(error) ?? t('users.error.update'))
     },
@@ -150,15 +159,16 @@ export function UsersPage() {
           email: t('users.column.email'),
           fullName: t('users.column.fullName'),
           role: t('users.column.role'),
-          formatRole: (role) => getDictionaryLabel(roleOptions, role, role),
           username: t('users.column.username'),
         },
         {
+          canDelete,
+          canUpdate: canUpdate || canAssignRoles,
           onDelete: setDeleteTarget,
           onEdit: (user) => setFormState({ mode: 'edit', user }),
         },
       ),
-    [roleOptions, t],
+    [canAssignRoles, canDelete, canUpdate, t],
   )
 
   const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {
@@ -185,8 +195,8 @@ export function UsersPage() {
     }))
   }
 
-  function handleRoleChange(value: Role | typeof allRoleFilter) {
-    setRole(value)
+  function handleRoleChange(value: string | typeof allRoleFilter) {
+    setRoleCode(value)
     setPagination((currentPagination) => ({
       ...currentPagination,
       pageIndex: 0,
@@ -197,6 +207,10 @@ export function UsersPage() {
     if (formState?.mode === 'edit') {
       updateMutation.mutate({
         id: formState.user.id,
+        roleCodes:
+          'roleCodes' in value && Array.isArray(value.roleCodes)
+            ? value.roleCodes
+            : formState.user.roles.map((role) => role.code),
         value: value as UpdateUserRequest,
       })
       return
@@ -218,14 +232,16 @@ export function UsersPage() {
         <h2 className="text-lg font-semibold text-slate-950">
           {t('users.title')}
         </h2>
-        <button
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-medium text-white transition hover:bg-cyan-600"
-          onClick={() => setFormState({ mode: 'create' })}
-          type="button"
-        >
-          <Plus size={16} />
-          {t('users.action.create')}
-        </button>
+        {canCreate ? (
+          <button
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-medium text-white transition hover:bg-cyan-600"
+            onClick={() => setFormState({ mode: 'create' })}
+            type="button"
+          >
+            <Plus size={16} />
+            {t('users.action.create')}
+          </button>
+        ) : null}
       </div>
 
       <DataTable
@@ -251,18 +267,16 @@ export function UsersPage() {
                   aria-label={t('users.filter.role')}
                   className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
                   onChange={(event) =>
-                    handleRoleChange(
-                      event.target.value as Role | typeof allRoleFilter,
-                    )
+                    handleRoleChange(event.target.value)
                   }
-                  value={role}
+                  value={roleCode}
                 >
                   <option value={allRoleFilter}>
                     {t('users.filter.allRoles')}
                   </option>
                   {roleOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                    <option key={option.code} value={option.code}>
+                      {option.name}
                     </option>
                   ))}
                 </select>
@@ -297,6 +311,7 @@ export function UsersPage() {
                 createMutation.isPending || updateMutation.isPending
               }
               mode={formState.mode}
+              canAssignRoles={canAssignRoles}
               roleOptions={roleOptions}
               onCancel={() => setFormState(null)}
               onSubmit={handleSubmit}

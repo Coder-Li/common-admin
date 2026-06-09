@@ -50,7 +50,9 @@ export function DashboardContent({
             </div>
             <div>
               <dt className="text-slate-500">{t('dashboard.role')}</dt>
-              <dd className="font-medium">{user?.role}</dd>
+              <dd className="font-medium">
+                {user?.roles.map((role) => role.name).join(', ')}
+              </dd>
             </div>
           </dl>
         )}

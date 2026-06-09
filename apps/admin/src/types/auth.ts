@@ -1,4 +1,7 @@
-export type Role = 'ADMIN' | 'STANDARD'
+export interface UserRoleSummary {
+  code: string
+  name: string
+}
 
 export interface UserProfile {
   id: string
@@ -6,7 +9,8 @@ export interface UserProfile {
   username: string
   firstName: string
   lastName: string
-  role: Role
+  roles: UserRoleSummary[]
+  permissions: string[]
 }
 
 export interface AuthSession {

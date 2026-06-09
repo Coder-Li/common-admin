@@ -13,6 +13,7 @@ import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
+import { useAuthStore } from '../../stores/auth-store'
 import type {
   CreateDictionaryItemRequest,
   CreateDictionaryTypeRequest,
@@ -132,11 +133,30 @@ function deferred<T>() {
   return { promise, reject, resolve }
 }
 
-function renderDictionariesPage() {
+function renderDictionariesPage(
+  permissions = [
+    'dictionary.create',
+    'dictionary.update',
+    'dictionary.delete',
+  ],
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false },
+    },
+  })
+
+  useAuthStore.getState().setSession({
+    accessToken: 'access-token',
+    user: {
+      id: 'current-user',
+      email: 'admin@example.com',
+      username: 'admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      roles: [{ code: 'admin', name: 'Admin' }],
+      permissions,
     },
   })
 
@@ -158,6 +178,7 @@ describe('DictionariesPage', () => {
 
   afterEach(() => {
     cleanup()
+    useAuthStore.getState().reset()
   })
 
   it('renders the loading state while dictionary types are loading', () => {
@@ -539,5 +560,37 @@ describe('DictionariesPage', () => {
       await screen.findByRole('button', { name: 'Select user_role' }),
     ).toBeInTheDocument()
     expect(dictionariesApiMock.listDictionaryTypes).toHaveBeenCalledTimes(2)
+  })
+
+  it('hides create, edit, and delete actions without dictionary permissions', async () => {
+    dictionariesApiMock.listDictionaryTypes.mockResolvedValue(
+      typeListResponse([commonStatusType]),
+    )
+    dictionariesApiMock.listDictionaryItems.mockResolvedValue(
+      itemListResponse([standardItem]),
+    )
+
+    renderDictionariesPage([])
+    const typeButton = await screen.findByRole('button', {
+      name: 'Select common_status',
+    })
+    await screen.findByText('STANDARD')
+
+    expect(
+      screen.queryByRole('button', { name: 'Create type' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Create item' }),
+    ).not.toBeInTheDocument()
+
+    fireEvent.contextMenu(typeButton)
+    expect(screen.queryByRole('menuitem', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('menuitem', { name: 'Delete' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Delete' }),
+    ).not.toBeInTheDocument()
   })
 })

@@ -7,6 +7,14 @@ reference pattern.
 The goal is to reuse the current backend and frontend CRUD table shape without
 introducing a second admin architecture.
 
+Authorization note:
+
+- The admin app uses the RBAC permission system. Every new admin CRUD module
+  must follow `docs/patterns/admin-rbac-crud-permission-pattern-guide.md`.
+- Use permission registry entries and `@Permissions()` for admin CRUD
+  endpoints. Do not add role-name checks such as `@Roles(Role.ADMIN)`.
+- Menus, routes, pages, and buttons must consume the same permission codes.
+
 ## Reference Implementation
 
 Before implementing a new resource, read these files.
@@ -25,6 +33,8 @@ Backend:
 
 Frontend:
 
+- `apps/admin/src/routes/admin-routes.tsx`
+- `apps/admin/src/lib/permissions.ts`
 - `apps/admin/src/lib/crud/list-query.ts`
 - `apps/admin/src/lib/crud/useServerTableQuery.ts`
 - `apps/admin/src/components/data-table/DataTable.tsx`
@@ -36,6 +46,7 @@ Frontend:
 - `apps/admin/src/features/users/UserForm.tsx`
 - `apps/admin/src/features/users/UsersPage.tsx`
 - `apps/admin/src/features/users/UsersPage.test.tsx`
+- `apps/admin/src/features/roles/RolesPage.tsx`
 - `apps/admin/src/layouts/AdminShell.tsx`
 - `apps/admin/src/i18n/messages.ts`
 
@@ -176,12 +187,23 @@ DELETE /<resources>/:id
 
 Rules:
 
-- Add `@Roles(Role.ADMIN)` to each admin-only method.
-- Do not add class-level admin role metadata if the controller has non-admin
-  endpoints.
+- Add `@Permissions('<resource>.<action>')` to each admin-only method.
+- Do not add new `@Roles()` decorators or role-name based authorization checks.
+- Do not add class-level admin permission metadata if the controller has
+  authenticated self-service endpoints.
 - Put literal routes before parameter routes, for example `me` before `:id`.
 - Use `@HttpCode(204)` for successful deletes.
 - Add Swagger response decorators.
+
+### Permission Contract
+
+For each admin CRUD resource, add permission registry entries and use the same
+codes across:
+
+- backend controller decorators with `@Permissions('<resource>.<action>')`
+- `apps/admin/src/routes/admin-routes.tsx` route/menu metadata
+- frontend page action gates through `apps/admin/src/lib/permissions.ts`
+- optional feature-local permission constants
 
 ### Backend Tests
 
@@ -200,8 +222,9 @@ Add focused service tests for:
 
 Add auth or flow tests when routes or permissions are introduced:
 
-- standard users cannot access admin CRUD
-- admins can access admin CRUD
+- users without the required permission cannot access admin CRUD
+- users with the required permission can access admin CRUD
+- unauthenticated users receive `401`
 - delete returns `204`
 - literal route ordering is preserved when relevant
 
@@ -311,15 +334,20 @@ Pages should:
 - keep UI dense and operational
 - avoid marketing or explanatory page copy
 
-### AdminShell Wiring
+### Route And Menu Wiring
 
 The current app uses custom path state through `AppContent`, `resolveRoute`,
-and `AdminShell`.
+`AdminShell`, and permission-aware route metadata in
+`apps/admin/src/routes/admin-routes.tsx`.
 
 Rules:
 
 - Do not introduce a TanStack Router route refactor for standard CRUD pages.
-- Add or replace the relevant `AdminShell` branch only.
+- Add the page to `apps/admin/src/routes/admin-routes.tsx` with
+  `requiredPermissions`.
+- Let `AdminShell` render navigation from the route metadata instead of adding
+  hard-coded role or permission branches.
+- Direct URL access without the route permission must resolve to `/403`.
 - Leave unrelated placeholder pages unchanged.
 
 ### Frontend Tests
@@ -349,8 +377,13 @@ Do not break these constraints when adding a new CRUD resource:
 - Do not import the global `api` object directly in resource pages.
 - Do not introduce a TanStack Router migration as part of a CRUD page.
 - Do not put users-specific behavior into shared table components.
-- Do not add class-level `@Roles(Role.ADMIN)` when a controller also has
-  authenticated non-admin endpoints.
+- Do not add role-name based authorization such as `@Roles(Role.ADMIN)`.
+- Do not reintroduce frontend `ADMIN` / `STANDARD` role unions for
+  authorization.
+- Do not hard-code menu, route, page, or button authorization separately.
+  Centralize permission codes and consume them through the shared helper.
+- Do not add class-level permission metadata when a controller also has
+  authenticated self-service endpoints.
 - Keep literal NestJS routes before parameter routes.
 - Keep frontend synthetic table columns unsortable unless the backend supports
   their sort field.
@@ -391,7 +424,8 @@ Sensitive fields that must never be returned:
 Special rules:
 - 
 
-AdminShell navigation/page branch:
+Route/menu metadata entry:
+Permission codes:
 ```
 
 ## AI Prompt Template
@@ -404,6 +438,7 @@ repository.
 
 First read and follow:
 - docs/patterns/admin-crud-table-pattern-guide.md
+- docs/patterns/admin-rbac-crud-permission-pattern-guide.md
 
 Use users as the reference implementation. Do not invent a separate CRUD
 architecture.
@@ -420,6 +455,8 @@ Backend reference files:
 - apps/api/src/auth/auth-flow.spec.ts
 
 Frontend reference files:
+- apps/admin/src/routes/admin-routes.tsx
+- apps/admin/src/lib/permissions.ts
 - apps/admin/src/lib/crud/list-query.ts
 - apps/admin/src/lib/crud/useServerTableQuery.ts
 - apps/admin/src/components/data-table/DataTable.tsx
@@ -431,6 +468,7 @@ Frontend reference files:
 - apps/admin/src/features/users/UserForm.tsx
 - apps/admin/src/features/users/UsersPage.tsx
 - apps/admin/src/features/users/UsersPage.test.tsx
+- apps/admin/src/features/roles/RolesPage.tsx
 - apps/admin/src/layouts/AdminShell.tsx
 - apps/admin/src/i18n/messages.ts
 
@@ -449,17 +487,23 @@ Resource details:
 - Special rules: <rules>
 
 Requirements:
+- Define permission codes for the resource before implementing.
+- Add permission registry entries and seed/upsert support.
 - Use server-side pagination/search/sort/filter.
 - List responses must use { items, total, page, pageSize }.
 - Sort fields must use a backend allowlist.
 - Do not expose sensitive fields.
-- Use method-level admin role guards for admin CRUD endpoints.
+- Use method-level `@Permissions()` decorators for admin CRUD endpoints.
+- Add the route to permission-aware frontend route/menu metadata.
+- Guard page action buttons with the permission helper.
+- Keep permission code constants feature-local when the page has more than one
+  action gate.
 - Use shared frontend DataTable and useServerTableQuery.
 - Use feature-local API wrapper functions.
 - Do not introduce TanStack Router changes.
 - Add focused backend and frontend tests.
 - Run and pass:
-  - pnpm --filter api test
+  - pnpm --filter api exec jest --runInBand
   - pnpm --filter admin test
   - pnpm --filter api build
   - pnpm --filter admin build
@@ -475,7 +519,7 @@ before implementing.
 Run these before claiming the resource is complete:
 
 ```bash
-pnpm --filter api test
+pnpm --filter api exec jest --runInBand
 pnpm --filter admin test
 pnpm --filter api build
 pnpm --filter admin build
@@ -501,4 +545,3 @@ Smoke test at least:
 - delete
 - empty state
 - error/retry path when practical
-

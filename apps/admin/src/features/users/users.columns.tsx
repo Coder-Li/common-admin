@@ -1,5 +1,5 @@
 import type { ColumnDef } from '../../components/data-table/DataTable'
-import type { Role, UserRecord } from './users.types'
+import type { UserRecord } from './users.types'
 
 export interface UserColumnLabels {
   username: string
@@ -10,10 +10,11 @@ export interface UserColumnLabels {
   actions: string
   edit: string
   delete: string
-  formatRole: (role: Role) => string
 }
 
 export interface UserRowActions {
+  canDelete: boolean
+  canUpdate: boolean
   onEdit: (user: UserRecord) => void
   onDelete: (user: UserRecord) => void
 }
@@ -60,9 +61,10 @@ export function createUserColumns(
       cell: ({ row }) => formatFullName(row.original),
     },
     {
-      accessorKey: 'role',
+      id: 'roles',
       header: labels.role,
-      cell: ({ row }) => labels.formatRole(row.original.role),
+      cell: ({ row }) =>
+        row.original.roles.map((role) => role.name).join(', '),
       size: 120,
     },
     {
@@ -78,20 +80,24 @@ export function createUserColumns(
       size: 160,
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-2">
-          <button
-            className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-            onClick={() => actions.onEdit(row.original)}
-            type="button"
-          >
-            {labels.edit}
-          </button>
-          <button
-            className="inline-flex h-8 items-center rounded-md border border-rose-200 bg-white px-3 text-sm font-medium text-rose-700 transition hover:bg-rose-50"
-            onClick={() => actions.onDelete(row.original)}
-            type="button"
-          >
-            {labels.delete}
-          </button>
+          {actions.canUpdate ? (
+            <button
+              className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              onClick={() => actions.onEdit(row.original)}
+              type="button"
+            >
+              {labels.edit}
+            </button>
+          ) : null}
+          {actions.canDelete ? (
+            <button
+              className="inline-flex h-8 items-center rounded-md border border-rose-200 bg-white px-3 text-sm font-medium text-rose-700 transition hover:bg-rose-50"
+              onClick={() => actions.onDelete(row.original)}
+              type="button"
+            >
+              {labels.delete}
+            </button>
+          ) : null}
         </div>
       ),
     },

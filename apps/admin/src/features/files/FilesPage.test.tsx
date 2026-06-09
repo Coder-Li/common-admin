@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
+import { useAuthStore } from '../../stores/auth-store'
 import type {
   FileListQuery,
   FileListResponse,
@@ -73,11 +74,31 @@ function deferred<T>() {
   return { promise, reject, resolve }
 }
 
-function renderFilesPage() {
+function renderFilesPage(
+  permissions = [
+    'file.upload',
+    'file.update',
+    'file.delete',
+    'file.download',
+  ],
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false },
+    },
+  })
+
+  useAuthStore.getState().setSession({
+    accessToken: 'access-token',
+    user: {
+      id: 'current-user',
+      email: 'admin@example.com',
+      username: 'admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      roles: [{ code: 'admin', name: 'Admin' }],
+      permissions,
     },
   })
 
@@ -103,6 +124,7 @@ describe('FilesPage', () => {
 
   afterEach(() => {
     cleanup()
+    useAuthStore.getState().reset()
   })
 
   it('renders the loading state while files are loading', () => {
@@ -265,5 +287,23 @@ describe('FilesPage', () => {
     expect(URL.createObjectURL).toHaveBeenCalledOnce()
     expect(click).toHaveBeenCalledOnce()
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:download-url')
+  })
+
+  it('hides upload, download, edit, and delete without file permissions', async () => {
+    filesApiMock.listFiles.mockResolvedValue(listResponse([report]))
+
+    renderFilesPage([])
+    await screen.findByText('Report')
+
+    expect(
+      screen.queryByRole('button', { name: 'Upload file' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Download' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Delete' }),
+    ).not.toBeInTheDocument()
   })
 })

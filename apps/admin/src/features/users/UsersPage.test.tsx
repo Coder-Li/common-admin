@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
+import { useAuthStore } from '../../stores/auth-store'
 import type {
   CreateUserRequest,
   UpdateUserRequest,
@@ -25,16 +26,19 @@ const usersApiMock = vi.hoisted(() => ({
   createUser: vi.fn(),
   deleteUser: vi.fn(),
   listUsers: vi.fn(),
+  replaceUserRoles: vi.fn(),
   updateUser: vi.fn(),
 }))
 
-const dictionaryHookMock = vi.hoisted(() => ({
-  useDictionary: vi.fn(),
+const rolesApiMock = vi.hoisted(() => ({
+  rolesApi: {
+    list: vi.fn(),
+  },
 }))
 
 vi.mock('./users.api', () => usersApiMock)
 
-vi.mock('../../lib/dictionaries/useDictionary', () => dictionaryHookMock)
+vi.mock('../roles/roles.api', () => rolesApiMock)
 
 vi.mock('sonner', () => ({
   toast: {
@@ -49,7 +53,7 @@ const alice: UserRecord = {
   username: 'alice',
   firstName: 'Alice',
   lastName: 'Admin',
-  role: 'ADMIN',
+  roles: [{ code: 'admin', name: 'Administrator' }],
   createdAt: '2026-01-02T03:04:05.000Z',
   updatedAt: '2026-01-02T03:04:05.000Z',
 }
@@ -60,7 +64,7 @@ const bruno: UserRecord = {
   username: 'bruno',
   firstName: 'Bruno',
   lastName: 'Builder',
-  role: 'STANDARD',
+  roles: [{ code: 'standard', name: 'Team member' }],
   createdAt: '2026-01-03T03:04:05.000Z',
   updatedAt: '2026-01-03T03:04:05.000Z',
 }
@@ -85,11 +89,58 @@ function deferred<T>() {
   return { promise, reject, resolve }
 }
 
-function renderUsersPage() {
+const roleOptions = [
+  {
+    id: 'role-admin',
+    code: 'admin',
+    name: 'Administrator',
+    description: null,
+    status: 'ACTIVE' as const,
+    isSystem: true,
+    isDefault: false,
+    permissions: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'role-standard',
+    code: 'standard',
+    name: 'Team member',
+    description: null,
+    status: 'ACTIVE' as const,
+    isSystem: true,
+    isDefault: true,
+    permissions: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+]
+
+function renderUsersPage(
+  permissions = [
+    'user.create',
+    'user.update',
+    'user.delete',
+    'user.assign_roles',
+  ],
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false },
+    },
+  })
+
+  useAuthStore.getState().setSession({
+    accessToken: 'access-token',
+    user: {
+      id: 'current-user',
+      email: 'admin@example.com',
+      username: 'admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      roles: [{ code: 'admin', name: 'Admin' }],
+      permissions,
     },
   })
 
@@ -102,45 +153,26 @@ function renderUsersPage() {
   )
 }
 
-function mockRoleDictionary(
-  options = [
-    {
-      value: 'ADMIN',
-      label: 'Administrator',
-      isDefault: false,
-    },
-    {
-      value: 'STANDARD',
-      label: 'Team member',
-      isDefault: true,
-    },
-    {
-      value: 'MANAGER',
-      label: 'Manager',
-      isDefault: false,
-    },
-  ],
-) {
-  dictionaryHookMock.useDictionary.mockReturnValue({
-    isError: false,
-    isLoading: false,
-    options,
-  })
-}
-
 describe('UsersPage', () => {
   beforeEach(() => {
     window.localStorage.clear()
-    dictionaryHookMock.useDictionary.mockReset()
-    mockRoleDictionary()
     usersApiMock.createUser.mockReset()
     usersApiMock.deleteUser.mockReset()
     usersApiMock.listUsers.mockReset()
+    usersApiMock.replaceUserRoles.mockReset()
     usersApiMock.updateUser.mockReset()
+    rolesApiMock.rolesApi.list.mockReset()
+    rolesApiMock.rolesApi.list.mockResolvedValue({
+      items: roleOptions,
+      page: 1,
+      pageSize: 100,
+      total: roleOptions.length,
+    })
   })
 
   afterEach(() => {
     cleanup()
+    useAuthStore.getState().reset()
   })
 
   it('renders the loading state while users are loading', () => {
@@ -169,16 +201,16 @@ describe('UsersPage', () => {
     expect(screen.getByText('Bruno Builder')).toBeInTheDocument()
   })
 
-  it('renders table role labels from the user role dictionary', async () => {
+  it('renders table role labels from role records', async () => {
     usersApiMock.listUsers.mockResolvedValue(listResponse([alice, bruno]))
 
     renderUsersPage()
 
-    expect(await screen.findByText('Administrator')).toBeInTheDocument()
-    expect(screen.getByText('Team member')).toBeInTheDocument()
+    expect((await screen.findAllByText('Administrator')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Team member').length).toBeGreaterThan(0)
   })
 
-  it('renders dictionary labels in the role filter while keeping all roles', async () => {
+  it('renders role records in the role filter while keeping all roles', async () => {
     usersApiMock.listUsers.mockResolvedValue(listResponse([]))
 
     renderUsersPage()
@@ -192,12 +224,12 @@ describe('UsersPage', () => {
       })),
     ).toEqual([
       { label: 'All', value: 'ALL' },
-      { label: 'Administrator', value: 'ADMIN' },
-      { label: 'Team member', value: 'STANDARD' },
+      { label: 'Administrator', value: 'admin' },
+      { label: 'Team member', value: 'standard' },
     ])
   })
 
-  it('renders dictionary labels in the role select without unsupported dictionary values', async () => {
+  it('renders role records in the role select', async () => {
     const user = userEvent.setup()
     usersApiMock.listUsers.mockResolvedValue(listResponse([]))
 
@@ -213,44 +245,13 @@ describe('UsersPage', () => {
         value: option.value,
       })),
     ).toEqual([
-      { label: 'Administrator', value: 'ADMIN' },
-      { label: 'Team member', value: 'STANDARD' },
+      { label: 'Administrator', value: 'admin' },
+      { label: 'Team member', value: 'standard' },
     ])
   })
 
-  it('restores missing seeded role options from local fallbacks', async () => {
-    mockRoleDictionary([
-      {
-        value: 'ADMIN',
-        label: 'Administrator',
-        isDefault: false,
-      },
-    ])
-    usersApiMock.listUsers.mockResolvedValue(listResponse([]))
-
-    renderUsersPage()
-    await screen.findByText('No users found')
-
-    const roleFilter = screen.getByLabelText('Filter by role')
-    expect(
-      Array.from(roleFilter.querySelectorAll('option')).map((option) => ({
-        label: option.textContent,
-        value: option.value,
-      })),
-    ).toEqual([
-      { label: 'All', value: 'ALL' },
-      { label: 'Administrator', value: 'ADMIN' },
-      { label: 'Standard', value: 'STANDARD' },
-    ])
-  })
-
-  it('keeps user creation usable when the role dictionary fails to load', async () => {
+  it('keeps user creation usable with selected role codes', async () => {
     const user = userEvent.setup()
-    dictionaryHookMock.useDictionary.mockReturnValue({
-      isError: true,
-      isLoading: false,
-      options: [],
-    })
     usersApiMock.listUsers.mockResolvedValue(listResponse([]))
     usersApiMock.createUser.mockResolvedValue(alice)
 
@@ -264,7 +265,7 @@ describe('UsersPage', () => {
     await user.type(screen.getByLabelText('Last name'), 'Admin')
     await user.type(screen.getByLabelText('Password'), 'password-1')
     const dialog = screen.getByRole('dialog')
-    await user.selectOptions(within(dialog).getByLabelText('Role'), 'ADMIN')
+    await user.selectOptions(within(dialog).getByLabelText('Role'), 'admin')
     await user.click(within(dialog).getByRole('button', { name: 'Create user' }))
 
     await waitFor(() => {
@@ -274,7 +275,7 @@ describe('UsersPage', () => {
           firstName: 'Alice',
           lastName: 'Admin',
           password: 'password-1',
-          role: 'ADMIN',
+          roleCodes: ['admin'],
           username: 'alice',
         }),
       )
@@ -288,14 +289,14 @@ describe('UsersPage', () => {
     renderUsersPage()
     await screen.findByText('alice')
 
-    await user.selectOptions(screen.getByLabelText('Filter by role'), 'ADMIN')
+    await user.selectOptions(screen.getByLabelText('Filter by role'), 'admin')
 
     await waitFor(() => {
       expect(usersApiMock.listUsers).toHaveBeenLastCalledWith(
         expect.objectContaining<UserListQuery>({
           page: 1,
           pageSize: 20,
-          role: 'ADMIN',
+          roleCode: 'admin',
         }),
       )
     })
@@ -331,7 +332,7 @@ describe('UsersPage', () => {
     await user.type(screen.getByLabelText('Last name'), 'Admin')
     await user.type(screen.getByLabelText('Password'), 'password-1')
     const dialog = screen.getByRole('dialog')
-    await user.selectOptions(within(dialog).getByLabelText('Role'), 'ADMIN')
+    await user.selectOptions(within(dialog).getByLabelText('Role'), 'admin')
     await user.click(within(dialog).getByRole('button', { name: 'Create user' }))
 
     await waitFor(() => {
@@ -341,7 +342,7 @@ describe('UsersPage', () => {
           firstName: 'Alice',
           lastName: 'Admin',
           password: 'password-1',
-          role: 'ADMIN',
+          roleCodes: ['admin'],
           username: 'alice',
         }),
       )
@@ -354,6 +355,10 @@ describe('UsersPage', () => {
     const user = userEvent.setup()
     usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
     usersApiMock.updateUser.mockResolvedValue({
+      ...alice,
+      firstName: 'Alicia',
+    })
+    usersApiMock.replaceUserRoles.mockResolvedValue({
       ...alice,
       firstName: 'Alicia',
     })
@@ -375,12 +380,31 @@ describe('UsersPage', () => {
           email: 'alice@example.com',
           firstName: 'Alicia',
           lastName: 'Admin',
-          role: 'ADMIN',
           username: 'alice',
         }),
       )
     })
+    await waitFor(() => {
+      expect(usersApiMock.replaceUserRoles).toHaveBeenCalledWith('user-1', [
+        'admin',
+      ])
+    })
     await waitFor(() => expect(usersApiMock.listUsers).toHaveBeenCalledTimes(2))
+  })
+
+  it('hides create, edit, delete, and role assignment without permissions', async () => {
+    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
+
+    renderUsersPage([])
+    await screen.findByText('alice')
+
+    expect(
+      screen.queryByRole('button', { name: 'Create user' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Delete' }),
+    ).not.toBeInTheDocument()
   })
 
   it('confirms delete, calls delete, and refetches users', async () => {

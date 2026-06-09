@@ -27,6 +27,8 @@ import type {
 } from '../../components/data-table/DataTable'
 import { useI18n } from '../../i18n/useI18n'
 import { useServerTableQuery } from '../../lib/crud/useServerTableQuery'
+import { can } from '../../lib/permissions'
+import { useAuthStore } from '../../stores/auth-store'
 import { DictionaryItemForm } from './DictionaryItemForm'
 import { DictionaryTypeForm } from './DictionaryTypeForm'
 import {
@@ -98,6 +100,7 @@ function emptyItemResponse(page: number, pageSize: number) {
 export function DictionariesPage() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
+  const permissions = useAuthStore((state) => state.permissions)
   const [typeSearch, setTypeSearch] = useState('')
   const [itemSearch, setItemSearch] = useState('')
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null)
@@ -115,6 +118,9 @@ export function DictionariesPage() {
   const [deleteState, setDeleteState] = useState<DeleteState>(null)
   const [typeContextMenu, setTypeContextMenu] =
     useState<TypeContextMenuState>(null)
+  const canCreate = can(permissions, 'dictionary.create')
+  const canUpdate = can(permissions, 'dictionary.update')
+  const canDelete = can(permissions, 'dictionary.delete')
 
   const typeQuery = useServerTableQuery<
     DictionaryTypeRecord,
@@ -263,11 +269,13 @@ export function DictionariesPage() {
           value: t('dictionaries.column.value'),
         },
         {
+          canDelete,
+          canUpdate,
           onDelete: (item) => setDeleteState({ kind: 'item', record: item }),
           onEdit: (item) => setItemFormState({ mode: 'edit', item }),
         },
       ),
-    [t],
+    [canDelete, canUpdate, t],
   )
 
   const handleItemPaginationChange: OnChangeFn<PaginationState> = (updater) => {
@@ -387,14 +395,16 @@ export function DictionariesPage() {
             >
               <RefreshCw size={16} />
             </button>
-            <button
-              aria-label={t('dictionaries.action.createType')}
-              className="inline-flex size-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-              onClick={() => setTypeFormState({ mode: 'create' })}
-              type="button"
-            >
-              <Plus size={17} />
-            </button>
+            {canCreate ? (
+              <button
+                aria-label={t('dictionaries.action.createType')}
+                className="inline-flex size-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                onClick={() => setTypeFormState({ mode: 'create' })}
+                type="button"
+              >
+                <Plus size={17} />
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -432,6 +442,7 @@ export function DictionariesPage() {
           selectedTypeId={selectedType?.id}
           systemLabel={t('dictionaries.system.yes')}
           title={t('dictionaries.type.listLabel')}
+          canOpenMenu={canUpdate || canDelete}
         />
       </aside>
 
@@ -447,15 +458,17 @@ export function DictionariesPage() {
               {selectedType?.code ?? t('dictionaries.item.selectType')}
             </p>
           </div>
-          <button
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-medium text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={!selectedType}
-            onClick={() => setItemFormState({ mode: 'create' })}
-            type="button"
-          >
-            <Plus size={16} />
-            {t('dictionaries.action.createItem')}
-          </button>
+          {canCreate ? (
+            <button
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-cyan-500 px-3 text-sm font-medium text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!selectedType}
+              onClick={() => setItemFormState({ mode: 'create' })}
+              type="button"
+            >
+              <Plus size={16} />
+              {t('dictionaries.action.createItem')}
+            </button>
+          ) : null}
         </div>
 
         <DataTable
@@ -489,6 +502,8 @@ export function DictionariesPage() {
           deleteLabel={t('dictionaries.action.delete')}
           editLabel={t('dictionaries.action.edit')}
           isSystem={typeContextMenu.type.isSystem}
+          canDelete={canDelete}
+          canUpdate={canUpdate}
           onDelete={() => {
             setDeleteState({ kind: 'type', record: typeContextMenu.type })
             setTypeContextMenu(null)
@@ -589,6 +604,7 @@ export function DictionariesPage() {
 }
 
 function DictionaryTypeList({
+  canOpenMenu,
   deleteLabel,
   editLabel,
   emptyLabel,
@@ -606,6 +622,7 @@ function DictionaryTypeList({
   systemLabel,
   title,
 }: {
+  canOpenMenu: boolean
   deleteLabel: string
   editLabel: string
   emptyLabel: string
@@ -709,19 +726,21 @@ function DictionaryTypeList({
                   {isSelected ? <Check size={16} /> : null}
                 </span>
               </button>
-              <button
-                aria-label={`${editLabel} ${type.code}`}
-                className={`mr-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md transition ${
-                  isSelected
-                    ? 'text-white hover:bg-white/15'
-                    : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700'
-                } outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-1`}
-                onClick={(event) => onContextMenu(event, type)}
-                title={`${editLabel} / ${deleteLabel}`}
-                type="button"
-              >
-                <MoreHorizontal size={16} />
-              </button>
+              {canOpenMenu ? (
+                <button
+                  aria-label={`${editLabel} ${type.code}`}
+                  className={`mr-1 inline-flex size-8 shrink-0 items-center justify-center rounded-md transition ${
+                    isSelected
+                      ? 'text-white hover:bg-white/15'
+                      : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700'
+                  } outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-1`}
+                  onClick={(event) => onContextMenu(event, type)}
+                  title={`${editLabel} / ${deleteLabel}`}
+                  type="button"
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+              ) : null}
             </div>
           </li>
         )
@@ -731,6 +750,8 @@ function DictionaryTypeList({
 }
 
 function DictionaryTypeContextMenu({
+  canDelete,
+  canUpdate,
   deleteLabel,
   editLabel,
   isSystem,
@@ -740,6 +761,8 @@ function DictionaryTypeContextMenu({
   x,
   y,
 }: {
+  canDelete: boolean
+  canUpdate: boolean
   deleteLabel: string
   editLabel: string
   isSystem: boolean
@@ -783,23 +806,27 @@ function DictionaryTypeContextMenu({
         top: y,
       }}
     >
-      <button
-        className="flex h-9 w-full items-center px-3 text-left text-sm text-slate-700 transition hover:bg-slate-100"
-        onClick={onEdit}
-        role="menuitem"
-        type="button"
-      >
-        {editLabel}
-      </button>
-      <button
-        className="flex h-9 w-full items-center px-3 text-left text-sm text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-white"
-        disabled={isSystem}
-        onClick={onDelete}
-        role="menuitem"
-        type="button"
-      >
-        {deleteLabel}
-      </button>
+      {canUpdate ? (
+        <button
+          className="flex h-9 w-full items-center px-3 text-left text-sm text-slate-700 transition hover:bg-slate-100"
+          onClick={onEdit}
+          role="menuitem"
+          type="button"
+        >
+          {editLabel}
+        </button>
+      ) : null}
+      {canDelete ? (
+        <button
+          className="flex h-9 w-full items-center px-3 text-left text-sm text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-white"
+          disabled={isSystem}
+          onClick={onDelete}
+          role="menuitem"
+          type="button"
+        >
+          {deleteLabel}
+        </button>
+      ) : null}
     </div>
   )
 }

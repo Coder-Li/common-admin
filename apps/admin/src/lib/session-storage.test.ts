@@ -20,7 +20,8 @@ const session: AuthSession = {
     username: 'admin',
     firstName: 'Admin',
     lastName: 'User',
-    role: 'ADMIN',
+    roles: [{ code: 'admin', name: 'Admin' }],
+    permissions: ['user.read', 'role.read'],
   },
 }
 
@@ -31,6 +32,20 @@ describe('session storage', () => {
     saveSession(session, storage)
 
     expect(loadSession(storage)).toEqual(session)
+  })
+
+  it('persists role and permission context with the session', () => {
+    const storage = createStorage()
+
+    saveSession(session, storage)
+
+    expect(loadSession(storage)?.user.roles).toEqual([
+      { code: 'admin', name: 'Admin' },
+    ])
+    expect(loadSession(storage)?.user.permissions).toEqual([
+      'user.read',
+      'role.read',
+    ])
   })
 
   it('returns null when stored session JSON is invalid', () => {

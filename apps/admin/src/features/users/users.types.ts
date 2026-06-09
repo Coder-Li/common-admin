@@ -1,11 +1,14 @@
-export type Role = 'ADMIN' | 'STANDARD'
+export interface UserRoleSummary {
+  code: string
+  name: string
+}
 
 export interface UserListQuery {
   page: number
   pageSize: number
   search?: string
   sort?: string
-  role?: Role
+  roleCode?: string
 }
 
 export interface UserRecord {
@@ -14,7 +17,7 @@ export interface UserRecord {
   username: string
   firstName: string
   lastName: string
-  role: Role
+  roles: UserRoleSummary[]
   createdAt: string
   updatedAt: string
 }
@@ -32,7 +35,7 @@ export interface CreateUserRequest {
   firstName: string
   lastName: string
   password: string
-  role: Role
+  roleCodes?: string[]
 }
 
 export interface UpdateUserRequest {
@@ -40,5 +43,4 @@ export interface UpdateUserRequest {
   username?: string
   firstName?: string
   lastName?: string
-  role?: Role
 }

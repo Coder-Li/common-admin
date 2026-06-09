@@ -1,15 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { BookOpen, Folder, Lock, LogOut, Settings, Users } from 'lucide-react'
+import { Lock, LogOut } from 'lucide-react'
 import { api } from '../app/api-client'
 import { clearQueryCache } from '../app/query-client'
-import { DictionariesPage } from '../features/dictionaries/DictionariesPage'
-import { FilesPage } from '../features/files/FilesPage'
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher'
 import { useI18n } from '../i18n/useI18n'
 import { navigateTo } from '../lib/navigation'
-import { UsersPage } from '../features/users/UsersPage'
-import { DashboardContent } from '../pages/DashboardContent'
-import { PlaceholderPage } from '../pages/PlaceholderPage'
+import { findAdminRoute, getVisibleAdminRoutes } from '../routes/admin-routes'
 import { useAuthStore } from '../stores/auth-store'
 import { ThemeSwitcher } from '../theme/ThemeSwitcher'
 
@@ -30,6 +26,7 @@ export function AdminShell({ currentPath }: AdminShellProps) {
   const { t } = useI18n()
   const accessToken = useAuthStore((state) => state.accessToken)
   const user = useAuthStore((state) => state.user)
+  const permissions = useAuthStore((state) => state.permissions)
   const setUser = useAuthStore((state) => state.setUser)
   const reset = useAuthStore((state) => state.reset)
 
@@ -49,16 +46,29 @@ export function AdminShell({ currentPath }: AdminShellProps) {
     navigateTo('/login')
   }
 
-  const pageTitle =
-    currentPath === '/users'
-      ? t('nav.users')
-      : currentPath === '/dictionaries'
-        ? t('nav.dictionaries')
-        : currentPath === '/files'
-          ? t('nav.files')
-          : currentPath === '/settings'
-            ? t('nav.settings')
-            : t('nav.dashboard')
+  const visibleRoutes = getVisibleAdminRoutes(permissions)
+  const currentRoute = findAdminRoute(currentPath) ?? visibleRoutes[0]
+  const pageTitle = currentRoute ? t(currentRoute.labelKey) : ''
+  const PageComponent = currentRoute?.component
+
+  function renderNavItem(route: (typeof visibleRoutes)[number], mobile = false) {
+    const Icon = route.icon
+    const testPrefix = mobile ? 'mobile-nav' : 'nav'
+    const testId = `${testPrefix}-${route.path.replace('/', '')}`
+
+    return (
+      <button
+        className={navItemClass(currentPath === route.path)}
+        data-testid={testId}
+        key={`${testPrefix}-${route.path}`}
+        onClick={() => navigateTo(route.path)}
+        type="button"
+      >
+        <Icon size={16} />
+        {t(route.labelKey)}
+      </button>
+    )
+  }
 
   return (
     <main className="min-h-screen bg-[var(--color-app)] text-[var(--color-text)]">
@@ -76,101 +86,13 @@ export function AdminShell({ currentPath }: AdminShellProps) {
         </div>
 
         <nav className="mt-8 grid gap-1 text-sm">
-          <button
-            className={navItemClass(currentPath === '/dashboard')}
-            data-testid="nav-dashboard"
-            onClick={() => navigateTo('/dashboard')}
-            type="button"
-          >
-            <Lock size={16} />
-            {t('nav.dashboard')}
-          </button>
-          <button
-            className={navItemClass(currentPath === '/users')}
-            data-testid="nav-users"
-            onClick={() => navigateTo('/users')}
-            type="button"
-          >
-            <Users size={16} />
-            {t('nav.users')}
-          </button>
-          <button
-            className={navItemClass(currentPath === '/dictionaries')}
-            data-testid="nav-dictionaries"
-            onClick={() => navigateTo('/dictionaries')}
-            type="button"
-          >
-            <BookOpen size={16} />
-            {t('nav.dictionaries')}
-          </button>
-          <button
-            className={navItemClass(currentPath === '/files')}
-            data-testid="nav-files"
-            onClick={() => navigateTo('/files')}
-            type="button"
-          >
-            <Folder size={16} />
-            {t('nav.files')}
-          </button>
-          <button
-            className={navItemClass(currentPath === '/settings')}
-            data-testid="nav-settings"
-            onClick={() => navigateTo('/settings')}
-            type="button"
-          >
-            <Settings size={16} />
-            {t('nav.settings')}
-          </button>
+          {visibleRoutes.map((route) => renderNavItem(route))}
         </nav>
       </aside>
 
       <section className="md:pl-64">
         <nav className="flex gap-2 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3 md:hidden">
-          <button
-            className={navItemClass(currentPath === '/dashboard')}
-            data-testid="mobile-nav-dashboard"
-            onClick={() => navigateTo('/dashboard')}
-            type="button"
-          >
-            <Lock size={16} />
-            {t('nav.dashboard')}
-          </button>
-          <button
-            className={navItemClass(currentPath === '/users')}
-            data-testid="mobile-nav-users"
-            onClick={() => navigateTo('/users')}
-            type="button"
-          >
-            <Users size={16} />
-            {t('nav.users')}
-          </button>
-          <button
-            className={navItemClass(currentPath === '/dictionaries')}
-            data-testid="mobile-nav-dictionaries"
-            onClick={() => navigateTo('/dictionaries')}
-            type="button"
-          >
-            <BookOpen size={16} />
-            {t('nav.dictionaries')}
-          </button>
-          <button
-            className={navItemClass(currentPath === '/files')}
-            data-testid="mobile-nav-files"
-            onClick={() => navigateTo('/files')}
-            type="button"
-          >
-            <Folder size={16} />
-            {t('nav.files')}
-          </button>
-          <button
-            className={navItemClass(currentPath === '/settings')}
-            data-testid="mobile-nav-settings"
-            onClick={() => navigateTo('/settings')}
-            type="button"
-          >
-            <Settings size={16} />
-            {t('nav.settings')}
-          </button>
+          {visibleRoutes.map((route) => renderNavItem(route, true))}
         </nav>
 
         <header className="flex h-16 items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5">
@@ -197,21 +119,9 @@ export function AdminShell({ currentPath }: AdminShellProps) {
           </div>
         </header>
 
-        {currentPath === '/users' ? (
-          <UsersPage />
-        ) : currentPath === '/dictionaries' ? (
-          <DictionariesPage />
-        ) : currentPath === '/files' ? (
-          <FilesPage />
-        ) : currentPath === '/settings' ? (
-          <PlaceholderPage
-            icon={<Settings size={20} />}
-            title={t('nav.settings')}
-            description={t('page.settingsDescription')}
-          />
-        ) : (
-          <DashboardContent isLoading={meQuery.isLoading} user={user} />
-        )}
+        {PageComponent ? (
+          <PageComponent isLoading={meQuery.isLoading} user={user} />
+        ) : null}
       </section>
     </main>
   )

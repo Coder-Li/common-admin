@@ -12,7 +12,8 @@ describe('api client', () => {
           username: 'admin',
           firstName: 'Admin',
           lastName: 'User',
-          role: 'ADMIN',
+          roles: [{ code: 'admin', name: 'Admin' }],
+          permissions: ['user.read'],
         },
       },
     })
@@ -45,7 +46,8 @@ describe('api client', () => {
         username: 'admin',
         firstName: 'Admin',
         lastName: 'User',
-        role: 'ADMIN',
+        roles: [{ code: 'admin', name: 'Admin' }],
+        permissions: ['user.read'],
       },
     })
     const client = createApiClient({
@@ -94,7 +96,7 @@ describe('api client', () => {
       page: 1,
       pageSize: 20,
       sort: 'createdAt:desc',
-      role: 'ADMIN' as const,
+      roleCode: 'admin',
     }
     const response = await client.users.list(query)
 
@@ -113,7 +115,7 @@ describe('api client', () => {
         username: 'editor',
         firstName: 'Edit',
         lastName: 'Or',
-        role: 'STANDARD',
+        roles: [{ code: 'standard', name: 'Standard' }],
         createdAt: '2026-06-07T00:00:00.000Z',
         updatedAt: '2026-06-07T00:00:00.000Z',
       },
@@ -128,7 +130,7 @@ describe('api client', () => {
       firstName: 'Edit',
       lastName: 'Or',
       password: 'Password123!',
-      role: 'STANDARD' as const,
+      roleCodes: ['standard'],
     }
 
     const response = await client.users.create(payload)
@@ -147,7 +149,7 @@ describe('api client', () => {
         username: 'admin',
         firstName: 'Admin',
         lastName: 'Updated',
-        role: 'ADMIN',
+        roles: [{ code: 'admin', name: 'Admin' }],
         createdAt: '2026-06-07T00:00:00.000Z',
         updatedAt: '2026-06-07T00:00:00.000Z',
       },
@@ -178,6 +180,37 @@ describe('api client', () => {
     expect(deleteRequest).toHaveBeenCalledWith('/users/user-1', {
       headers: { Authorization: 'Bearer access-token' },
     })
+  })
+
+  it('replaces user roles with bearer auth', async () => {
+    const updatedUser = {
+      id: 'user-1',
+      email: 'admin@example.com',
+      username: 'admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      roles: [{ code: 'admin', name: 'Admin' }],
+      permissions: ['user.read'],
+      createdAt: '2026-06-07T00:00:00.000Z',
+      updatedAt: '2026-06-07T00:00:00.000Z',
+    }
+    const put = vi.fn().mockResolvedValue({ data: updatedUser })
+    const client = createApiClient({
+      client: { put },
+      getAccessToken: () => 'access-token',
+    })
+
+    await expect(
+      client.users.replaceRoles('user-1', ['admin']),
+    ).resolves.toEqual(updatedUser)
+
+    expect(put).toHaveBeenCalledWith(
+      '/users/user-1/roles',
+      { roleCodes: ['admin'] },
+      {
+        headers: { Authorization: 'Bearer access-token' },
+      },
+    )
   })
 
   it('loads dictionary options with bearer auth', async () => {
@@ -481,6 +514,123 @@ describe('api client', () => {
     expect(get).toHaveBeenCalledWith('/files/file-1/download', {
       headers: { Authorization: 'Bearer access-token' },
       responseType: 'blob',
+    })
+  })
+
+  it('manages roles with bearer auth', async () => {
+    const roleRecord = {
+      id: 'role-1',
+      code: 'operator',
+      name: 'Operator',
+      description: null,
+      status: 'ACTIVE',
+      isSystem: false,
+      isDefault: false,
+      permissions: [{ code: 'user.read', name: 'View users' }],
+      createdAt: '2026-06-09T00:00:00.000Z',
+      updatedAt: '2026-06-09T00:00:00.000Z',
+    }
+    const get = vi.fn().mockResolvedValue({
+      data: { items: [roleRecord], total: 1, page: 1, pageSize: 20 },
+    })
+    const post = vi.fn().mockResolvedValue({ data: roleRecord })
+    const patch = vi.fn().mockResolvedValue({
+      data: { ...roleRecord, name: 'Ops' },
+    })
+    const deleteRequest = vi.fn().mockResolvedValue({ data: undefined })
+    const client = createApiClient({
+      client: { delete: deleteRequest, get, patch, post },
+      getAccessToken: () => 'access-token',
+    })
+    const query = { page: 1, pageSize: 20, search: 'op' }
+    const createPayload = {
+      code: 'operator',
+      name: 'Operator',
+      description: null,
+      isDefault: false,
+    }
+    const updatePayload = { name: 'Ops', status: 'ACTIVE' as const }
+
+    await client.roles.list(query)
+    await client.roles.create(createPayload)
+    await client.roles.update('role-1', updatePayload)
+    await client.roles.delete('role-1')
+
+    expect(get).toHaveBeenCalledWith('/roles', {
+      params: query,
+      headers: { Authorization: 'Bearer access-token' },
+    })
+    expect(post).toHaveBeenCalledWith('/roles', createPayload, {
+      headers: { Authorization: 'Bearer access-token' },
+    })
+    expect(patch).toHaveBeenCalledWith('/roles/role-1', updatePayload, {
+      headers: { Authorization: 'Bearer access-token' },
+    })
+    expect(deleteRequest).toHaveBeenCalledWith('/roles/role-1', {
+      headers: { Authorization: 'Bearer access-token' },
+    })
+  })
+
+  it('replaces role permissions with bearer auth', async () => {
+    const roleRecord = {
+      id: 'role-1',
+      code: 'operator',
+      name: 'Operator',
+      description: null,
+      status: 'ACTIVE',
+      isSystem: false,
+      isDefault: false,
+      permissions: [{ code: 'file.read', name: 'View files' }],
+      createdAt: '2026-06-09T00:00:00.000Z',
+      updatedAt: '2026-06-09T00:00:00.000Z',
+    }
+    const put = vi.fn().mockResolvedValue({ data: roleRecord })
+    const client = createApiClient({
+      client: { put },
+      getAccessToken: () => 'access-token',
+    })
+
+    await expect(
+      client.roles.replacePermissions('role-1', ['file.read']),
+    ).resolves.toEqual(roleRecord)
+
+    expect(put).toHaveBeenCalledWith(
+      '/roles/role-1/permissions',
+      { permissionCodes: ['file.read'] },
+      {
+        headers: { Authorization: 'Bearer access-token' },
+      },
+    )
+  })
+
+  it('lists permission modules with bearer auth', async () => {
+    const modules = [
+      {
+        module: 'user',
+        permissions: [
+          {
+            id: 'permission-1',
+            code: 'user.read',
+            module: 'user',
+            action: 'read',
+            name: 'View users',
+            description: null,
+            status: 'ACTIVE',
+            sortOrder: 100,
+          },
+        ],
+      },
+    ]
+    const get = vi.fn().mockResolvedValue({ data: modules })
+    const client = createApiClient({
+      client: { get },
+      getAccessToken: () => 'access-token',
+    })
+
+    await expect(client.permissions.modules()).resolves.toEqual(modules)
+
+    expect(get).toHaveBeenCalledWith('/permissions/modules', {
+      headers: { Authorization: 'Bearer access-token' },
     })
   })
 })
