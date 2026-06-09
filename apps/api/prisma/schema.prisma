@@ -25,19 +25,56 @@ enum DictionaryBadgeVariant {
   NEUTRAL
 }
 
+enum FileStorageDriver {
+  LOCAL
+}
+
+enum FileVisibility {
+  PRIVATE
+}
+
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique @db.VarChar(255)
-  username     String   @unique @db.VarChar(80)
-  firstName    String   @db.VarChar(80)
-  lastName     String   @db.VarChar(80)
-  passwordHash String   @db.VarChar(255)
-  role         Role     @default(STANDARD)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String        @id @default(uuid())
+  email         String        @unique @db.VarChar(255)
+  username      String        @unique @db.VarChar(80)
+  firstName     String        @db.VarChar(80)
+  lastName      String        @db.VarChar(80)
+  passwordHash  String        @db.VarChar(255)
+  role          Role          @default(STANDARD)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  uploadedFiles ManagedFile[]
 
   @@index([email])
   @@index([username])
+}
+
+model ManagedFile {
+  id            String            @id @default(uuid())
+  originalName  String            @db.VarChar(255)
+  displayName   String            @db.VarChar(255)
+  mimeType      String            @db.VarChar(120)
+  extension     String?           @db.VarChar(32)
+  size          BigInt
+  storageDriver FileStorageDriver @default(LOCAL)
+  bucket        String?           @db.VarChar(120)
+  objectKey     String            @db.VarChar(500)
+  checksum      String?           @db.VarChar(128)
+  visibility    FileVisibility    @default(PRIVATE)
+  description   String?           @db.VarChar(500)
+  metadata      Json?
+  uploadedById  String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  deletedAt     DateTime?
+
+  uploadedBy    User?             @relation(fields: [uploadedById], references: [id])
+
+  @@index([createdAt])
+  @@index([mimeType])
+  @@index([storageDriver])
+  @@index([uploadedById])
+  @@index([deletedAt])
 }
 
 model DictionaryType {
