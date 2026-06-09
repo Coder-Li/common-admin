@@ -5,18 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  FileStorageDriver,
-  FileVisibility,
-  ManagedFile,
-  Prisma,
-} from '@prisma/client';
+import { FileVisibility, ManagedFile, Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import {
-  ListResponse,
-  createListResponse,
-} from '../common/dto/list-response.dto';
+import { createListResponse } from '../common/dto/list-response.dto';
 import type { AppEnv } from '../config/env.config';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -76,7 +68,7 @@ export class FileService {
       total,
       page,
       pageSize,
-    ) as ListResponse<FileResponseDto>;
+    );
   }
 
   async findById(id: string): Promise<FileResponseDto> {
@@ -263,7 +255,7 @@ export class FileService {
 
   private assertAllowedMimeType(mimeType: string): void {
     const allowedMimeTypes = this.config
-      .getOrThrow('FILE_ALLOWED_MIME_TYPES')
+      .getOrThrow<string>('FILE_ALLOWED_MIME_TYPES')
       .split(',')
       .map((item) => item.trim())
       .filter(Boolean);
@@ -306,7 +298,10 @@ function truncateFileName(fileName: string, maxLength: number): string {
   return `${fileName.slice(0, maxLength - extension.length)}${extension}`;
 }
 
-function deriveExtension(originalName: string, mimeType: string): string | null {
+function deriveExtension(
+  originalName: string,
+  mimeType: string,
+): string | null {
   const extension = path.extname(originalName).replace(/^\./, '').trim();
 
   if (extension) {

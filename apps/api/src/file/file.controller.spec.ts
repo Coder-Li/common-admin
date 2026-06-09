@@ -38,34 +38,42 @@ describe('FileController', () => {
     updatedAt: '2026-06-09T04:05:06.000Z',
   };
 
-  const createService = () =>
-    ({
-      listFiles: jest.fn().mockResolvedValue({
-        items: [responseDto],
-        total: 1,
-        page: 1,
-        pageSize: 20,
-      }),
-      findById: jest.fn().mockResolvedValue(responseDto),
-      createFile: jest.fn().mockResolvedValue(responseDto),
-      updateFile: jest.fn().mockResolvedValue(responseDto),
-      deleteFile: jest.fn().mockResolvedValue(undefined),
-      getDownload: jest.fn().mockResolvedValue({
-        file: {
-          ...responseDto,
-          size: 5n,
-          bucket: null,
-          objectKey: '2026/06/object.pdf',
-          checksum: 'abc123',
-          deletedAt: null,
-          createdAt: new Date(responseDto.createdAt),
-          updatedAt: new Date(responseDto.updatedAt),
-        },
-        stream: Readable.from(['hello']),
-        size: 5,
-        downloadName: 'Report.pdf',
-      }),
-    }) as unknown as jest.Mocked<FileService>;
+  const createService = () => {
+    const listFiles = jest.fn().mockResolvedValue({
+      items: [responseDto],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    });
+    const findById = jest.fn().mockResolvedValue(responseDto);
+    const createFile = jest.fn().mockResolvedValue(responseDto);
+    const updateFile = jest.fn().mockResolvedValue(responseDto);
+    const deleteFile = jest.fn().mockResolvedValue(undefined);
+    const getDownload = jest.fn().mockResolvedValue({
+      file: {
+        ...responseDto,
+        size: 5n,
+        bucket: null,
+        objectKey: '2026/06/object.pdf',
+        checksum: 'abc123',
+        deletedAt: null,
+        createdAt: new Date(responseDto.createdAt),
+        updatedAt: new Date(responseDto.updatedAt),
+      },
+      stream: Readable.from(['hello']),
+      size: 5,
+      downloadName: 'Report.pdf',
+    });
+
+    return {
+      listFiles,
+      findById,
+      createFile,
+      updateFile,
+      deleteFile,
+      getDownload,
+    };
+  };
 
   it('requires admin role on all management routes', () => {
     for (const method of [
@@ -84,7 +92,7 @@ describe('FileController', () => {
 
   it('GET /files calls FileService.listFiles() with FileListQueryDto', async () => {
     const service = createService();
-    const controller = new FileController(service);
+    const controller = new FileController(service as unknown as FileService);
     const query = new FileListQueryDto();
 
     await expect(controller.listFiles(query)).resolves.toMatchObject({
@@ -95,7 +103,7 @@ describe('FileController', () => {
 
   it('GET /files/:id calls FileService.findById()', async () => {
     const service = createService();
-    const controller = new FileController(service);
+    const controller = new FileController(service as unknown as FileService);
 
     await expect(controller.getFile('file-1')).resolves.toBe(responseDto);
     expect(service.findById).toHaveBeenCalledWith('file-1');
@@ -103,7 +111,7 @@ describe('FileController', () => {
 
   it('upload calls FileService.createFile() with the multipart file, body DTO, and current user id', async () => {
     const service = createService();
-    const controller = new FileController(service);
+    const controller = new FileController(service as unknown as FileService);
     const file = { originalname: 'report.pdf' } as Express.Multer.File;
     const body = { displayName: 'Report' };
     const user = { sub: 'user-1' };
@@ -116,7 +124,7 @@ describe('FileController', () => {
 
   it('PATCH /files/:id calls FileService.updateFile() with UpdateFileDto', async () => {
     const service = createService();
-    const controller = new FileController(service);
+    const controller = new FileController(service as unknown as FileService);
     const body = new UpdateFileDto();
     body.displayName = 'Updated';
 
@@ -128,7 +136,7 @@ describe('FileController', () => {
 
   it('DELETE /files/:id calls FileService.deleteFile()', async () => {
     const service = createService();
-    const controller = new FileController(service);
+    const controller = new FileController(service as unknown as FileService);
 
     await expect(controller.deleteFile('file-1')).resolves.toBeUndefined();
     expect(service.deleteFile).toHaveBeenCalledWith('file-1');
@@ -136,7 +144,7 @@ describe('FileController', () => {
 
   it('propagates upload BadRequestException from the service', async () => {
     const service = createService();
-    const controller = new FileController(service);
+    const controller = new FileController(service as unknown as FileService);
     const error = new BadRequestException('File upload is required');
     service.createFile.mockRejectedValue(error);
 
@@ -147,7 +155,7 @@ describe('FileController', () => {
 
   it('download sets Content-Type, Content-Length, and Content-Disposition', async () => {
     const service = createService();
-    const controller = new FileController(service);
+    const controller = new FileController(service as unknown as FileService);
     const response = { setHeader: jest.fn() };
 
     const streamableFile = await controller.downloadFile(

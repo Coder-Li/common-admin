@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileStorageDriver } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
@@ -20,7 +24,7 @@ export class LocalStorageService implements StorageService {
   private readonly root: string;
 
   constructor(config: ConfigService<AppEnv, true>) {
-    const configuredRoot = config.getOrThrow('LOCAL_STORAGE_ROOT');
+    const configuredRoot = config.getOrThrow<string>('LOCAL_STORAGE_ROOT');
     this.root = path.isAbsolute(configuredRoot)
       ? path.resolve(configuredRoot)
       : path.resolve(process.cwd(), configuredRoot);

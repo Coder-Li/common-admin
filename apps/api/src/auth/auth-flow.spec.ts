@@ -66,6 +66,27 @@ interface DictionaryOptionsResponseBody {
   }>;
 }
 
+interface FileListResponseBody {
+  items: Array<{
+    id: string;
+    originalName: string;
+    displayName: string;
+    mimeType: string;
+    extension: string | null;
+    size: string;
+    storageDriver: 'LOCAL';
+    visibility: 'PRIVATE';
+    description: string | null;
+    metadata: Record<string, unknown> | null;
+    uploadedById: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 function loginBody(response: Response): LoginResponseBody {
   return response.body as LoginResponseBody;
 }
@@ -92,6 +113,10 @@ function dictionaryOptionsBody(
   response: Response,
 ): DictionaryOptionsResponseBody {
   return response.body as DictionaryOptionsResponseBody;
+}
+
+function fileListBody(response: Response): FileListResponseBody {
+  return response.body as FileListResponseBody;
 }
 
 function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
@@ -135,6 +160,13 @@ describe('Auth flow', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
+    },
+    managedFile: {
+      count: jest.fn(),
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn(),
     },
     $transaction: jest.fn(),
     $connect: jest.fn(),
@@ -195,13 +227,16 @@ describe('Auth flow', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    [prisma.user, prisma.dictionaryType, prisma.dictionaryItem].forEach(
-      (model) => {
-        Object.values(model).forEach((mock) => {
-          mock.mockReset();
-        });
-      },
-    );
+    [
+      prisma.user,
+      prisma.dictionaryType,
+      prisma.dictionaryItem,
+      prisma.managedFile,
+    ].forEach((model) => {
+      Object.values(model).forEach((mock) => {
+        mock.mockReset();
+      });
+    });
     prisma.$transaction.mockReset();
   });
 
@@ -630,6 +665,95 @@ describe('Auth flow', () => {
 
     expect(prisma.dictionaryType.delete).toHaveBeenCalledWith({
       where: { id: 'type-1' },
+    });
+  });
+
+  it('rejects unauthenticated file list requests', async () => {
+    await request(httpServer).get('/api/files').expect(401);
+  });
+
+  it('forbids a standard user from listing files', async () => {
+    const standardUser = persistedUser({
+      id: 'standard-1',
+      email: 'standard@example.com',
+      username: 'standard',
+      role: Role.STANDARD,
+    });
+    standardUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(standardUser);
+
+    await request(httpServer)
+      .get('/api/files')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(403);
+
+    expect(prisma.managedFile.findMany).not.toHaveBeenCalled();
+  });
+
+  it('allows an admin user to list files', async () => {
+    const adminUser = persistedUser();
+    adminUser.passwordHash = await bcrypt.hash('Admin123!', 4);
+    const accessToken = await signIn(adminUser);
+    prisma.managedFile.findMany.mockResolvedValueOnce([
+      {
+        id: 'file-1',
+        originalName: 'report.pdf',
+        displayName: 'Report',
+        mimeType: 'application/pdf',
+        extension: 'pdf',
+        size: 5n,
+        storageDriver: 'LOCAL',
+        bucket: null,
+        objectKey: '2026/06/object.pdf',
+        checksum: 'abc123',
+        visibility: 'PRIVATE',
+        description: null,
+        metadata: null,
+        uploadedById: 'user-1',
+        createdAt: new Date('2026-06-09T01:02:03.000Z'),
+        updatedAt: new Date('2026-06-09T04:05:06.000Z'),
+        deletedAt: null,
+      },
+    ]);
+    prisma.managedFile.count.mockResolvedValueOnce(1);
+
+    await request(httpServer)
+      .get('/api/files')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(fileListBody(response)).toEqual({
+          items: [
+            {
+              id: 'file-1',
+              originalName: 'report.pdf',
+              displayName: 'Report',
+              mimeType: 'application/pdf',
+              extension: 'pdf',
+              size: '5',
+              storageDriver: 'LOCAL',
+              visibility: 'PRIVATE',
+              description: null,
+              metadata: null,
+              uploadedById: 'user-1',
+              createdAt: '2026-06-09T01:02:03.000Z',
+              updatedAt: '2026-06-09T04:05:06.000Z',
+            },
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+        });
+      });
+
+    expect(prisma.managedFile.findMany).toHaveBeenCalledWith({
+      skip: 0,
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+      where: { deletedAt: null },
+    });
+    expect(prisma.managedFile.count).toHaveBeenCalledWith({
+      where: { deletedAt: null },
     });
   });
 });

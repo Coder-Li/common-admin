@@ -31,7 +31,8 @@ const envSchema = z.object({
       if (mimeTypes.length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'FILE_ALLOWED_MIME_TYPES must include at least one MIME type',
+          message:
+            'FILE_ALLOWED_MIME_TYPES must include at least one MIME type',
         });
         return z.NEVER;
       }

@@ -3,6 +3,7 @@ import type { ConfigService } from '@nestjs/config';
 import { FileStorageDriver, FileVisibility } from '@prisma/client';
 import { Readable } from 'node:stream';
 import type { AppEnv } from '../config/env.config';
+import type { PrismaService } from '../prisma/prisma.service';
 import {
   FileListQueryDto,
   UpdateFileDto,
@@ -10,7 +11,6 @@ import {
 } from './dto/file.request';
 import { toFileResponse } from './file.mapper';
 import { FileService } from './file.service';
-import type { StorageService } from './storage/storage.types';
 
 const validationPipe = new ValidationPipe({
   whitelist: true,
@@ -18,14 +18,20 @@ const validationPipe = new ValidationPipe({
   transform: true,
 });
 
-function transformQuery<T>(metatype: new () => T, query: Record<string, unknown>) {
+function transformQuery<T>(
+  metatype: new () => T,
+  query: Record<string, unknown>,
+) {
   return validationPipe.transform(query, {
     type: 'query',
     metatype,
   }) as Promise<T>;
 }
 
-function transformBody<T>(metatype: new () => T, body: Record<string, unknown>) {
+function transformBody<T>(
+  metatype: new () => T,
+  body: Record<string, unknown>,
+) {
   return validationPipe.transform(body, {
     type: 'body',
     metatype,
@@ -78,7 +84,10 @@ describe('metadata validation helpers', () => {
   it.each([
     ['arrays', []],
     ['scalars', 'hello'],
-    ['objects deeper than 5 levels', { a: { b: { c: { d: { e: { f: true } } } } } }],
+    [
+      'objects deeper than 5 levels',
+      { a: { b: { c: { d: { e: { f: true } } } } } },
+    ],
     ['serialized JSON over 16 KB', { value: 'x'.repeat(16 * 1024) }],
   ])('rejects %s', (_label, value) => {
     expect(() => validateMetadataShape(value)).toThrow(BadRequestException);
@@ -129,6 +138,23 @@ describe('file mapper', () => {
 });
 
 describe('FileService', () => {
+  type MockPrisma = {
+    managedFile: {
+      findMany: jest.Mock;
+      count: jest.Mock;
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+  };
+
+  type MockStorage = {
+    driver: FileStorageDriver;
+    save: jest.Mock;
+    read: jest.Mock;
+    delete: jest.Mock;
+  };
+
   const makeFile = (overrides: Record<string, unknown> = {}) => ({
     id: 'file-1',
     originalName: 'report.pdf',
@@ -139,7 +165,8 @@ describe('FileService', () => {
     storageDriver: FileStorageDriver.LOCAL,
     bucket: null,
     objectKey: '2026/06/object.pdf',
-    checksum: '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+    checksum:
+      '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
     visibility: FileVisibility.PRIVATE,
     description: null,
     metadata: null,
@@ -150,18 +177,25 @@ describe('FileService', () => {
     ...overrides,
   });
 
-  const makeUpload = (overrides: Partial<Express.Multer.File> = {}) =>
-    ({
+  const makeUpload = (overrides: Partial<Express.Multer.File> = {}) => {
+    const upload: Express.Multer.File = {
       fieldname: 'file',
       originalname: 'report.pdf',
       encoding: '7bit',
       mimetype: 'application/pdf',
       size: 5,
+      destination: '',
+      filename: '',
+      path: '',
+      stream: Readable.from([]),
       buffer: Buffer.from('hello'),
       ...overrides,
-    }) as Express.Multer.File;
+    };
 
-  const createPrismaMock = () => ({
+    return upload;
+  };
+
+  const createPrismaMock = (): MockPrisma => ({
     managedFile: {
       findMany: jest.fn(),
       count: jest.fn(),
@@ -171,7 +205,7 @@ describe('FileService', () => {
     },
   });
 
-  const createStorageMock = (): jest.Mocked<StorageService> => ({
+  const createStorageMock = (): MockStorage => ({
     driver: FileStorageDriver.LOCAL,
     save: jest.fn(),
     read: jest.fn(),
@@ -193,7 +227,11 @@ describe('FileService', () => {
     const prisma = createPrismaMock();
     const storage = createStorageMock();
     const config = createConfigMock(configOverrides);
-    const service = new FileService(prisma as never, config, storage);
+    const service = new FileService(
+      prisma as unknown as PrismaService,
+      config,
+      storage,
+    );
 
     storage.save.mockResolvedValue({
       bucket: null,
@@ -307,7 +345,9 @@ describe('FileService', () => {
       const { prisma, service } = createService();
       prisma.managedFile.findFirst.mockResolvedValue(null);
 
-      await expect(service.findById('file-1')).rejects.toThrow('File not found');
+      await expect(service.findById('file-1')).rejects.toThrow(
+        'File not found',
+      );
     });
   });
 
@@ -350,14 +390,14 @@ describe('FileService', () => {
         {},
       );
 
-      expect(prisma.managedFile.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            originalName: 'uploaded-file',
-            displayName: 'uploaded-file',
-          }),
-        }),
-      );
+      const createArgs = firstMockArg<{
+        data: { originalName: string; displayName: string };
+      }>(prisma.managedFile.create);
+
+      expect(createArgs.data).toMatchObject({
+        originalName: 'uploaded-file',
+        displayName: 'uploaded-file',
+      });
     });
 
     it('derives extension without a leading dot', async () => {
@@ -385,25 +425,30 @@ describe('FileService', () => {
         'user-1',
       );
 
-      expect(storage.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          buffer: Buffer.from('hello'),
-          originalName: 'report.pdf',
-          mimeType: 'application/pdf',
-        }),
-      );
-      expect(prisma.managedFile.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          originalName: 'report.pdf',
-          displayName: 'Quarterly Report',
-          description: 'For admins',
-          metadata: { source: 'test' },
-          checksum:
-            '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
-          uploadedById: 'user-1',
-          bucket: null,
-          objectKey: '2026/06/object.pdf',
-        }),
+      const saveArgs = firstMockArg<{
+        buffer: Buffer;
+        originalName: string;
+        mimeType: string;
+      }>(storage.save);
+      const createArgs = firstMockArg<{
+        data: Record<string, unknown>;
+      }>(prisma.managedFile.create);
+
+      expect(saveArgs).toMatchObject({
+        buffer: Buffer.from('hello'),
+        originalName: 'report.pdf',
+        mimeType: 'application/pdf',
+      });
+      expect(createArgs.data).toMatchObject({
+        originalName: 'report.pdf',
+        displayName: 'Quarterly Report',
+        description: 'For admins',
+        metadata: { source: 'test' },
+        checksum:
+          '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+        uploadedById: 'user-1',
+        bucket: null,
+        objectKey: '2026/06/object.pdf',
       });
     });
 
@@ -452,7 +497,9 @@ describe('FileService', () => {
     it('calls storage delete before setting deletedAt', async () => {
       const { prisma, storage, service } = createService();
       prisma.managedFile.findFirst.mockResolvedValue(makeFile());
-      prisma.managedFile.update.mockResolvedValue(makeFile({ deletedAt: new Date() }));
+      prisma.managedFile.update.mockResolvedValue(
+        makeFile({ deletedAt: new Date() }),
+      );
 
       await service.deleteFile('file-1');
 
@@ -465,10 +512,13 @@ describe('FileService', () => {
       expect(storage.delete.mock.invocationCallOrder[0]).toBeLessThan(
         prisma.managedFile.update.mock.invocationCallOrder[0],
       );
-      expect(prisma.managedFile.update).toHaveBeenCalledWith({
-        where: { id: 'file-1' },
-        data: { deletedAt: expect.any(Date) },
-      });
+      const updateArgs = firstMockArg<{
+        where: { id: string };
+        data: { deletedAt: Date };
+      }>(prisma.managedFile.update);
+
+      expect(updateArgs.where).toEqual({ id: 'file-1' });
+      expect(updateArgs.data.deletedAt).toBeInstanceOf(Date);
     });
 
     it('does not set deletedAt if storage delete throws', async () => {
@@ -490,11 +540,11 @@ describe('FileService', () => {
         makeFile({ displayName: 'Quarterly Report' }),
       );
 
-      await expect(service.getDownload('file-1')).resolves.toMatchObject({
-        file: expect.objectContaining({ id: 'file-1' }),
-        size: 5,
-        downloadName: 'Quarterly Report.pdf',
-      });
+      const download = await service.getDownload('file-1');
+
+      expect(download.file.id).toBe('file-1');
+      expect(download.size).toBe(5);
+      expect(download.downloadName).toBe('Quarterly Report.pdf');
     });
   });
 });

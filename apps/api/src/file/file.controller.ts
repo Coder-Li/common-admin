@@ -125,8 +125,13 @@ export class FileController {
 }
 
 function contentDisposition(fileName: string): string {
-  const fallback = fileName.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
-  const encoded = encodeURIComponent(fileName).replace(/['()]/g, escapeHeaderChar);
+  const fallback = fileName
+    .replace(/[^\x20-\x7e]/g, '_')
+    .replace(/["\\]/g, '_');
+  const encoded = encodeURIComponent(fileName).replace(
+    /['()]/g,
+    escapeHeaderChar,
+  );
 
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
