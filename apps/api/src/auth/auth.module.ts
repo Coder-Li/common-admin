@@ -8,6 +8,7 @@ import {
 } from '../config/auth.config';
 import { PermissionModule } from '../permission/permission.module';
 import { AuthController } from './auth.controller';
+import { AuthOriginGuard } from './auth-origin.guard';
 import { AuthService } from './auth.service';
 import { JwtAccessStrategy } from './jwt-access.strategy';
 import { RefreshTokenService } from './refresh-token.service';
@@ -18,6 +19,7 @@ import { SessionCookieService } from './session-cookie.service';
   controllers: [AuthController],
   providers: [
     AuthService,
+    AuthOriginGuard,
     JwtAccessStrategy,
     RefreshTokenService,
     SessionCookieService,
