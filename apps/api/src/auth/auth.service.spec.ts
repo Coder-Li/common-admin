@@ -2,6 +2,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
+import { RefreshTokenService } from './refresh-token.service';
 
 describe('AuthService', () => {
   const user = {
@@ -27,6 +28,9 @@ describe('AuthService', () => {
     user: {
       findFirst: jest.fn(),
     },
+    userSession: {
+      create: jest.fn(),
+    },
   };
 
   const jwtService = {
@@ -35,6 +39,7 @@ describe('AuthService', () => {
   const permissionService = {
     resolveUserPermissionContext: jest.fn(),
   };
+  const refreshTokenService = new RefreshTokenService();
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -57,19 +62,32 @@ describe('AuthService', () => {
       prisma as never,
       jwtService,
       permissionService as never,
+      refreshTokenService,
       {
         accessTokenSecret: 'access-secret',
         accessTokenExpiresIn: '15m',
+        refreshTokenExpiresInDays: 30,
+        refreshCookieName: 'common_admin_refresh',
+        refreshCookieSecure: false,
+        refreshCookieSameSite: 'lax',
+        refreshCookieDomain: '',
       },
     );
 
-    const result = await service.login({
-      usernameOrEmail: 'admin@example.com',
-      password: 'Admin123!',
-    });
+    const result = await service.login(
+      {
+        usernameOrEmail: 'admin@example.com',
+        password: 'Admin123!',
+      },
+      {
+        userAgent: 'Jest Agent',
+        ipAddress: '203.0.113.10',
+      },
+    );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       accessToken: 'access-token',
+      refreshToken: expect.stringMatching(/^[^.]+\./),
       user: {
         id: 'user-1',
         email: 'admin@example.com',
@@ -80,6 +98,24 @@ describe('AuthService', () => {
         permissions: ['user.read'],
       },
     });
+    const sessionId = result.refreshToken.split('.')[0];
+    const { secret } = refreshTokenService.parseToken(result.refreshToken);
+    expect(prisma.userSession.create).toHaveBeenCalledWith({
+      data: {
+        id: sessionId,
+        userId: 'user-1',
+        refreshTokenHash: expect.any(String),
+        userAgent: 'Jest Agent',
+        ipAddress: '203.0.113.10',
+        expiresAt: expect.any(Date),
+      },
+    });
+    const session = prisma.userSession.create.mock.calls[0][0].data;
+    expect(session.refreshTokenHash).not.toBe(secret);
+    await expect(
+      refreshTokenService.verifySecret(secret, session.refreshTokenHash),
+    ).resolves.toBe(true);
+    expect(session.expiresAt.getTime()).toBeGreaterThan(Date.now());
     expect(signAsync).toHaveBeenCalledTimes(1);
     expect(prisma.user.findFirst).toHaveBeenCalledWith({
       where: {
@@ -90,6 +126,7 @@ describe('AuthService', () => {
     expect(signAsync).toHaveBeenCalledWith(
       {
         sub: 'user-1',
+        sid: sessionId,
         email: 'admin@example.com',
         username: 'admin',
       },
@@ -106,9 +143,15 @@ describe('AuthService', () => {
       prisma as never,
       jwtService,
       permissionService as never,
+      refreshTokenService,
       {
         accessTokenSecret: 'access-secret',
         accessTokenExpiresIn: '15m',
+        refreshTokenExpiresInDays: 30,
+        refreshCookieName: 'common_admin_refresh',
+        refreshCookieSecure: false,
+        refreshCookieSameSite: 'lax',
+        refreshCookieDomain: '',
       },
     );
 
@@ -126,9 +169,15 @@ describe('AuthService', () => {
       prisma as never,
       jwtService,
       permissionService as never,
+      refreshTokenService,
       {
         accessTokenSecret: 'access-secret',
         accessTokenExpiresIn: '15m',
+        refreshTokenExpiresInDays: 30,
+        refreshCookieName: 'common_admin_refresh',
+        refreshCookieSecure: false,
+        refreshCookieSameSite: 'lax',
+        refreshCookieDomain: '',
       },
     );
 

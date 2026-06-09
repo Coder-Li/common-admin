@@ -69,6 +69,12 @@ describe('Auth flow', () => {
       createMany: jest.fn(),
       count: jest.fn(),
     },
+    userSession: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
+    },
     dictionaryType: {
       count: jest.fn(),
       create: jest.fn(),
@@ -189,6 +195,7 @@ describe('Auth flow', () => {
       prisma.user,
       prisma.role,
       prisma.userRole,
+      prisma.userSession,
       prisma.dictionaryType,
       prisma.dictionaryItem,
       prisma.managedFile,
@@ -235,6 +242,10 @@ describe('Auth flow', () => {
       permissions: ['user.read'],
     });
     expect(body.accessToken).toEqual(expect.any(String));
+    expect(loginResponse.headers['set-cookie'][0]).toContain(
+      'common_admin_refresh=',
+    );
+    expect(loginResponse.headers['set-cookie'][0]).toContain('HttpOnly');
     expect(loginResponse.body).not.toHaveProperty('refreshToken');
 
     await request(httpServer)

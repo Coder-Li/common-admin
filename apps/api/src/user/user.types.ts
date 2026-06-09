@@ -15,6 +15,7 @@ export interface UserProfile {
 
 export interface JwtUserPayload {
   sub: string;
+  sid: string;
   email?: string;
   username?: string;
 }
