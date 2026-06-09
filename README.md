@@ -31,9 +31,9 @@ pnpm dev:api
 ```text
 Postgres: postgresql://postgres:postgres@localhost:5432/common_admin
 Redis:    redis://localhost:6379
-API:      http://localhost:3001/api
-Admin:    http://localhost:5173
-Swagger:  http://localhost:3001/api/docs
+API:      http://localhost:13001/api
+Admin:    http://localhost:15173
+Swagger:  http://localhost:13001/api/docs
 ```
 
 初始化 API 环境：

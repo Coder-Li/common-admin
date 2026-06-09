@@ -153,7 +153,7 @@ describe('Auth flow', () => {
     invalidateUserPermissionContext: jest.fn(),
     invalidateAllPermissionContexts: jest.fn(),
   };
-  const allowedOrigin = 'http://localhost:5173';
+  const allowedOrigin = 'http://localhost:15173';
 
   function persistedUser(overrides: Record<string, unknown> = {}) {
     const roles = (overrides.roles as Array<{

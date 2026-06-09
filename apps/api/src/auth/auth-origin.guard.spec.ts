@@ -42,7 +42,7 @@ describe('AuthOriginGuard', () => {
     jest.resetAllMocks();
     configService.getOrThrow.mockImplementation((key: string) => {
       if (key === 'ALLOWED_ORIGINS') {
-        return 'http://localhost:5173, https://admin.example.com';
+        return 'http://localhost:15173, https://admin.example.com';
       }
 
       if (key === 'AUTH_REFRESH_COOKIE_NAME') {
@@ -55,7 +55,7 @@ describe('AuthOriginGuard', () => {
 
   it('allows configured browser origins', () => {
     expect(
-      createGuard().canActivate(createContext('http://localhost:5173')),
+      createGuard().canActivate(createContext('http://localhost:15173')),
     ).toBe(true);
   });
 

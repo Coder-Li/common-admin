@@ -30,6 +30,13 @@ describe('validateEnv', () => {
     expect(env.AUTH_REFRESH_COOKIE_DOMAIN).toBe('');
   });
 
+  it('uses local admin and API defaults that stay connected', () => {
+    expect(validateEnv({})).toMatchObject({
+      PORT: 13001,
+      ALLOWED_ORIGINS: 'http://localhost:15173,http://127.0.0.1:15173',
+    });
+  });
+
   it('rejects sameSite none without secure cookies in production', () => {
     expect(() =>
       validateEnv({

@@ -4,13 +4,15 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),
-  PORT: z.coerce.number().int().positive().default(3001),
+  PORT: z.coerce.number().int().positive().default(13001),
   DATABASE_URL: z
     .string()
     .url()
     .default('postgresql://postgres:postgres@localhost:5432/common_admin'),
   REDIS_URL: z.string().url().default('redis://localhost:6379'),
-  ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
+  ALLOWED_ORIGINS: z
+    .string()
+    .default('http://localhost:15173,http://127.0.0.1:15173'),
   JWT_ACCESS_TOKEN_SECRET: z
     .string()
     .min(16)

@@ -43,7 +43,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(configService.getOrThrow<number>('PORT'));
+  await app.listen(configService.getOrThrow<number>('PORT'), '0.0.0.0');
 }
 void bootstrap().catch((error: unknown) => {
   console.error(error);
