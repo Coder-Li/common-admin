@@ -38,4 +38,18 @@ describe('route guard', () => {
       redirectTo: '/login',
     })
   })
+
+  it('allows authenticated users to visit file management', () => {
+    expect(resolveRoute('/files', true)).toEqual({
+      path: '/files',
+      redirectTo: null,
+    })
+  })
+
+  it('redirects anonymous file management visits to login', () => {
+    expect(resolveRoute('/files', false)).toEqual({
+      path: '/files',
+      redirectTo: '/login',
+    })
+  })
 })

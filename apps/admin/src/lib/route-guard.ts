@@ -2,6 +2,7 @@ const protectedPaths = new Set([
   '/dashboard',
   '/users',
   '/dictionaries',
+  '/files',
   '/settings',
 ])
 

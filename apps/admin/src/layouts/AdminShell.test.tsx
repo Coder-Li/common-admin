@@ -26,6 +26,10 @@ vi.mock('../app/api-client', () => ({
   },
 }))
 
+vi.mock('../features/files/FilesPage', () => ({
+  FilesPage: () => <div>Files page content</div>,
+}))
+
 function mockBrowserLanguages(languages: readonly string[]) {
   Object.defineProperty(window.navigator, 'languages', {
     configurable: true,
@@ -98,5 +102,18 @@ describe('AdminShell i18n', () => {
     expect(screen.getByText('当前用户')).toBeInTheDocument()
     expect(screen.getByText('下一步')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /退出登录/ })).toBeInTheDocument()
+  })
+
+  it('renders the Files nav item on desktop and mobile', () => {
+    renderAdminShell('/files')
+
+    expect(screen.getByTestId('nav-files')).toHaveTextContent('Files')
+    expect(screen.getByTestId('mobile-nav-files')).toHaveTextContent('Files')
+  })
+
+  it('renders FilesPage for the files route', () => {
+    renderAdminShell('/files')
+
+    expect(screen.getByText('Files page content')).toBeInTheDocument()
   })
 })

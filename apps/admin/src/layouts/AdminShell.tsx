@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { BookOpen, Lock, LogOut, Settings, Users } from 'lucide-react'
+import { BookOpen, Folder, Lock, LogOut, Settings, Users } from 'lucide-react'
 import { api } from '../app/api-client'
 import { clearQueryCache } from '../app/query-client'
 import { DictionariesPage } from '../features/dictionaries/DictionariesPage'
+import { FilesPage } from '../features/files/FilesPage'
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher'
 import { useI18n } from '../i18n/useI18n'
 import { navigateTo } from '../lib/navigation'
@@ -53,9 +54,11 @@ export function AdminShell({ currentPath }: AdminShellProps) {
       ? t('nav.users')
       : currentPath === '/dictionaries'
         ? t('nav.dictionaries')
-      : currentPath === '/settings'
-        ? t('nav.settings')
-        : t('nav.dashboard')
+        : currentPath === '/files'
+          ? t('nav.files')
+          : currentPath === '/settings'
+            ? t('nav.settings')
+            : t('nav.dashboard')
 
   return (
     <main className="min-h-screen bg-[var(--color-app)] text-[var(--color-text)]">
@@ -101,6 +104,15 @@ export function AdminShell({ currentPath }: AdminShellProps) {
             {t('nav.dictionaries')}
           </button>
           <button
+            className={navItemClass(currentPath === '/files')}
+            data-testid="nav-files"
+            onClick={() => navigateTo('/files')}
+            type="button"
+          >
+            <Folder size={16} />
+            {t('nav.files')}
+          </button>
+          <button
             className={navItemClass(currentPath === '/settings')}
             data-testid="nav-settings"
             onClick={() => navigateTo('/settings')}
@@ -142,6 +154,15 @@ export function AdminShell({ currentPath }: AdminShellProps) {
             {t('nav.dictionaries')}
           </button>
           <button
+            className={navItemClass(currentPath === '/files')}
+            data-testid="mobile-nav-files"
+            onClick={() => navigateTo('/files')}
+            type="button"
+          >
+            <Folder size={16} />
+            {t('nav.files')}
+          </button>
+          <button
             className={navItemClass(currentPath === '/settings')}
             data-testid="mobile-nav-settings"
             onClick={() => navigateTo('/settings')}
@@ -180,6 +201,8 @@ export function AdminShell({ currentPath }: AdminShellProps) {
           <UsersPage />
         ) : currentPath === '/dictionaries' ? (
           <DictionariesPage />
+        ) : currentPath === '/files' ? (
+          <FilesPage />
         ) : currentPath === '/settings' ? (
           <PlaceholderPage
             icon={<Settings size={20} />}
