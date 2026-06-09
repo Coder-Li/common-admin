@@ -5,6 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+} from '../audit-log/audit-log.constants';
+import type {
+  AuditActor,
+  AuditRequestMeta,
+} from '../audit-log/audit-log.types';
+import { toRoleResponse } from './role.mapper';
 import { RoleService } from './role.service';
 
 describe('RoleService', () => {
@@ -17,6 +26,9 @@ describe('RoleService', () => {
       update: jest.fn(),
       delete: jest.fn(),
       updateMany: jest.fn(),
+    },
+    auditLog: {
+      create: jest.fn(),
     },
     permission: {
       findMany: jest.fn(),
@@ -37,15 +49,31 @@ describe('RoleService', () => {
 
   const createService = () => {
     const prisma = createPrismaMock();
+    const tx = createPrismaMock();
     prisma.$transaction.mockImplementation(async (callback: Function) =>
-      callback(prisma),
+      callback(tx),
     );
+    const auditLogService = {
+      record: jest.fn(),
+    };
     const service = new RoleService(
       prisma as never,
       permissionService as never,
+      auditLogService as never,
     );
 
-    return { prisma, service };
+    return { auditLogService, prisma, service, tx };
+  };
+
+  const auditActor: AuditActor = {
+    userId: 'actor-1',
+    email: 'actor@example.com',
+    name: 'Actor',
+  };
+
+  const auditRequestMeta: AuditRequestMeta = {
+    ipAddress: '127.0.0.1',
+    userAgent: 'jest',
   };
 
   const role = (overrides: Record<string, unknown> = {}) => ({
@@ -67,15 +95,15 @@ describe('RoleService', () => {
   });
 
   it('creates a non-system role', async () => {
-    const { prisma, service } = createService();
-    prisma.role.create.mockResolvedValue(role());
+    const { service, tx } = createService();
+    tx.role.create.mockResolvedValue(role());
 
     await service.createRole({
       code: 'operator',
       name: 'Operator',
     });
 
-    expect(prisma.role.create).toHaveBeenCalledWith({
+    expect(tx.role.create).toHaveBeenCalledWith({
       data: {
         code: 'operator',
         name: 'Operator',
@@ -86,9 +114,43 @@ describe('RoleService', () => {
     });
   });
 
+  it('createRole writes create role audit log with after snapshot in the same transaction', async () => {
+    const { auditLogService, prisma, service, tx } = createService();
+    const created = role();
+    tx.role.create.mockResolvedValue(created);
+
+    await service.createRole(
+      {
+        code: 'operator',
+        name: 'Operator',
+      },
+      auditActor,
+      auditRequestMeta,
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.role.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.any(Object),
+      }),
+    );
+    expect(prisma.role.create).not.toHaveBeenCalled();
+    expect(auditLogService.record).toHaveBeenCalledWith(
+      {
+        action: AUDIT_ACTIONS.CREATE,
+        resourceType: AUDIT_RESOURCE_TYPES.ROLE,
+        resourceId: 'role-1',
+        actor: auditActor,
+        requestMeta: auditRequestMeta,
+        after: toRoleResponse(created),
+      },
+      tx,
+    );
+  });
+
   it('rejects duplicate role code', async () => {
-    const { prisma, service } = createService();
-    prisma.role.create.mockRejectedValue(
+    const { service, tx } = createService();
+    tx.role.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('duplicate', {
         code: 'P2002',
         clientVersion: 'test',
@@ -121,34 +183,194 @@ describe('RoleService', () => {
   });
 
   it('enforces one active default role', async () => {
-    const { prisma, service } = createService();
+    const { prisma, service, tx } = createService();
     prisma.role.findUnique.mockResolvedValue(role());
-    prisma.role.update.mockResolvedValue(role({ isDefault: true }));
+    tx.role.findUnique.mockResolvedValue(role());
+    tx.role.update.mockResolvedValue(role({ isDefault: true }));
 
     await service.updateRole('role-1', { isDefault: true });
 
-    expect(prisma.role.updateMany).toHaveBeenCalledWith({
+    expect(tx.role.updateMany).toHaveBeenCalledWith({
       where: { id: { not: 'role-1' }, status: 'ACTIVE', isDefault: true },
       data: { isDefault: false },
     });
   });
 
+  it('updateRole reads before, updates, and writes before and after audit in the same transaction', async () => {
+    const { auditLogService, prisma, service, tx } = createService();
+    const guardRole = role({ name: 'Operator' });
+    const before = role({ name: 'Operator' });
+    const after = role({ name: 'Operations' });
+    prisma.role.findUnique.mockResolvedValue(guardRole);
+    tx.role.findUnique.mockResolvedValue(before);
+    tx.role.update.mockResolvedValue(after);
+
+    await service.updateRole(
+      'role-1',
+      { name: 'Operations' },
+      auditActor,
+      auditRequestMeta,
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.role.findUnique).toHaveBeenCalledWith({
+      where: { id: 'role-1' },
+      include: expect.any(Object),
+    });
+    expect(tx.role.update).toHaveBeenCalledWith({
+      where: { id: 'role-1' },
+      data: { name: 'Operations' },
+      include: expect.any(Object),
+    });
+    expect(prisma.role.update).not.toHaveBeenCalled();
+    expect(auditLogService.record).toHaveBeenCalledWith(
+      {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: AUDIT_RESOURCE_TYPES.ROLE,
+        resourceId: 'role-1',
+        actor: auditActor,
+        requestMeta: auditRequestMeta,
+        before: toRoleResponse(before),
+        after: toRoleResponse(after),
+      },
+      tx,
+    );
+  });
+
   it('replaces role permissions atomically', async () => {
-    const { prisma, service } = createService();
+    const { prisma, service, tx } = createService();
     prisma.role.findUnique.mockResolvedValue(role());
     prisma.permission.findMany.mockResolvedValue([
       { id: 'permission-1', code: 'user.read', status: 'ACTIVE' },
     ]);
+    tx.role.findUnique.mockResolvedValue(
+      role({
+        permissions: [
+          { permission: { code: 'user.read', name: 'Read users' } },
+        ],
+      }),
+    );
 
     await service.replaceRolePermissions('role-1', ['user.read']);
 
-    expect(prisma.rolePermission.deleteMany).toHaveBeenCalledWith({
+    expect(tx.rolePermission.deleteMany).toHaveBeenCalledWith({
       where: { roleId: 'role-1' },
     });
-    expect(prisma.rolePermission.createMany).toHaveBeenCalledWith({
+    expect(tx.rolePermission.createMany).toHaveBeenCalledWith({
       data: [{ roleId: 'role-1', permissionId: 'permission-1' }],
       skipDuplicates: true,
     });
+  });
+
+  it('deleteRole writes delete role audit log with before snapshot in the same transaction', async () => {
+    const { auditLogService, prisma, service, tx } = createService();
+    const before = role();
+    prisma.role.findUnique.mockResolvedValue(before);
+    prisma.userRole.count.mockResolvedValue(0);
+    tx.role.delete.mockResolvedValue(before);
+
+    await service.deleteRole('role-1', auditActor, auditRequestMeta);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.role.delete).toHaveBeenCalledWith({
+      where: { id: 'role-1' },
+      include: expect.any(Object),
+    });
+    expect(prisma.role.delete).not.toHaveBeenCalled();
+    expect(auditLogService.record).toHaveBeenCalledWith(
+      {
+        action: AUDIT_ACTIONS.DELETE,
+        resourceType: AUDIT_RESOURCE_TYPES.ROLE,
+        resourceId: 'role-1',
+        actor: auditActor,
+        requestMeta: auditRequestMeta,
+        before: toRoleResponse(before),
+      },
+      tx,
+    );
+  });
+
+  it('replaceRolePermissions writes before and after permission code lists in the same transaction', async () => {
+    const { auditLogService, prisma, service, tx } = createService();
+    prisma.role.findUnique.mockResolvedValue(role());
+    prisma.permission.findMany.mockResolvedValue([
+      { id: 'permission-1', code: 'user.read', status: 'ACTIVE' },
+      { id: 'permission-2', code: 'user.update', status: 'ACTIVE' },
+    ]);
+    tx.role.findUnique
+      .mockResolvedValueOnce(
+        role({
+          permissions: [
+            { permission: { code: 'setting.read', name: 'Read settings' } },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        role({
+          permissions: [
+            { permission: { code: 'user.read', name: 'Read users' } },
+            { permission: { code: 'user.update', name: 'Update users' } },
+          ],
+        }),
+      );
+
+    await service.replaceRolePermissions(
+      'role-1',
+      ['user.update', 'user.read', 'user.read'],
+      auditActor,
+      auditRequestMeta,
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.role.findUnique).toHaveBeenNthCalledWith(1, {
+      where: { id: 'role-1' },
+      include: expect.any(Object),
+    });
+    expect(tx.rolePermission.deleteMany).toHaveBeenCalledWith({
+      where: { roleId: 'role-1' },
+    });
+    expect(tx.rolePermission.createMany).toHaveBeenCalledWith({
+      data: [
+        { roleId: 'role-1', permissionId: 'permission-1' },
+        { roleId: 'role-1', permissionId: 'permission-2' },
+      ],
+      skipDuplicates: true,
+    });
+    expect(tx.role.findUnique).toHaveBeenNthCalledWith(2, {
+      where: { id: 'role-1' },
+      include: expect.any(Object),
+    });
+    expect(prisma.rolePermission.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.rolePermission.createMany).not.toHaveBeenCalled();
+    expect(auditLogService.record).toHaveBeenCalledWith(
+      {
+        action: AUDIT_ACTIONS.REPLACE_PERMISSIONS,
+        resourceType: AUDIT_RESOURCE_TYPES.ROLE,
+        resourceId: 'role-1',
+        actor: auditActor,
+        requestMeta: auditRequestMeta,
+        before: { permissionCodes: ['setting.read'] },
+        after: { permissionCodes: ['user.read', 'user.update'] },
+      },
+      tx,
+    );
+  });
+
+  it('rejects the business request when role audit recording fails inside a Prisma transaction', async () => {
+    const { auditLogService, prisma, service, tx } = createService();
+    prisma.role.findUnique.mockResolvedValue(role());
+    tx.role.findUnique.mockResolvedValue(role());
+    tx.role.update.mockResolvedValue(role({ name: 'Operations' }));
+    auditLogService.record.mockRejectedValue(new Error('audit failed'));
+
+    await expect(
+      service.updateRole(
+        'role-1',
+        { name: 'Operations' },
+        auditActor,
+        auditRequestMeta,
+      ),
+    ).rejects.toThrow('audit failed');
   });
 
   it('rejects disabled permission assignment', async () => {
@@ -162,9 +384,10 @@ describe('RoleService', () => {
   });
 
   it('invalidates permission cache after role permission replacement', async () => {
-    const { prisma, service } = createService();
+    const { prisma, service, tx } = createService();
     prisma.role.findUnique.mockResolvedValue(role());
     prisma.permission.findMany.mockResolvedValue([]);
+    tx.role.findUnique.mockResolvedValue(role());
 
     await service.replaceRolePermissions('role-1', []);
 

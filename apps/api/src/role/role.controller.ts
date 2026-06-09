@@ -9,7 +9,9 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -19,7 +21,13 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  buildAuditActor,
+  getAuditRequestMeta,
+} from '../audit-log/audit-log-request-meta';
 import { Permissions } from '../auth/permissions.decorator';
+import { CurrentUser } from '../user/current-user.decorator';
+import type { JwtUserPayload } from '../user/user.types';
 import {
   CreateRoleDto,
   ReplaceRolePermissionsDto,
@@ -47,8 +55,16 @@ export class RoleController {
   @ApiForbiddenResponse({ description: 'Permission required' })
   @Permissions('role.create')
   @Post()
-  createRole(@Body() body: CreateRoleDto): Promise<RoleResponseDto> {
-    return this.roleService.createRole(body);
+  createRole(
+    @Body() body: CreateRoleDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
+  ): Promise<RoleResponseDto> {
+    return this.roleService.createRole(
+      body,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiOkResponse({ type: RoleResponseDto })
@@ -68,8 +84,15 @@ export class RoleController {
   updateRole(
     @Param('id') id: string,
     @Body() body: UpdateRoleDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<RoleResponseDto> {
-    return this.roleService.updateRole(id, body);
+    return this.roleService.updateRole(
+      id,
+      body,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiNoContentResponse({ description: 'Role deleted' })
@@ -78,8 +101,16 @@ export class RoleController {
   @Permissions('role.delete')
   @HttpCode(204)
   @Delete(':id')
-  deleteRole(@Param('id') id: string): Promise<void> {
-    return this.roleService.deleteRole(id);
+  deleteRole(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
+  ): Promise<void> {
+    return this.roleService.deleteRole(
+      id,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiOkResponse({ type: RoleResponseDto })
@@ -90,7 +121,14 @@ export class RoleController {
   replaceRolePermissions(
     @Param('id') id: string,
     @Body() body: ReplaceRolePermissionsDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<RoleResponseDto> {
-    return this.roleService.replaceRolePermissions(id, body.permissionCodes);
+    return this.roleService.replaceRolePermissions(
+      id,
+      body.permissionCodes,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 }

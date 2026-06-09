@@ -13,6 +13,15 @@ import {
 import { PermissionService } from '../permission/permission.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+} from '../audit-log/audit-log.constants';
+import { AuditLogService } from '../audit-log/audit-log.service';
+import type {
+  AuditActor,
+  AuditRequestMeta,
+} from '../audit-log/audit-log.types';
+import {
   CreateRoleDto,
   RoleListQueryDto,
   UpdateRoleDto,
@@ -28,6 +37,19 @@ const ROLE_INCLUDE = {
   },
 } as const;
 
+const ACTIVE_ROLE_PERMISSIONS_INCLUDE = {
+  permissions: {
+    where: {
+      permission: {
+        status: PermissionStatus.ACTIVE,
+      },
+    },
+    include: {
+      permission: true,
+    },
+  },
+} as const;
+
 const ROLE_SORT_FIELDS = new Set(['createdAt', 'updatedAt', 'code', 'name']);
 
 @Injectable()
@@ -35,6 +57,7 @@ export class RoleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissionService: PermissionService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async listRoles(
@@ -83,14 +106,18 @@ export class RoleService {
     return toRoleResponse(role);
   }
 
-  async createRole(dto: CreateRoleDto): Promise<RoleResponseDto> {
+  async createRole(
+    dto: CreateRoleDto,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
+  ): Promise<RoleResponseDto> {
     try {
-      const role = await this.prisma.$transaction(async (tx) => {
+      const response = await this.prisma.$transaction(async (tx) => {
         if (dto.isDefault) {
           await this.clearOtherDefaults(tx);
         }
 
-        return tx.role.create({
+        const role = await tx.role.create({
           data: {
             code: dto.code,
             name: dto.name,
@@ -99,17 +126,37 @@ export class RoleService {
           },
           include: ROLE_INCLUDE,
         });
+        const response = toRoleResponse(role);
+
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.CREATE,
+            resourceType: AUDIT_RESOURCE_TYPES.ROLE,
+            resourceId: role.id,
+            actor,
+            requestMeta,
+            after: response,
+          },
+          tx,
+        );
+
+        return response;
       });
 
       await this.permissionService.invalidateAllPermissionContexts();
 
-      return toRoleResponse(role);
+      return response;
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
   }
 
-  async updateRole(id: string, dto: UpdateRoleDto): Promise<RoleResponseDto> {
+  async updateRole(
+    id: string,
+    dto: UpdateRoleDto,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
+  ): Promise<RoleResponseDto> {
     const existing = await this.requireRole(id);
 
     if (existing.code === 'super_admin' && dto.status === RoleStatus.DISABLED) {
@@ -125,27 +172,56 @@ export class RoleService {
     }
 
     try {
-      const role = await this.prisma.$transaction(async (tx) => {
+      const response = await this.prisma.$transaction(async (tx) => {
+        const before = await tx.role.findUnique({
+          where: { id },
+          include: ROLE_INCLUDE,
+        });
+
+        if (!before) {
+          throw new NotFoundException('Role not found');
+        }
+
         if (dto.isDefault) {
           await this.clearOtherDefaults(tx, id);
         }
 
-        return tx.role.update({
+        const role = await tx.role.update({
           where: { id },
           data: dto,
           include: ROLE_INCLUDE,
         });
+        const response = toRoleResponse(role);
+
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.UPDATE,
+            resourceType: AUDIT_RESOURCE_TYPES.ROLE,
+            resourceId: id,
+            actor,
+            requestMeta,
+            before: toRoleResponse(before),
+            after: response,
+          },
+          tx,
+        );
+
+        return response;
       });
 
       await this.permissionService.invalidateAllPermissionContexts();
 
-      return toRoleResponse(role);
+      return response;
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
   }
 
-  async deleteRole(id: string): Promise<void> {
+  async deleteRole(
+    id: string,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
+  ): Promise<void> {
     const role = await this.requireRole(id);
 
     if (role.isSystem) {
@@ -161,7 +237,24 @@ export class RoleService {
     }
 
     try {
-      await this.prisma.role.delete({ where: { id } });
+      await this.prisma.$transaction(async (tx) => {
+        const deleted = await tx.role.delete({
+          where: { id },
+          include: ROLE_INCLUDE,
+        });
+
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.DELETE,
+            resourceType: AUDIT_RESOURCE_TYPES.ROLE,
+            resourceId: id,
+            actor,
+            requestMeta,
+            before: toRoleResponse(deleted),
+          },
+          tx,
+        );
+      });
       await this.permissionService.invalidateAllPermissionContexts();
     } catch (error) {
       this.handlePrismaWriteError(error);
@@ -171,6 +264,8 @@ export class RoleService {
   async replaceRolePermissions(
     roleId: string,
     permissionCodes: string[],
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
   ): Promise<RoleResponseDto> {
     await this.requireRole(roleId);
     const uniqueCodes = [...new Set(permissionCodes)].sort();
@@ -189,28 +284,76 @@ export class RoleService {
     }
 
     const role = await this.prisma.$transaction(async (tx) => {
+      const before = await tx.role.findUnique({
+        where: { id: roleId },
+        include: ACTIVE_ROLE_PERMISSIONS_INCLUDE,
+      });
+
+      if (!before) {
+        throw new NotFoundException('Role not found');
+      }
+
       await tx.rolePermission.deleteMany({ where: { roleId } });
       await tx.rolePermission.createMany({
-        data: permissions.map((permission) => ({
+        data: this.toRolePermissionCreateManyData(
           roleId,
-          permissionId: permission.id,
-        })),
+          uniqueCodes,
+          permissions,
+        ),
         skipDuplicates: true,
       });
 
-      return tx.role.findUnique({
+      const updated = await tx.role.findUnique({
         where: { id: roleId },
-        include: ROLE_INCLUDE,
+        include: ACTIVE_ROLE_PERMISSIONS_INCLUDE,
       });
-    });
 
-    if (!role) {
-      throw new NotFoundException('Role not found');
-    }
+      if (!updated) {
+        throw new NotFoundException('Role not found');
+      }
+
+      await this.auditLogService.record(
+        {
+          action: AUDIT_ACTIONS.REPLACE_PERMISSIONS,
+          resourceType: AUDIT_RESOURCE_TYPES.ROLE,
+          resourceId: roleId,
+          actor,
+          requestMeta,
+          before: { permissionCodes: this.toPermissionCodes(before) },
+          after: { permissionCodes: this.toPermissionCodes(updated) },
+        },
+        tx,
+      );
+
+      return updated;
+    });
 
     await this.permissionService.invalidateAllPermissionContexts();
 
     return toRoleResponse(role);
+  }
+
+  private toPermissionCodes(role: {
+    permissions?: Array<{ permission: { code: string } }>;
+  }): string[] {
+    return (role.permissions ?? [])
+      .map((rolePermission) => rolePermission.permission.code)
+      .sort();
+  }
+
+  private toRolePermissionCreateManyData(
+    roleId: string,
+    uniqueCodes: string[],
+    permissions: Array<{ id: string; code: string }>,
+  ): Array<{ roleId: string; permissionId: string }> {
+    const permissionsByCode = new Map(
+      permissions.map((permission) => [permission.code, permission]),
+    );
+
+    return uniqueCodes.map((code) => ({
+      roleId,
+      permissionId: permissionsByCode.get(code)!.id,
+    }));
   }
 
   private async requireRole(id: string) {
