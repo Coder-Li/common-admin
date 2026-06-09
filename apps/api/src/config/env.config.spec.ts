@@ -15,6 +15,7 @@ describe('validateEnv', () => {
       validateEnv({
         NODE_ENV: 'production',
         JWT_ACCESS_TOKEN_SECRET: 'production-secret-change-me',
+        AUTH_REFRESH_COOKIE_SECURE: 'true',
       }).JWT_ACCESS_TOKEN_SECRET,
     ).toBe('production-secret-change-me');
   });
@@ -40,11 +41,22 @@ describe('validateEnv', () => {
     ).toThrow('AUTH_REFRESH_COOKIE_SECURE must be true');
   });
 
+  it('rejects insecure refresh cookies in production', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_ACCESS_TOKEN_SECRET: 'production-secret-change-me',
+        AUTH_REFRESH_COOKIE_SECURE: 'false',
+      }),
+    ).toThrow('AUTH_REFRESH_COOKIE_SECURE must be true in production');
+  });
+
   it('rejects wildcard allowed origins in production', () => {
     expect(() =>
       validateEnv({
         NODE_ENV: 'production',
         JWT_ACCESS_TOKEN_SECRET: 'production-secret-change-me',
+        AUTH_REFRESH_COOKIE_SECURE: 'true',
         ALLOWED_ORIGINS: '*',
       }),
     ).toThrow('ALLOWED_ORIGINS cannot include wildcard');

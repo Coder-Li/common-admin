@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 @Injectable()
 export class AuthOriginGuard implements CanActivate {
   private readonly allowedOrigins: Set<string>;
+  private readonly refreshCookieName: string;
 
   constructor(configService: ConfigService) {
     this.allowedOrigins = new Set(
@@ -17,6 +18,9 @@ export class AuthOriginGuard implements CanActivate {
         .split(',')
         .map((origin) => origin.trim())
         .filter(Boolean),
+    );
+    this.refreshCookieName = configService.getOrThrow<string>(
+      'AUTH_REFRESH_COOKIE_NAME',
     );
   }
 
@@ -28,7 +32,7 @@ export class AuthOriginGuard implements CanActivate {
     const origin = request.headers.origin;
 
     if (!origin) {
-      if (Object.keys(request.cookies ?? {}).length > 0) {
+      if (request.cookies?.[this.refreshCookieName]) {
         throw new ForbiddenException(
           'Origin is required for cookie auth endpoints',
         );

@@ -76,14 +76,8 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     throw new Error('JWT_ACCESS_TOKEN_SECRET must be configured in production');
   }
 
-  if (
-    env.NODE_ENV === 'production' &&
-    env.AUTH_REFRESH_COOKIE_SAME_SITE === 'none' &&
-    !env.AUTH_REFRESH_COOKIE_SECURE
-  ) {
-    throw new Error(
-      'AUTH_REFRESH_COOKIE_SECURE must be true when SameSite=None in production',
-    );
+  if (env.NODE_ENV === 'production' && !env.AUTH_REFRESH_COOKIE_SECURE) {
+    throw new Error('AUTH_REFRESH_COOKIE_SECURE must be true in production');
   }
 
   if (

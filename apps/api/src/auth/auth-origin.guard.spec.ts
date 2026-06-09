@@ -28,11 +28,29 @@ describe('AuthOriginGuard', () => {
       }),
     }) as unknown as ExecutionContext;
 
+  const createContextWithUnrelatedCookie = () =>
+    ({
+      switchToHttp: () => ({
+        getRequest: () => ({
+          headers: {},
+          cookies: { analytics_session: 'opaque' },
+        }),
+      }),
+    }) as unknown as ExecutionContext;
+
   beforeEach(() => {
     jest.resetAllMocks();
-    configService.getOrThrow.mockReturnValue(
-      'http://localhost:5173, https://admin.example.com',
-    );
+    configService.getOrThrow.mockImplementation((key: string) => {
+      if (key === 'ALLOWED_ORIGINS') {
+        return 'http://localhost:5173, https://admin.example.com';
+      }
+
+      if (key === 'AUTH_REFRESH_COOKIE_NAME') {
+        return 'common_admin_refresh';
+      }
+
+      throw new Error(`Unexpected config key: ${key}`);
+    });
   });
 
   it('allows configured browser origins', () => {
@@ -54,6 +72,12 @@ describe('AuthOriginGuard', () => {
   it('rejects requests without origin headers when refresh cookie is present', () => {
     expect(() => createGuard().canActivate(createContextWithCookie())).toThrow(
       new ForbiddenException('Origin is required for cookie auth endpoints'),
+    );
+  });
+
+  it('allows requests without origin headers when only unrelated cookies are present', () => {
+    expect(createGuard().canActivate(createContextWithUnrelatedCookie())).toBe(
+      true,
     );
   });
 });
