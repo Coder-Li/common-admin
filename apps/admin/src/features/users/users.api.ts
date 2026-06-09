@@ -1,6 +1,7 @@
 import { api as defaultApi } from '../../app/api-client'
 import type {
   CreateUserRequest,
+  ResetUserPasswordRequest,
   UpdateUserRequest,
   UserListQuery,
   UserListResponse,
@@ -14,6 +15,7 @@ export interface UsersApiClient {
     update(id: string, payload: UpdateUserRequest): Promise<UserRecord>
     delete(id: string): Promise<void>
     replaceRoles(id: string, roleCodes: string[]): Promise<UserRecord>
+    resetPassword(id: string, payload: ResetUserPasswordRequest): Promise<void>
   }
 }
 
@@ -49,4 +51,12 @@ export function replaceUserRoles(
   api: UsersApiClient = defaultApi,
 ) {
   return api.users.replaceRoles(id, roleCodes)
+}
+
+export function resetUserPassword(
+  id: string,
+  payload: ResetUserPasswordRequest,
+  api: UsersApiClient = defaultApi,
+) {
+  return api.users.resetPassword(id, payload)
 }

@@ -40,10 +40,14 @@ export function AdminShell({ currentPath }: AdminShellProps) {
     },
   })
 
-  function signOut() {
-    reset()
-    clearQueryCache()
-    navigateTo('/login')
+  async function signOut() {
+    try {
+      await api.logout()
+    } finally {
+      reset()
+      clearQueryCache()
+      navigateTo('/login')
+    }
   }
 
   const visibleRoutes = getVisibleAdminRoutes(permissions)
@@ -110,7 +114,9 @@ export function AdminShell({ currentPath }: AdminShellProps) {
             />
             <button
               className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--color-border-strong)] px-3 text-sm text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
-              onClick={signOut}
+              onClick={() => {
+                void signOut().catch(() => undefined)
+              }}
               type="button"
             >
               <LogOut size={16} />

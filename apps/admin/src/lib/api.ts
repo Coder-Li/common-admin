@@ -2,6 +2,7 @@ import axios from 'axios'
 import type { AuthSession, UserProfile } from '../types/auth'
 import type {
   CreateUserRequest,
+  ResetUserPasswordRequest,
   UpdateUserRequest,
   UserListQuery,
   UserListResponse,
@@ -45,10 +46,6 @@ export interface LoginCredentials {
 
 export interface ChangePasswordRequest {
   currentPassword: string
-  newPassword: string
-}
-
-export interface ResetUserPasswordRequest {
   newPassword: string
 }
 

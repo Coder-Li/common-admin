@@ -44,3 +44,7 @@ export interface UpdateUserRequest {
   firstName?: string
   lastName?: string
 }
+
+export interface ResetUserPasswordRequest {
+  newPassword: string
+}

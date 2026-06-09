@@ -2,10 +2,14 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { api } from '../app/api-client'
+import { clearQueryCache } from '../app/query-client'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { LOCALE_STORAGE_KEY } from '../i18n/locale-storage'
+import { navigateTo } from '../lib/navigation'
 import { useAuthStore } from '../stores/auth-store'
 import { ThemeProvider } from '../theme/ThemeProvider'
 import type { UserProfile } from '../types/auth'
@@ -31,7 +35,16 @@ const user: UserProfile = {
 vi.mock('../app/api-client', () => ({
   api: {
     me: vi.fn(async () => user),
+    logout: vi.fn(async () => undefined),
   },
+}))
+
+vi.mock('../app/query-client', () => ({
+  clearQueryCache: vi.fn(),
+}))
+
+vi.mock('../lib/navigation', () => ({
+  navigateTo: vi.fn(),
 }))
 
 vi.mock('../features/files/FilesPage', () => ({
@@ -86,6 +99,10 @@ describe('AdminShell i18n', () => {
   beforeEach(() => {
     window.localStorage.clear()
     mockBrowserLanguages(['en-US'])
+    vi.mocked(api.logout).mockReset()
+    vi.mocked(api.logout).mockResolvedValue(undefined)
+    vi.mocked(clearQueryCache).mockReset()
+    vi.mocked(navigateTo).mockReset()
   })
 
   it('renders English shell and dashboard copy by default', () => {
@@ -155,5 +172,35 @@ describe('AdminShell i18n', () => {
     expect(screen.getByTestId('nav-files')).toBeInTheDocument()
     expect(screen.queryByTestId('nav-dictionaries')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument()
+  })
+
+  it('logs out through the API before clearing local state', async () => {
+    const testUser = userEvent.setup()
+    vi.mocked(api.logout).mockResolvedValueOnce(undefined)
+
+    renderAdminShell()
+
+    await testUser.click(screen.getByRole('button', { name: /sign out/i }))
+
+    expect(api.logout).toHaveBeenCalledOnce()
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(clearQueryCache).toHaveBeenCalledOnce()
+    expect(navigateTo).toHaveBeenCalledWith('/login')
+  })
+
+  it('still clears local state when logout API rejects', async () => {
+    const testUser = userEvent.setup()
+    vi.mocked(api.logout).mockRejectedValueOnce(new Error('logout failed'))
+
+    renderAdminShell()
+
+    await testUser.click(screen.getByRole('button', { name: /sign out/i }))
+
+    expect(api.logout).toHaveBeenCalledOnce()
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(clearQueryCache).toHaveBeenCalledOnce()
+    expect(navigateTo).toHaveBeenCalledWith('/login')
   })
 })
