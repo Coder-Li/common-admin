@@ -771,6 +771,58 @@ describe('api client', () => {
     })
   })
 
+  it('lists audit logs with query params and bearer auth', async () => {
+    const get = vi.fn().mockResolvedValue({
+      data: {
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+      },
+    })
+    const client = createApiClient({
+      client: { get },
+      getAccessToken: () => 'access-token',
+    })
+    const query = {
+      page: 1,
+      pageSize: 20,
+      search: 'admin',
+      sort: 'createdAt:desc',
+      resourceType: 'user',
+    }
+
+    const response = await client.auditLogs.list(query)
+
+    expect(get).toHaveBeenCalledWith('/audit-logs', {
+      params: query,
+      headers: { Authorization: 'Bearer access-token' },
+    })
+    expect(response.items).toEqual([])
+  })
+
+  it('gets audit log detail with bearer auth', async () => {
+    const get = vi.fn().mockResolvedValue({
+      data: {
+        id: 'log-1',
+        action: 'create',
+        resourceType: 'user',
+        createdAt: '2026-06-09T00:00:00.000Z',
+      },
+    })
+    const client = createApiClient({
+      client: { get },
+      getAccessToken: () => 'access-token',
+    })
+
+    const response = await client.auditLogs.get('log-1')
+
+    expect(get).toHaveBeenCalledWith('/audit-logs/log-1', {
+      headers: { Authorization: 'Bearer access-token' },
+    })
+    expect(response.id).toBe('log-1')
+  })
+
   it('manages roles with bearer auth', async () => {
     const roleRecord = {
       id: 'role-1',

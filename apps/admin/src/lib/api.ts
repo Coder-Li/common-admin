@@ -31,6 +31,11 @@ import type {
   UpdateFileRequest,
 } from '../features/files/files.types'
 import type {
+  AuditLogListQuery,
+  AuditLogListResponse,
+  AuditLogRecord,
+} from '../features/audit-logs/audit-logs.types'
+import type {
   CreateRoleRequest,
   PermissionModule,
   RoleListQuery,
@@ -496,6 +501,32 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
             ...authenticatedConfig(),
             responseType: 'blob',
           }),
+        )
+      },
+    },
+
+    auditLogs: {
+      async list(query: AuditLogListQuery): Promise<AuditLogListResponse> {
+        if (!client.get) {
+          throw new Error('HTTP get client is not configured')
+        }
+        return request(() =>
+          client.get!<AuditLogListResponse>(
+            '/audit-logs',
+            authenticatedConfig(undefined, query),
+          ),
+        )
+      },
+
+      async get(id: string): Promise<AuditLogRecord> {
+        if (!client.get) {
+          throw new Error('HTTP get client is not configured')
+        }
+        return request(() =>
+          client.get!<AuditLogRecord>(
+            `/audit-logs/${id}`,
+            authenticatedConfig(),
+          ),
         )
       },
     },
