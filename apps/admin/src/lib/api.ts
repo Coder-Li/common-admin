@@ -49,7 +49,7 @@ export interface ChangePasswordRequest {
 }
 
 export interface ResetUserPasswordRequest {
-  password: string
+  newPassword: string
 }
 
 export interface ListResponse<TItem> {
@@ -254,7 +254,7 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
       )
     },
 
-    async me(accessToken = getAccessToken?.()): Promise<UserProfile> {
+    async me(accessToken?: string): Promise<UserProfile> {
       if (!client.get) {
         throw new Error('HTTP get client is not configured')
       }

@@ -89,16 +89,19 @@ describe('api client', () => {
 
   it('401 from normal request triggers refresh then retries original request once', async () => {
     const error = { response: { status: 401 } }
+    let accessToken = 'expired-token'
     const get = vi
       .fn()
       .mockRejectedValueOnce(error)
       .mockResolvedValueOnce({ data: session.user })
     const post = vi.fn().mockResolvedValue({ data: session })
-    const setSession = vi.fn()
+    const setSession = vi.fn((nextSession: typeof session) => {
+      accessToken = nextSession.accessToken
+    })
     const onUnauthorized = vi.fn()
     const client = createApiClient({
       client: { get, post },
-      getAccessToken: () => 'expired-token',
+      getAccessToken: () => accessToken,
       setSession,
       onUnauthorized,
     })
@@ -111,6 +114,12 @@ describe('api client', () => {
     })
     expect(setSession).toHaveBeenCalledWith(session)
     expect(get).toHaveBeenCalledTimes(2)
+    expect(get).toHaveBeenNthCalledWith(1, '/users/me', {
+      headers: { Authorization: 'Bearer expired-token' },
+    })
+    expect(get).toHaveBeenNthCalledWith(2, '/users/me', {
+      headers: { Authorization: 'Bearer access-token' },
+    })
     expect(onUnauthorized).not.toHaveBeenCalled()
   })
 
@@ -349,7 +358,7 @@ describe('api client', () => {
       client: { post },
       getAccessToken: () => 'access-token',
     })
-    const payload = { password: 'NewPassword123!' }
+    const payload = { newPassword: 'NewPassword123!' }
 
     await expect(
       client.users.resetPassword('user-1', payload),
