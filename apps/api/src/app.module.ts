@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AuditLogModule } from './audit-log/audit-log.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './auth/permissions.guard';
@@ -33,6 +34,7 @@ import { UserModule } from './user/user.module';
     PermissionModule,
     RoleModule,
     UserModule,
+    AuditLogModule,
     DictionaryModule,
     FileModule,
     HealthModule,
