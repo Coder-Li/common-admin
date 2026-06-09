@@ -19,8 +19,7 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Roles } from '../auth/roles.decorator';
-import { Role } from '../user/role.enum';
+import { Permissions } from '../auth/permissions.decorator';
 import { DictionaryItemService } from './dictionary-item.service';
 import {
   CreateDictionaryItemDto,
@@ -39,8 +38,8 @@ export class DictionaryItemController {
   constructor(private readonly dictionaryItemService: DictionaryItemService) {}
 
   @ApiOkResponse({ type: DictionaryItemListResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
-  @Roles(Role.ADMIN)
+  @ApiForbiddenResponse({ description: 'Permission required' })
+  @Permissions('dictionary.read')
   @Get()
   listItems(
     @Query() query: DictionaryItemListQueryDto,
@@ -49,19 +48,19 @@ export class DictionaryItemController {
   }
 
   @ApiOkResponse({ type: DictionaryItemResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Dictionary item not found' })
-  @Roles(Role.ADMIN)
+  @Permissions('dictionary.read')
   @Get(':id')
   getItem(@Param('id') id: string): Promise<DictionaryItemResponseDto> {
     return this.dictionaryItemService.findById(id);
   }
 
   @ApiCreatedResponse({ type: DictionaryItemResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiConflictResponse({ description: 'Dictionary item already exists' })
   @ApiNotFoundResponse({ description: 'Dictionary type not found' })
-  @Roles(Role.ADMIN)
+  @Permissions('dictionary.create')
   @Post()
   createItem(
     @Body() body: CreateDictionaryItemDto,
@@ -70,10 +69,10 @@ export class DictionaryItemController {
   }
 
   @ApiOkResponse({ type: DictionaryItemResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiConflictResponse({ description: 'System dictionary item constraint' })
   @ApiNotFoundResponse({ description: 'Dictionary item not found' })
-  @Roles(Role.ADMIN)
+  @Permissions('dictionary.update')
   @Patch(':id')
   updateItem(
     @Param('id') id: string,
@@ -83,12 +82,12 @@ export class DictionaryItemController {
   }
 
   @ApiNoContentResponse({ description: 'Dictionary item deleted' })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiConflictResponse({
     description: 'System dictionary item cannot be deleted',
   })
   @ApiNotFoundResponse({ description: 'Dictionary item not found' })
-  @Roles(Role.ADMIN)
+  @Permissions('dictionary.delete')
   @HttpCode(204)
   @Delete(':id')
   deleteItem(@Param('id') id: string): Promise<void> {

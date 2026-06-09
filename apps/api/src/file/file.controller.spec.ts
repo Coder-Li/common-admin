@@ -2,8 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import { FileStorageDriver, FileVisibility } from '@prisma/client';
 import { Readable } from 'node:stream';
-import { ROLES_KEY } from '../auth/roles.decorator';
-import { Role } from '../user/role.enum';
+import { PERMISSIONS_KEY } from '../auth/permissions.decorator';
 import { FileListQueryDto, UpdateFileDto } from './dto/file.request';
 import { FileController } from './file.controller';
 import { FileService } from './file.service';
@@ -75,19 +74,17 @@ describe('FileController', () => {
     };
   };
 
-  it('requires admin role on all management routes', () => {
-    for (const method of [
-      'listFiles',
-      'getFile',
-      'uploadFile',
-      'downloadFile',
-      'updateFile',
-      'deleteFile',
-    ] satisfies Array<keyof FileController>) {
-      expect(Reflect.getMetadata(ROLES_KEY, controllerMethod(method))).toEqual([
-        Role.ADMIN,
-      ]);
-    }
+  it.each([
+    ['listFiles', ['file.read']],
+    ['getFile', ['file.read']],
+    ['uploadFile', ['file.upload']],
+    ['downloadFile', ['file.download']],
+    ['updateFile', ['file.update']],
+    ['deleteFile', ['file.delete']],
+  ] as const)('requires %s permission metadata', (method, permissions) => {
+    expect(
+      Reflect.getMetadata(PERMISSIONS_KEY, controllerMethod(method)),
+    ).toEqual(permissions);
   });
 
   it('GET /files calls FileService.listFiles() with FileListQueryDto', async () => {
@@ -149,7 +146,7 @@ describe('FileController', () => {
     service.createFile.mockRejectedValue(error);
 
     await expect(
-      controller.uploadFile(undefined, {}, { sub: 'user-1' } as never),
+      controller.uploadFile(undefined, {}, { sub: 'user-1' }),
     ).rejects.toBe(error);
   });
 

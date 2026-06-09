@@ -1,31 +1,30 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayNotEmpty,
   Matches,
   IsEmail,
-  IsEnum,
+  IsArray,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { ListQueryDto } from '../../common/dto/list-query.dto';
-import { Role } from '../role.enum';
 
 const USER_SORT_FIELDS = [
   'email',
   'username',
   'firstName',
   'lastName',
-  'role',
   'createdAt',
   'updatedAt',
 ];
 
 export class UserListQueryDto extends ListQueryDto {
-  @ApiPropertyOptional({ enum: Role })
+  @ApiPropertyOptional({ example: 'admin' })
   @IsOptional()
-  @IsEnum(Role)
-  role?: Role;
+  @IsString()
+  roleCode?: string;
 
   @ApiPropertyOptional({
     example: 'createdAt:desc',
@@ -68,9 +67,11 @@ export class CreateUserDto {
   @MinLength(8)
   password!: string;
 
-  @ApiProperty({ enum: Role })
-  @IsEnum(Role)
-  role!: Role;
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  roleCodes?: string[];
 }
 
 export class UpdateUserDto {
@@ -100,9 +101,12 @@ export class UpdateUserDto {
   @MinLength(1)
   @MaxLength(80)
   lastName?: string;
+}
 
-  @ApiPropertyOptional({ enum: Role })
-  @IsOptional()
-  @IsEnum(Role)
-  role?: Role;
+export class ReplaceUserRolesDto {
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  roleCodes!: string[];
 }

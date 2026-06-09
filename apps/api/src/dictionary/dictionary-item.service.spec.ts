@@ -6,8 +6,7 @@ import {
 } from '@nestjs/common';
 import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import { DictionaryStatus, Prisma } from '@prisma/client';
-import { ROLES_KEY } from '../auth/roles.decorator';
-import { Role } from '../user/role.enum';
+import { PERMISSIONS_KEY } from '../auth/permissions.decorator';
 import { DictionaryItemController } from './dictionary-item.controller';
 import {
   CreateDictionaryItemDto,
@@ -88,7 +87,7 @@ describe('DictionaryItemController', () => {
     return descriptor.value as unknown;
   }
 
-  it('delegates delete requests, uses 204, and requires admin role', async () => {
+  it('delegates delete requests, uses 204, and requires delete permission', async () => {
     const service = {
       deleteItem: jest.fn().mockResolvedValue(undefined),
     };
@@ -101,26 +100,26 @@ describe('DictionaryItemController', () => {
       Reflect.getMetadata(HTTP_CODE_METADATA, controllerMethod('deleteItem')),
     ).toBe(204);
     expect(
-      Reflect.getMetadata(ROLES_KEY, controllerMethod('deleteItem')),
-    ).toEqual([Role.ADMIN]);
+      Reflect.getMetadata(PERMISSIONS_KEY, controllerMethod('deleteItem')),
+    ).toEqual(['dictionary.delete']);
   });
 
-  it('requires admin role on every management method', () => {
+  it('requires permission metadata on every management method', () => {
     expect(
-      Reflect.getMetadata(ROLES_KEY, controllerMethod('listItems')),
-    ).toEqual([Role.ADMIN]);
-    expect(Reflect.getMetadata(ROLES_KEY, controllerMethod('getItem'))).toEqual(
-      [Role.ADMIN],
-    );
+      Reflect.getMetadata(PERMISSIONS_KEY, controllerMethod('listItems')),
+    ).toEqual(['dictionary.read']);
     expect(
-      Reflect.getMetadata(ROLES_KEY, controllerMethod('createItem')),
-    ).toEqual([Role.ADMIN]);
+      Reflect.getMetadata(PERMISSIONS_KEY, controllerMethod('getItem')),
+    ).toEqual(['dictionary.read']);
     expect(
-      Reflect.getMetadata(ROLES_KEY, controllerMethod('updateItem')),
-    ).toEqual([Role.ADMIN]);
+      Reflect.getMetadata(PERMISSIONS_KEY, controllerMethod('createItem')),
+    ).toEqual(['dictionary.create']);
     expect(
-      Reflect.getMetadata(ROLES_KEY, controllerMethod('deleteItem')),
-    ).toEqual([Role.ADMIN]);
+      Reflect.getMetadata(PERMISSIONS_KEY, controllerMethod('updateItem')),
+    ).toEqual(['dictionary.update']);
+    expect(
+      Reflect.getMetadata(PERMISSIONS_KEY, controllerMethod('deleteItem')),
+    ).toEqual(['dictionary.delete']);
   });
 });
 
@@ -293,7 +292,7 @@ describe('DictionaryItemService', () => {
   const makeItem = (overrides: Record<string, unknown> = {}) => ({
     id: 'item-1',
     typeId: 'type-1',
-    value: Role.ADMIN,
+    value: 'admin',
     label: 'Admin',
     sortOrder: 10,
     status: DictionaryStatus.ACTIVE,
@@ -469,25 +468,26 @@ describe('DictionaryItemService', () => {
       await expect(
         service.createItem({
           typeId: 'type-1',
-          value: Role.ADMIN,
+          value: 'admin',
           label: 'Admin',
         }),
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it('rejects invalid user_role values regardless of requested status', async () => {
+    it('does not validate user_role values against the removed backend role enum', async () => {
       const { prisma, service } = createService();
+      const createdItem = makeItem({ value: 'custom_role' });
       prisma.dictionaryType.findUnique.mockResolvedValue(makeType());
+      prisma.dictionaryItem.create.mockResolvedValue(createdItem);
 
       await expect(
         service.createItem({
           typeId: 'type-1',
-          value: 'OWNER',
-          label: 'Owner',
+          value: 'custom_role',
+          label: 'Custom role',
           status: DictionaryStatus.DISABLED,
         }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(prisma.dictionaryItem.create).not.toHaveBeenCalled();
+      ).resolves.toMatchObject({ value: 'custom_role' });
     });
 
     it('clears previous defaults in the same transaction when creating a default item', async () => {
@@ -502,7 +502,7 @@ describe('DictionaryItemService', () => {
 
       await service.createItem({
         typeId: 'type-1',
-        value: Role.ADMIN,
+        value: 'admin',
         label: 'Admin',
         isDefault: true,
       });
@@ -517,7 +517,7 @@ describe('DictionaryItemService', () => {
       }>(prisma.dictionaryItem.create);
       expect(createArg.data).toMatchObject({
         typeId: 'type-1',
-        value: Role.ADMIN,
+        value: 'admin',
         label: 'Admin',
         isDefault: true,
       });
@@ -543,16 +543,20 @@ describe('DictionaryItemService', () => {
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
-    it('rejects enabling a drifted user_role item with an invalid value', async () => {
+    it('allows enabling user_role items because roles are managed by RBAC records', async () => {
       const { prisma, service } = createService();
+      const updatedItem = makeItem({
+        value: 'custom_role',
+        status: DictionaryStatus.ACTIVE,
+      });
       prisma.dictionaryItem.findUnique.mockResolvedValue(
-        makeItem({ value: 'OWNER', status: DictionaryStatus.DISABLED }),
+        makeItem({ value: 'custom_role', status: DictionaryStatus.DISABLED }),
       );
+      prisma.dictionaryItem.update.mockResolvedValue(updatedItem);
 
       await expect(
         service.updateItem('item-1', { status: DictionaryStatus.ACTIVE }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(prisma.dictionaryItem.update).not.toHaveBeenCalled();
+      ).resolves.toMatchObject({ value: 'custom_role', status: 'ACTIVE' });
     });
 
     it('allows system item editable fields and returns type context', async () => {

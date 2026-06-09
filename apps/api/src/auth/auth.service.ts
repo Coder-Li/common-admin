@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { AUTH_TOKEN_CONFIG } from '../config/auth.config';
 import type { AuthTokenConfig } from '../config/auth.config';
+import { PermissionService } from '../permission/permission.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { toUserProfile } from '../user/user.mapper';
 import { JwtUserPayload, UserProfile } from '../user/user.types';
@@ -18,6 +19,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly permissionService: PermissionService,
     @Inject(AUTH_TOKEN_CONFIG)
     private readonly tokenConfig: AuthTokenConfig,
   ) {}
@@ -30,6 +32,7 @@ export class AuthService {
           { username: credentials.usernameOrEmail },
         ],
       },
+      include: { roles: { include: { role: true } } },
     });
 
     if (!user) {
@@ -45,10 +48,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid username or password');
     }
 
-    const profile = toUserProfile(user);
+    const permissionContext =
+      await this.permissionService.resolveUserPermissionContext(user.id);
+    const profile = toUserProfile(user, permissionContext.permissionCodes);
     const payload: JwtUserPayload = {
-      ...profile,
       sub: profile.id,
+      email: profile.email,
+      username: profile.username,
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {

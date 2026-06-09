@@ -1,4 +1,7 @@
-import { Role } from './role.enum';
+export interface UserRoleSummary {
+  code: string;
+  name: string;
+}
 
 export interface UserProfile {
   id: string;
@@ -6,14 +9,17 @@ export interface UserProfile {
   username: string;
   firstName: string;
   lastName: string;
-  role: Role;
+  roles: UserRoleSummary[];
+  permissions: string[];
 }
 
-export interface JwtUserPayload extends UserProfile {
+export interface JwtUserPayload {
   sub: string;
+  email?: string;
+  username?: string;
 }
 
-export interface PublicUser extends UserProfile {
+export interface PublicUser extends Omit<UserProfile, 'permissions'> {
   createdAt: string;
   updatedAt: string;
 }

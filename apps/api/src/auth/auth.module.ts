@@ -3,12 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AUTH_TOKEN_CONFIG } from '../config/auth.config';
+import { PermissionModule } from '../permission/permission.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAccessStrategy } from './jwt-access.strategy';
 
 @Module({
-  imports: [PassportModule, JwtModule.register({})],
+  imports: [PassportModule, JwtModule.register({}), PermissionModule],
   controllers: [AuthController],
   providers: [
     AuthService,

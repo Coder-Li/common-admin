@@ -1,5 +1,4 @@
-import { Role } from './role.enum';
-import { PublicUser, UserProfile } from './user.types';
+import { PublicUser, UserProfile, UserRoleSummary } from './user.types';
 
 interface PersistedUser {
   id: string;
@@ -7,19 +6,28 @@ interface PersistedUser {
   username: string;
   firstName: string;
   lastName: string;
-  role: Role | string;
   createdAt?: Date | string;
   updatedAt?: Date | string;
+  roles?: Array<{
+    role: {
+      code: string;
+      name: string;
+    };
+  }>;
 }
 
-export function toUserProfile(user: PersistedUser): UserProfile {
+export function toUserProfile(
+  user: PersistedUser,
+  permissions: string[] = [],
+): UserProfile {
   return {
     id: user.id,
     email: user.email,
     username: user.username,
     firstName: user.firstName,
     lastName: user.lastName,
-    role: user.role as Role,
+    roles: toRoleSummaries(user),
+    permissions,
   };
 }
 
@@ -31,8 +39,22 @@ export function toUserResponse(
   user: PersistedUser & { createdAt: Date | string; updatedAt: Date | string },
 ): PublicUser {
   return {
-    ...toUserProfile(user),
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    roles: toRoleSummaries(user),
     createdAt: toIsoString(user.createdAt),
     updatedAt: toIsoString(user.updatedAt),
   };
+}
+
+function toRoleSummaries(user: PersistedUser): UserRoleSummary[] {
+  return (user.roles ?? [])
+    .map((userRole) => ({
+      code: userRole.role.code,
+      name: userRole.role.name,
+    }))
+    .sort((a, b) => a.code.localeCompare(b.code));
 }

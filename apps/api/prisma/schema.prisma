@@ -7,9 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  STANDARD
+enum PermissionStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum RoleStatus {
+  ACTIVE
+  DISABLED
 }
 
 enum DictionaryStatus {
@@ -40,13 +45,74 @@ model User {
   firstName     String        @db.VarChar(80)
   lastName      String        @db.VarChar(80)
   passwordHash  String        @db.VarChar(255)
-  role          Role          @default(STANDARD)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   uploadedFiles ManagedFile[]
+  roles         UserRole[]
 
   @@index([email])
   @@index([username])
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  code        String           @unique @db.VarChar(120)
+  module      String           @db.VarChar(80)
+  action      String           @db.VarChar(80)
+  name        String           @db.VarChar(120)
+  description String?          @db.VarChar(500)
+  status      PermissionStatus @default(ACTIVE)
+  isSystem    Boolean          @default(true)
+  sortOrder   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  roles       RolePermission[]
+
+  @@index([module, sortOrder])
+  @@index([status])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  code        String           @unique @db.VarChar(80)
+  name        String           @db.VarChar(120)
+  description String?          @db.VarChar(500)
+  status      RoleStatus       @default(ACTIVE)
+  isSystem    Boolean          @default(false)
+  isDefault   Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@index([status])
+  @@index([isDefault])
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
 }
 
 model ManagedFile {

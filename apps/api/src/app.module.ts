@@ -4,13 +4,15 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
-import { RolesGuard } from './auth/roles.guard';
+import { PermissionsGuard } from './auth/permissions.guard';
 import { validateEnv } from './config/env.config';
 import { DictionaryModule } from './dictionary/dictionary.module';
 import { FileModule } from './file/file.module';
 import { HealthModule } from './health/health.module';
+import { PermissionModule } from './permission/permission.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
+import { RoleModule } from './role/role.module';
 import { UserModule } from './user/user.module';
 
 @Module({
@@ -28,6 +30,8 @@ import { UserModule } from './user/user.module';
     PrismaModule,
     RedisModule,
     AuthModule,
+    PermissionModule,
+    RoleModule,
     UserModule,
     DictionaryModule,
     FileModule,
@@ -44,7 +48,7 @@ import { UserModule } from './user/user.module';
     },
     {
       provide: APP_GUARD,
-      useClass: RolesGuard,
+      useClass: PermissionsGuard,
     },
   ],
 })

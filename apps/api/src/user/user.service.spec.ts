@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-function-type, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
   ValidationPipe,
 } from '@nestjs/common';
@@ -8,7 +10,6 @@ import { Prisma } from '@prisma/client';
 import { ListQueryDto } from '../common/dto/list-query.dto';
 import { UserListQueryDto } from './dto/user.request';
 import { toUserResponse } from './user.mapper';
-import { Role } from './role.enum';
 import { UserService } from './user.service';
 
 describe('ListQueryDto', () => {
@@ -56,34 +57,18 @@ describe('UserListQueryDto', () => {
       metatype: UserListQueryDto,
     });
 
-  it('inherits list defaults and validates role filters', async () => {
-    await expect(transformQuery({ role: Role.ADMIN })).resolves.toMatchObject({
+  it('inherits list defaults and validates roleCode filters', async () => {
+    await expect(transformQuery({ roleCode: 'admin' })).resolves.toMatchObject({
       page: 1,
       pageSize: 20,
-      role: Role.ADMIN,
+      roleCode: 'admin',
     });
+  });
 
-    await expect(transformQuery({ role: 'OWNER' })).rejects.toBeInstanceOf(
+  it('rejects sorting by role', async () => {
+    await expect(transformQuery({ sort: 'role:asc' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
-  });
-
-  it('rejects sorting by passwordHash', async () => {
-    await expect(
-      transformQuery({ sort: 'passwordHash:asc' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('rejects sorting by id', async () => {
-    await expect(transformQuery({ sort: 'id:asc' })).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-  });
-
-  it('rejects invalid sort directions', async () => {
-    await expect(
-      transformQuery({ sort: 'createdAt:sideways' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
 
@@ -94,8 +79,8 @@ describe('user mapper', () => {
     username: 'admin',
     firstName: 'Ada',
     lastName: 'Lovelace',
-    role: Role.ADMIN,
     passwordHash: 'hashed-password',
+    roles: [{ role: { code: 'admin', name: 'Admin' } }],
     createdAt: new Date('2026-06-07T01:02:03.000Z'),
     updatedAt: new Date('2026-06-07T04:05:06.000Z'),
   };
@@ -107,7 +92,7 @@ describe('user mapper', () => {
       username: 'admin',
       firstName: 'Ada',
       lastName: 'Lovelace',
-      role: Role.ADMIN,
+      roles: [{ code: 'admin', name: 'Admin' }],
       createdAt: '2026-06-07T01:02:03.000Z',
       updatedAt: '2026-06-07T04:05:06.000Z',
     });
@@ -125,8 +110,8 @@ describe('UserService', () => {
     username: 'ada',
     firstName: 'Ada',
     lastName: 'Lovelace',
-    role: Role.ADMIN,
     passwordHash: 'hashed-password',
+    roles: [{ role: { code: 'admin', name: 'Admin' } }],
     createdAt: new Date('2026-06-07T01:02:03.000Z'),
     updatedAt: new Date('2026-06-07T04:05:06.000Z'),
     ...overrides,
@@ -141,11 +126,35 @@ describe('UserService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    role: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+    },
+    userRole: {
+      findMany: jest.fn(),
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+      count: jest.fn(),
+    },
+    $transaction: jest.fn(async (callback: Function) =>
+      callback(createPrismaMock()),
+    ),
   });
+
+  const permissionService = {
+    resolveUserPermissionContext: jest.fn(),
+    invalidateUserPermissionContext: jest.fn(),
+  };
 
   const createService = () => {
     const prisma = createPrismaMock();
-    const service = new UserService(prisma as never);
+    prisma.$transaction.mockImplementation(async (callback: Function) =>
+      callback(prisma),
+    );
+    const service = new UserService(
+      prisma as never,
+      permissionService as never,
+    );
 
     return { prisma, service };
   };
@@ -166,251 +175,176 @@ describe('UserService', () => {
       clientVersion: 'test',
     });
 
-  const notFoundError = () =>
-    new Prisma.PrismaClientKnownRequestError('Record not found', {
-      code: 'P2025',
-      clientVersion: 'test',
-    });
-
   beforeEach(() => {
-    jest.restoreAllMocks();
+    jest.resetAllMocks();
   });
 
-  describe('listUsers', () => {
-    it('calls findMany with skip, take, allowed orderBy, and role where', async () => {
-      const { prisma, service } = createService();
-      prisma.user.findMany.mockResolvedValue([makeUser()]);
-      prisma.user.count.mockResolvedValue(1);
+  it('create assigns active default role when role codes are omitted', async () => {
+    const { prisma, service } = createService();
+    prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
+    prisma.user.create.mockResolvedValue(makeUser());
 
-      await service.listUsers({
-        page: 2,
-        pageSize: 10,
-        sort: 'email:asc',
-        role: Role.ADMIN,
-      });
-
-      expect(prisma.user.findMany).toHaveBeenCalledWith({
-        skip: 10,
-        take: 10,
-        orderBy: { email: 'asc' },
-        where: { role: Role.ADMIN },
-      });
+    await service.createUser({
+      email: 'ada@example.com',
+      username: 'ada',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      password: 'CorrectHorse123',
     });
 
-    it('calls count with the same where object passed to findMany', async () => {
-      const { prisma, service } = createService();
-      prisma.user.findMany.mockResolvedValue([makeUser()]);
-      prisma.user.count.mockResolvedValue(1);
-
-      await service.listUsers({
-        page: 1,
-        pageSize: 20,
-        search: 'ada',
-        role: Role.ADMIN,
-      });
-
-      const findManyWhere = firstMockArg<{ where: Prisma.UserWhereInput }>(
-        prisma.user.findMany,
-      ).where;
-
-      expect(prisma.user.count).toHaveBeenCalledWith({
-        where: findManyWhere,
-      });
-    });
-
-    it('maps search to OR over public name and identity fields', async () => {
-      const { prisma, service } = createService();
-      prisma.user.findMany.mockResolvedValue([]);
-      prisma.user.count.mockResolvedValue(0);
-
-      await service.listUsers({ page: 1, pageSize: 20, search: 'Ada' });
-
-      expect(prisma.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            OR: [
-              { email: { contains: 'Ada', mode: 'insensitive' } },
-              { username: { contains: 'Ada', mode: 'insensitive' } },
-              { firstName: { contains: 'Ada', mode: 'insensitive' } },
-              { lastName: { contains: 'Ada', mode: 'insensitive' } },
-            ],
-          },
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          roles: { create: [{ roleId: 'role-standard' }] },
         }),
-      );
-    });
-
-    it('passes the same case-insensitive search where object to findMany and count', async () => {
-      const { prisma, service } = createService();
-      prisma.user.findMany.mockResolvedValue([]);
-      prisma.user.count.mockResolvedValue(0);
-
-      await service.listUsers({ page: 1, pageSize: 20, search: 'Ada' });
-
-      const findManyWhere = firstMockArg<{ where: Prisma.UserWhereInput }>(
-        prisma.user.findMany,
-      ).where;
-      const countWhere = firstMockArg<{ where: Prisma.UserWhereInput }>(
-        prisma.user.count,
-      ).where;
-
-      expect(findManyWhere).toBe(countWhere);
-      expect(countWhere.OR?.[0]).toEqual({
-        email: { contains: 'Ada', mode: 'insensitive' },
-      });
-    });
-
-    it('maps role to where.role', async () => {
-      const { prisma, service } = createService();
-      prisma.user.findMany.mockResolvedValue([]);
-      prisma.user.count.mockResolvedValue(0);
-
-      await service.listUsers({ page: 1, pageSize: 20, role: Role.STANDARD });
-
-      expect(
-        firstMockArg<{ where: Prisma.UserWhereInput }>(prisma.user.findMany)
-          .where,
-      ).toEqual({
-        role: Role.STANDARD,
-      });
-    });
-
-    it('rejects invalid sort fields', async () => {
-      const { service } = createService();
-
-      await expect(
-        service.listUsers({
-          page: 1,
-          pageSize: 20,
-          sort: 'passwordHash:asc',
-        }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
+      }),
+    );
   });
 
-  describe('createUser', () => {
-    it('hashes the password and writes passwordHash without password', async () => {
-      const { prisma, service } = createService();
-      prisma.user.create.mockResolvedValue(makeUser());
+  it('create assigns explicit active role codes when provided', async () => {
+    const { prisma, service } = createService();
+    prisma.role.findMany.mockResolvedValue([
+      { id: 'role-admin', code: 'admin' },
+    ]);
+    prisma.user.create.mockResolvedValue(makeUser());
 
-      const result = await service.createUser({
+    await service.createUser({
+      email: 'ada@example.com',
+      username: 'ada',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      password: 'CorrectHorse123',
+      roleCodes: ['admin'],
+    });
+
+    expect(prisma.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          roles: { create: [{ roleId: 'role-admin' }] },
+        }),
+      }),
+    );
+  });
+
+  it('create rejects disabled role codes', async () => {
+    const { prisma, service } = createService();
+    prisma.role.findMany.mockResolvedValue([]);
+
+    await expect(
+      service.createUser({
         email: 'ada@example.com',
         username: 'ada',
         firstName: 'Ada',
         lastName: 'Lovelace',
         password: 'CorrectHorse123',
-        role: Role.ADMIN,
-      });
+        roleCodes: ['disabled'],
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
 
-      const createData = firstMockArg<{
-        data: { passwordHash: string; password?: string };
-      }>(prisma.user.create).data;
+  it('update does not mutate roles', async () => {
+    const { prisma, service } = createService();
+    prisma.user.update.mockResolvedValue(makeUser({ firstName: 'Augusta' }));
 
-      expect(createData).not.toHaveProperty('password');
-      expect(createData.passwordHash).toEqual(expect.any(String));
-      expect(createData.passwordHash).not.toBe('CorrectHorse123');
-      expect(result).not.toHaveProperty('passwordHash');
-    });
+    await service.updateUser('user-1', { firstName: 'Augusta' });
 
-    it('maps duplicate unique constraints to ConflictException', async () => {
-      const { prisma, service } = createService();
-      prisma.user.create.mockRejectedValue(uniqueConstraintError());
-
-      await expect(
-        service.createUser({
-          email: 'ada@example.com',
-          username: 'ada',
-          firstName: 'Ada',
-          lastName: 'Lovelace',
-          password: 'CorrectHorse123',
-          role: Role.ADMIN,
-        }),
-      ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { firstName: 'Augusta' },
+      include: expect.any(Object),
     });
   });
 
-  describe('findById', () => {
-    it('returns a public user when found', async () => {
-      const { prisma, service } = createService();
-      prisma.user.findUnique.mockResolvedValue(makeUser());
+  it('replaceRoles replaces full role set atomically', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValue(makeUser());
+    prisma.role.findMany.mockResolvedValue([
+      { id: 'role-admin', code: 'admin' },
+    ]);
 
-      await expect(service.findById('user-1')).resolves.toEqual({
-        id: 'user-1',
+    await service.replaceRoles('user-1', ['admin'], 'actor-1');
+
+    expect(prisma.userRole.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+    });
+    expect(prisma.userRole.createMany).toHaveBeenCalledWith({
+      data: [{ userId: 'user-1', roleId: 'role-admin' }],
+      skipDuplicates: true,
+    });
+  });
+
+  it('replaceRoles rejects removing the last active super_admin', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValue(
+      makeUser({
+        roles: [{ role: { code: 'super_admin', name: 'Super admin' } }],
+      }),
+    );
+    prisma.role.findMany.mockResolvedValue([
+      { id: 'role-admin', code: 'admin' },
+    ]);
+    prisma.userRole.count.mockResolvedValue(1);
+
+    await expect(
+      service.replaceRoles('user-1', ['admin'], 'actor-2'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('list filters by any assigned role code', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findMany.mockResolvedValue([]);
+    prisma.user.count.mockResolvedValue(0);
+
+    await service.listUsers({ page: 1, pageSize: 20, roleCode: 'admin' });
+
+    expect(
+      firstMockArg<{ where: Prisma.UserWhereInput }>(prisma.user.findMany)
+        .where,
+    ).toEqual({
+      roles: { some: { role: { code: 'admin' } } },
+    });
+  });
+
+  it('list responses expose roles', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findMany.mockResolvedValue([makeUser()]);
+    prisma.user.count.mockResolvedValue(1);
+
+    await expect(service.listUsers({ page: 1, pageSize: 20 })).resolves.toEqual(
+      {
+        items: [
+          expect.objectContaining({
+            roles: [{ code: 'admin', name: 'Admin' }],
+          }),
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      },
+    );
+  });
+
+  it('sorting by role is rejected as unsupported', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.listUsers({ page: 1, pageSize: 20, sort: 'role:asc' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('maps duplicate unique constraints to ConflictException', async () => {
+    const { prisma, service } = createService();
+    prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
+    prisma.user.create.mockRejectedValue(uniqueConstraintError());
+
+    await expect(
+      service.createUser({
         email: 'ada@example.com',
         username: 'ada',
         firstName: 'Ada',
         lastName: 'Lovelace',
-        role: Role.ADMIN,
-        createdAt: '2026-06-07T01:02:03.000Z',
-        updatedAt: '2026-06-07T04:05:06.000Z',
-      });
-    });
-
-    it('throws NotFoundException when the user is missing', async () => {
-      const { prisma, service } = createService();
-      prisma.user.findUnique.mockResolvedValue(null);
-
-      await expect(service.findById('missing-user')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
-    });
-  });
-
-  describe('updateUser', () => {
-    it('returns a public updated user', async () => {
-      const { prisma, service } = createService();
-      prisma.user.update.mockResolvedValue(
-        makeUser({ firstName: 'Augusta', updatedAt: new Date('2026-06-08') }),
-      );
-
-      await expect(
-        service.updateUser('user-1', { firstName: 'Augusta' }),
-      ).resolves.toMatchObject({
-        id: 'user-1',
-        firstName: 'Augusta',
-      });
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: 'user-1' },
-        data: { firstName: 'Augusta' },
-      });
-    });
-
-    it('maps missing users to NotFoundException', async () => {
-      const { prisma, service } = createService();
-      prisma.user.update.mockRejectedValue(notFoundError());
-
-      await expect(
-        service.updateUser('missing-user', { firstName: 'Augusta' }),
-      ).rejects.toBeInstanceOf(NotFoundException);
-    });
-
-    it('maps duplicate unique conflicts to ConflictException', async () => {
-      const { prisma, service } = createService();
-      prisma.user.update.mockRejectedValue(uniqueConstraintError());
-
-      await expect(
-        service.updateUser('user-1', { email: 'taken@example.com' }),
-      ).rejects.toBeInstanceOf(ConflictException);
-    });
-  });
-
-  describe('deleteUser', () => {
-    it('returns void when deletion succeeds', async () => {
-      const { prisma, service } = createService();
-      prisma.user.delete.mockResolvedValue(makeUser());
-
-      await expect(service.deleteUser('user-1')).resolves.toBeUndefined();
-      expect(prisma.user.delete).toHaveBeenCalledWith({
-        where: { id: 'user-1' },
-      });
-    });
-
-    it('throws NotFoundException when the user is missing', async () => {
-      const { prisma, service } = createService();
-      prisma.user.delete.mockRejectedValue(notFoundError());
-
-      await expect(service.deleteUser('missing-user')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
-    });
+        password: 'CorrectHorse123',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });

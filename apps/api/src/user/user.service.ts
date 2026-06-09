@@ -3,8 +3,9 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, RoleStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import {
   ListResponse,
@@ -13,12 +14,15 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateUserDto,
+  ReplaceUserRolesDto,
   UpdateUserDto,
   UserListQueryDto,
 } from './dto/user.request';
 import { UserResponseDto } from './dto/user.response';
 import { toUserProfile, toUserResponse } from './user.mapper';
 import { UserProfile } from './user.types';
+import { PermissionService } from '../permission/permission.service';
+import { SYSTEM_ROLE_CODES } from '../permission/permission.constants';
 
 const USER_SORT_FIELDS = new Set([
   'createdAt',
@@ -27,12 +31,14 @@ const USER_SORT_FIELDS = new Set([
   'username',
   'firstName',
   'lastName',
-  'role',
 ]);
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly permissionService: PermissionService,
+  ) {}
 
   async listUsers(
     query: UserListQueryDto,
@@ -48,6 +54,7 @@ export class UserService {
         take: pageSize,
         orderBy: { [field]: direction },
         where,
+        include: { roles: { include: { role: true } } },
       }),
       this.prisma.user.count({ where }),
     ]);
@@ -61,7 +68,10 @@ export class UserService {
   }
 
   async findById(id: string): Promise<UserResponseDto> {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { roles: { include: { role: true } } },
+    });
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -71,15 +81,20 @@ export class UserService {
   }
 
   async createUser(dto: CreateUserDto): Promise<UserResponseDto> {
-    const { password, ...data } = dto;
+    const { password, roleCodes, ...data } = dto;
     const passwordHash = await bcrypt.hash(password, 10);
+    const roles = await this.resolveCreateRoles(roleCodes);
 
     try {
       const user = await this.prisma.user.create({
         data: {
           ...data,
           passwordHash,
+          roles: {
+            create: roles.map((role) => ({ roleId: role.id })),
+          },
         },
+        include: { roles: { include: { role: true } } },
       });
 
       return toUserResponse(user);
@@ -93,6 +108,7 @@ export class UserService {
       const user = await this.prisma.user.update({
         where: { id },
         data: dto,
+        include: { roles: { include: { role: true } } },
       });
 
       return toUserResponse(user);
@@ -110,13 +126,58 @@ export class UserService {
   }
 
   async findProfileById(id: string): Promise<UserProfile> {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { roles: { include: { role: true } } },
+    });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    return toUserProfile(user);
+    const permissionContext =
+      await this.permissionService.resolveUserPermissionContext(id);
+
+    return toUserProfile(user, permissionContext.permissionCodes);
+  }
+
+  async replaceRoles(
+    id: string,
+    roleCodes: ReplaceUserRolesDto['roleCodes'],
+    actorUserId: string,
+  ): Promise<UserResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: { roles: { include: { role: true } } },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const roles = await this.resolveExplicitRoles(roleCodes);
+    await this.assertCanReplaceSuperAdminRoles(user, roles, actorUserId);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({ where: { userId: id } });
+      await tx.userRole.createMany({
+        data: roles.map((role) => ({ userId: id, roleId: role.id })),
+        skipDuplicates: true,
+      });
+
+      return tx.user.findUnique({
+        where: { id },
+        include: { roles: { include: { role: true } } },
+      });
+    });
+
+    if (!updated) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.permissionService.invalidateUserPermissionContext(id);
+
+    return toUserResponse(updated);
   }
 
   private parseSort(sort = 'createdAt:desc'): {
@@ -139,8 +200,8 @@ export class UserService {
   private buildUserWhere(query: UserListQueryDto): Prisma.UserWhereInput {
     const where: Prisma.UserWhereInput = {};
 
-    if (query.role) {
-      where.role = query.role;
+    if (query.roleCode) {
+      where.roles = { some: { role: { code: query.roleCode } } };
     }
 
     if (query.search) {
@@ -172,5 +233,71 @@ export class UserService {
     }
 
     throw error;
+  }
+
+  private async resolveCreateRoles(roleCodes?: string[]) {
+    if (roleCodes?.length) {
+      return this.resolveExplicitRoles(roleCodes);
+    }
+
+    const defaultRole = await this.prisma.role.findFirst({
+      where: { isDefault: true, status: RoleStatus.ACTIVE },
+      select: { id: true, code: true },
+    });
+
+    if (!defaultRole) {
+      throw new NotFoundException('Default role not found');
+    }
+
+    return [defaultRole];
+  }
+
+  private async resolveExplicitRoles(roleCodes: string[]) {
+    const uniqueCodes = [...new Set(roleCodes)].sort();
+    const roles = await this.prisma.role.findMany({
+      where: { code: { in: uniqueCodes }, status: RoleStatus.ACTIVE },
+      select: { id: true, code: true },
+    });
+
+    if (roles.length !== uniqueCodes.length) {
+      throw new NotFoundException('Role not found or disabled');
+    }
+
+    return roles;
+  }
+
+  private async assertCanReplaceSuperAdminRoles(
+    user: {
+      id: string;
+      roles: Array<{ role: { code: string } }>;
+    },
+    nextRoles: Array<{ code: string }>,
+    actorUserId: string,
+  ) {
+    const hadSuperAdmin = user.roles.some(
+      (userRole) => userRole.role.code === SYSTEM_ROLE_CODES.superAdmin,
+    );
+    const keepsSuperAdmin = nextRoles.some(
+      (role) => role.code === SYSTEM_ROLE_CODES.superAdmin,
+    );
+
+    if (!hadSuperAdmin || keepsSuperAdmin) {
+      return;
+    }
+
+    const activeSuperAdminAssignments = await this.prisma.userRole.count({
+      where: {
+        role: {
+          code: SYSTEM_ROLE_CODES.superAdmin,
+          status: RoleStatus.ACTIVE,
+        },
+      },
+    });
+
+    if (activeSuperAdminAssignments <= 1 || actorUserId === user.id) {
+      throw new ForbiddenException(
+        'Cannot remove the last active super_admin assignment',
+      );
+    }
   }
 }

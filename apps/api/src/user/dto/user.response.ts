@@ -1,7 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ListResponse } from '../../common/dto/list-response.dto';
-import { Role } from '../role.enum';
 import type { PublicUser } from '../user.types';
+
+class UserRoleResponseDto {
+  @ApiProperty()
+  code!: string;
+
+  @ApiProperty()
+  name!: string;
+}
 
 export class UserResponseDto implements PublicUser {
   @ApiProperty()
@@ -19,8 +26,8 @@ export class UserResponseDto implements PublicUser {
   @ApiProperty()
   lastName!: string;
 
-  @ApiProperty({ enum: Role })
-  role!: Role;
+  @ApiProperty({ type: [UserRoleResponseDto] })
+  roles!: UserRoleResponseDto[];
 
   @ApiProperty()
   createdAt!: string;

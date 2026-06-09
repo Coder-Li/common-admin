@@ -19,8 +19,7 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Roles } from '../auth/roles.decorator';
-import { Role } from '../user/role.enum';
+import { Permissions } from '../auth/permissions.decorator';
 import {
   CreateDictionaryTypeDto,
   DictionaryTypeListQueryDto,
@@ -39,8 +38,8 @@ export class DictionaryTypeController {
   constructor(private readonly dictionaryTypeService: DictionaryTypeService) {}
 
   @ApiOkResponse({ type: DictionaryTypeListResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
-  @Roles(Role.ADMIN)
+  @ApiForbiddenResponse({ description: 'Permission required' })
+  @Permissions('dictionary.read')
   @Get()
   listTypes(
     @Query() query: DictionaryTypeListQueryDto,
@@ -49,18 +48,18 @@ export class DictionaryTypeController {
   }
 
   @ApiOkResponse({ type: DictionaryTypeResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Dictionary type not found' })
-  @Roles(Role.ADMIN)
+  @Permissions('dictionary.read')
   @Get(':id')
   getType(@Param('id') id: string): Promise<DictionaryTypeResponseDto> {
     return this.dictionaryTypeService.findById(id);
   }
 
   @ApiCreatedResponse({ type: DictionaryTypeResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiConflictResponse({ description: 'Dictionary type already exists' })
-  @Roles(Role.ADMIN)
+  @Permissions('dictionary.create')
   @Post()
   createType(
     @Body() body: CreateDictionaryTypeDto,
@@ -69,9 +68,9 @@ export class DictionaryTypeController {
   }
 
   @ApiOkResponse({ type: DictionaryTypeResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Dictionary type not found' })
-  @Roles(Role.ADMIN)
+  @Permissions('dictionary.update')
   @Patch(':id')
   updateType(
     @Param('id') id: string,
@@ -81,10 +80,10 @@ export class DictionaryTypeController {
   }
 
   @ApiNoContentResponse({ description: 'Dictionary type deleted' })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Dictionary type not found' })
   @ApiConflictResponse({ description: 'Dictionary type cannot be deleted' })
-  @Roles(Role.ADMIN)
+  @Permissions('dictionary.delete')
   @HttpCode(204)
   @Delete(':id')
   deleteType(@Param('id') id: string): Promise<void> {

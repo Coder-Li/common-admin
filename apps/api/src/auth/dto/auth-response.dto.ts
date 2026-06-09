@@ -1,6 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Role } from '../../user/role.enum';
 import type { UserProfile } from '../../user/user.types';
+
+class UserRoleSummaryDto {
+  @ApiProperty()
+  code!: string;
+
+  @ApiProperty()
+  name!: string;
+}
 
 class UserProfileDto implements UserProfile {
   @ApiProperty()
@@ -18,8 +25,11 @@ class UserProfileDto implements UserProfile {
   @ApiProperty()
   lastName!: string;
 
-  @ApiProperty({ enum: Role })
-  role!: Role;
+  @ApiProperty({ type: [UserRoleSummaryDto] })
+  roles!: UserRoleSummaryDto[];
+
+  @ApiProperty({ type: [String] })
+  permissions!: string[];
 }
 
 export class AuthResponseDto {

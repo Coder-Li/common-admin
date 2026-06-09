@@ -27,9 +27,8 @@ import {
 } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import type { Response } from 'express';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { CurrentUser } from '../user/current-user.decorator';
-import { Role } from '../user/role.enum';
 import type { JwtUserPayload } from '../user/user.types';
 import {
   FileListQueryDto,
@@ -46,18 +45,18 @@ export class FileController {
   constructor(private readonly fileService: FileService) {}
 
   @ApiOkResponse({ type: FileListResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
-  @Roles(Role.ADMIN)
+  @ApiForbiddenResponse({ description: 'Permission required' })
+  @Permissions('file.read')
   @Get()
   listFiles(@Query() query: FileListQueryDto): Promise<FileListResponseDto> {
     return this.fileService.listFiles(query);
   }
 
   @ApiCreatedResponse({ type: FileResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: UploadFileMetadataDto })
-  @Roles(Role.ADMIN)
+  @Permissions('file.upload')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -74,9 +73,9 @@ export class FileController {
   }
 
   @ApiOkResponse({ description: 'File download stream' })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'File not found' })
-  @Roles(Role.ADMIN)
+  @Permissions('file.download')
   @Get(':id/download')
   async downloadFile(
     @Param('id') id: string,
@@ -93,18 +92,18 @@ export class FileController {
   }
 
   @ApiOkResponse({ type: FileResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'File not found' })
-  @Roles(Role.ADMIN)
+  @Permissions('file.read')
   @Get(':id')
   getFile(@Param('id') id: string): Promise<FileResponseDto> {
     return this.fileService.findById(id);
   }
 
   @ApiOkResponse({ type: FileResponseDto })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'File not found' })
-  @Roles(Role.ADMIN)
+  @Permissions('file.update')
   @Patch(':id')
   updateFile(
     @Param('id') id: string,
@@ -114,9 +113,9 @@ export class FileController {
   }
 
   @ApiNoContentResponse({ description: 'File deleted' })
-  @ApiForbiddenResponse({ description: 'Admin role required' })
+  @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'File not found' })
-  @Roles(Role.ADMIN)
+  @Permissions('file.delete')
   @HttpCode(204)
   @Delete(':id')
   deleteFile(@Param('id') id: string): Promise<void> {

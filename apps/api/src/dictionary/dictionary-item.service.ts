@@ -10,7 +10,6 @@ import {
   createListResponse,
 } from '../common/dto/list-response.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { Role } from '../user/role.enum';
 import { toDictionaryItemResponse } from './dictionary-item.mapper';
 import {
   CreateDictionaryItemDto,
@@ -28,9 +27,6 @@ const DICTIONARY_ITEM_SORT_FIELDS = new Set([
   'createdAt',
   'updatedAt',
 ]);
-
-const USER_ROLE_CODE = 'user_role';
-const VALID_ROLE_VALUES = new Set<string>(Object.values(Role));
 
 @Injectable()
 export class DictionaryItemService {
@@ -86,8 +82,6 @@ export class DictionaryItemService {
     if (!type) {
       throw new NotFoundException('Dictionary type not found');
     }
-
-    this.assertValidUserRoleValue(type.code, dto.value);
 
     const data: Prisma.DictionaryItemUncheckedCreateInput = {
       typeId: dto.typeId,
@@ -149,10 +143,6 @@ export class DictionaryItemService {
 
     if (existingItem.isSystem && dto.status === DictionaryStatus.DISABLED) {
       throw new ConflictException('System dictionary item cannot be disabled');
-    }
-
-    if (dto.status === DictionaryStatus.ACTIVE) {
-      this.assertValidUserRoleValue(existingItem.type.code, existingItem.value);
     }
 
     const data: Prisma.DictionaryItemUpdateInput = {
@@ -276,14 +266,6 @@ export class DictionaryItemService {
     }
 
     return where;
-  }
-
-  private assertValidUserRoleValue(typeCode: string, value: string): void {
-    if (typeCode === USER_ROLE_CODE && !VALID_ROLE_VALUES.has(value)) {
-      throw new BadRequestException(
-        'User role dictionary values must match backend roles',
-      );
-    }
   }
 
   private handlePrismaWriteError(error: unknown): never {
