@@ -661,6 +661,9 @@ describe('DictionaryItemService', () => {
       prisma.dictionaryItem.findUnique.mockResolvedValue(
         makeItem({ value: 'custom_role', status: DictionaryStatus.DISABLED }),
       );
+      tx.dictionaryItem.findUnique.mockResolvedValue(
+        makeItem({ value: 'custom_role', status: DictionaryStatus.DISABLED }),
+      );
       tx.dictionaryItem.update.mockResolvedValue(updatedItem);
 
       await expect(
@@ -680,6 +683,7 @@ describe('DictionaryItemService', () => {
         description: 'Updated role',
       });
       prisma.dictionaryItem.findUnique.mockResolvedValue(existingItem);
+      tx.dictionaryItem.findUnique.mockResolvedValue(existingItem);
       tx.dictionaryItem.update.mockResolvedValue(updatedItem);
 
       await expect(
@@ -718,9 +722,14 @@ describe('DictionaryItemService', () => {
 
     it('clears previous defaults, updates, and audits in the same transaction when updating to default', async () => {
       const { auditLogService, prisma, service, tx } = createService();
-      const existingItem = makeItem({ isDefault: false });
+      const existingItem = makeItem({ isDefault: false, label: 'Preflight' });
+      const transactionalBefore = makeItem({
+        isDefault: false,
+        label: 'Transactional before',
+      });
       const updatedItem = makeItem({ isDefault: true });
       prisma.dictionaryItem.findUnique.mockResolvedValue(existingItem);
+      tx.dictionaryItem.findUnique.mockResolvedValue(transactionalBefore);
       tx.dictionaryItem.updateMany.mockResolvedValue({ count: 1 });
       tx.dictionaryItem.update.mockResolvedValue(updatedItem);
 
@@ -750,7 +759,7 @@ describe('DictionaryItemService', () => {
           resourceId: 'item-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
-          before: toDictionaryItemResponse(existingItem),
+          before: toDictionaryItemResponse(transactionalBefore),
           after: toDictionaryItemResponse(updatedItem),
         },
         tx,
@@ -760,8 +769,10 @@ describe('DictionaryItemService', () => {
     it('updates a non-default item and writes update audit with before and after snapshots in one transaction', async () => {
       const { auditLogService, prisma, service, tx } = createService();
       const before = makeItem({ label: 'Admin' });
+      const transactionalBefore = makeItem({ label: 'Transactional Admin' });
       const after = makeItem({ label: 'Administrator' });
       prisma.dictionaryItem.findUnique.mockResolvedValue(before);
+      tx.dictionaryItem.findUnique.mockResolvedValue(transactionalBefore);
       tx.dictionaryItem.update.mockResolvedValue(after);
 
       await expect(
@@ -774,6 +785,10 @@ describe('DictionaryItemService', () => {
       ).resolves.toEqual(toDictionaryItemResponse(after));
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.dictionaryItem.findUnique).toHaveBeenCalledWith({
+        where: { id: 'item-1' },
+        include: { type: true },
+      });
       expect(tx.dictionaryItem.update).toHaveBeenCalledWith({
         where: { id: 'item-1' },
         data: { label: 'Administrator' },
@@ -787,7 +802,7 @@ describe('DictionaryItemService', () => {
           resourceId: 'item-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
-          before: toDictionaryItemResponse(before),
+          before: toDictionaryItemResponse(transactionalBefore),
           after: toDictionaryItemResponse(after),
         },
         tx,
@@ -834,13 +849,22 @@ describe('DictionaryItemService', () => {
 
     it('deletes an item and writes delete audit with before snapshot in one transaction', async () => {
       const { auditLogService, prisma, service, tx } = createService();
-      const before = makeItem({ isSystem: false });
+      const before = makeItem({ isSystem: false, label: 'Preflight' });
+      const transactionalBefore = makeItem({
+        isSystem: false,
+        label: 'Transactional before',
+      });
       prisma.dictionaryItem.findUnique.mockResolvedValue(before);
-      tx.dictionaryItem.delete.mockResolvedValue(before);
+      tx.dictionaryItem.findUnique.mockResolvedValue(transactionalBefore);
+      tx.dictionaryItem.delete.mockResolvedValue(transactionalBefore);
 
       await service.deleteItem('item-1', auditActor, auditRequestMeta);
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.dictionaryItem.findUnique).toHaveBeenCalledWith({
+        where: { id: 'item-1' },
+        include: { type: true },
+      });
       expect(tx.dictionaryItem.delete).toHaveBeenCalledWith({
         where: { id: 'item-1' },
         include: { type: true },
@@ -853,7 +877,7 @@ describe('DictionaryItemService', () => {
           resourceId: 'item-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
-          before: toDictionaryItemResponse(before),
+          before: toDictionaryItemResponse(transactionalBefore),
         },
         tx,
       );

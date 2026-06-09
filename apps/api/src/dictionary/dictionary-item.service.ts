@@ -186,10 +186,19 @@ export class DictionaryItemService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const before = await tx.dictionaryItem.findUnique({
+          where: { id },
+          include: { type: true },
+        });
+
+        if (!before) {
+          throw new NotFoundException('Dictionary item not found');
+        }
+
         if (dto.isDefault) {
           await tx.dictionaryItem.updateMany({
             where: {
-              typeId: existingItem.typeId,
+              typeId: before.typeId,
               isDefault: true,
               id: { not: id },
             },
@@ -211,7 +220,7 @@ export class DictionaryItemService {
             resourceId: id,
             actor,
             requestMeta,
-            before: toDictionaryItemResponse(existingItem),
+            before: toDictionaryItemResponse(before),
             after: response,
           },
           tx,
@@ -244,6 +253,15 @@ export class DictionaryItemService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        const before = await tx.dictionaryItem.findUnique({
+          where: { id },
+          include: { type: true },
+        });
+
+        if (!before) {
+          throw new NotFoundException('Dictionary item not found');
+        }
+
         await tx.dictionaryItem.delete({
           where: { id },
           include: { type: true },
@@ -256,7 +274,7 @@ export class DictionaryItemService {
             resourceId: id,
             actor,
             requestMeta,
-            before: toDictionaryItemResponse(existingItem),
+            before: toDictionaryItemResponse(before),
           },
           tx,
         );
