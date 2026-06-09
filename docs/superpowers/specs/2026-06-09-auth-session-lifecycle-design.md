@@ -149,6 +149,7 @@ httpOnly   true
 secure     true in production
 sameSite   lax by default
 path       /api/auth
+domain     unset by default
 maxAge     matches refresh/session lifetime
 ```
 
@@ -160,7 +161,71 @@ cookies are required, production configuration must explicitly opt into
 and safer with same-site or same-origin assumptions.
 
 The API should clear the same cookie name and path during logout and refresh
-failure handling.
+failure handling. If `domain`, `sameSite`, or `secure` are configured
+explicitly, clear-cookie must use the same effective cookie options as
+set-cookie so browsers actually remove the cookie.
+
+## CORS And Cookie Credentials
+
+Cookie-backed refresh only works when both the browser client and API explicitly
+allow credentials.
+
+Backend CORS requirements:
+
+- Enable `credentials: true` in Nest CORS when refresh cookies are enabled.
+- Use configured, non-wildcard origins from `ALLOWED_ORIGINS`.
+- Do not combine credentialed CORS with `Access-Control-Allow-Origin: *`.
+- Include any CSRF header name in `allowedHeaders` if a header-based CSRF token
+  is introduced later.
+
+Frontend request requirements:
+
+- Configure Axios with `withCredentials: true` for auth-cookie endpoints.
+- Login, refresh, and logout must send credentials so the browser can store,
+  send, and clear the refresh cookie.
+- Normal authenticated API requests may also use the same credentialed Axios
+  instance for consistency, while access authorization still uses the bearer
+  access token.
+
+Cross-origin deployment requirements:
+
+- If the admin app and API are on different origins, confirm that
+  `VITE_API_BASE_URL`, `ALLOWED_ORIGINS`, cookie `sameSite`, cookie `secure`, and
+  CORS credentials are configured together.
+- A cross-site deployment that needs cookies must use `sameSite = none` and
+  `secure = true`.
+- Local same-origin or same-site deployment should keep the safer default
+  `sameSite = lax`.
+
+## CSRF And Origin Policy
+
+Refresh cookies are sent automatically by browsers, so cookie-sensitive
+endpoints need an origin policy.
+
+For v1, validate the `Origin` header on these endpoints:
+
+```text
+POST /auth/login
+POST /auth/refresh
+POST /auth/logout
+POST /auth/change-password
+```
+
+Rules:
+
+- Accept requests whose `Origin` matches configured admin origins.
+- Reject unexpected browser origins with `403`.
+- Treat missing `Origin` on non-browser clients conservatively; allow only if
+  the request does not include the refresh cookie or if the environment
+  explicitly permits same-origin/proxy traffic without the header.
+- Require strict origin validation for any production deployment using
+  `sameSite = none`.
+- Keep bearer-token authorization as the API security boundary, but do not rely
+  on CORS alone to prevent cross-site refresh or logout side effects.
+
+If the project later adds a formal CSRF token, use a double-submit or
+server-issued token pattern and document how it is bootstrapped. Do not make that
+a v1 dependency unless cross-site cookie deployments become the default.
 
 ## Environment Configuration
 
@@ -173,6 +238,7 @@ AUTH_REFRESH_TOKEN_EXPIRES_IN_DAYS=14
 AUTH_REFRESH_COOKIE_NAME=common_admin_refresh
 AUTH_REFRESH_COOKIE_SECURE=false
 AUTH_REFRESH_COOKIE_SAME_SITE=lax
+AUTH_REFRESH_COOKIE_DOMAIN=
 ```
 
 Rules:
@@ -182,6 +248,8 @@ Rules:
 - Refresh lifetime should default to 14 days for the starter template.
 - Cookie security should default to local development values but fail or require
   explicit configuration for unsafe production combinations.
+- Production should reject `sameSite = none` unless `secure = true`.
+- Production should reject credentialed CORS with wildcard origins.
 - `.env.example` files should document the values.
 
 ## Backend Authentication Flow
@@ -251,6 +319,23 @@ make v1 overly complex just to detect every possible replay shape.
 Concurrent refresh requests may cause one request to fail because the token has
 already rotated. The frontend should avoid this by sharing a single in-flight
 refresh promise.
+
+Rotation must be atomic. Implement refresh with a transaction or conditional
+update that only replaces `refreshTokenHash` when all of these still match:
+
+```text
+id = parsed session id
+userId = session user id
+refreshTokenHash = hash of incoming secret
+revokedAt is null
+expiresAt > now
+```
+
+If the conditional update affects zero rows after the initial validation, return
+`401` and clear the refresh cookie. Do not mark this ordinary race as
+`token_reuse_detected` by default; near-simultaneous browser requests should not
+revoke an otherwise valid session. Reserve `token_reuse_detected` for cases
+where the backend can distinguish suspicious reuse from a normal rotation race.
 
 ### Logout
 
@@ -352,12 +437,11 @@ Validation behavior:
 1. Verify access token signature and expiration.
 2. Require payload.sub.
 3. Require payload.sid.
-4. Find the user by sub.
-5. Find the session by sid.
-6. Verify the session belongs to the user.
-7. Verify the session is not expired.
-8. Verify the session is not revoked.
-9. Return the JWT user payload for downstream guards.
+4. Query the session and user with a minimal joined/select lookup.
+5. Verify the session belongs to the user.
+6. Verify the session is not expired.
+7. Verify the session is not revoked.
+8. Return a normalized request user built from current database fields.
 ```
 
 Failure modes:
@@ -369,6 +453,36 @@ Failure modes:
 
 The permissions guard remains responsible for authorization. The JWT strategy is
 responsible for authentication and session validity.
+
+Do not return stale mutable identity fields from the access token when the
+database has fresher values. If `email` or `username` remains in the token for
+debugging or client convenience, request authentication should still return the
+current user fields loaded from the database.
+
+The hot-path session lookup should avoid unnecessary double queries. Prefer a
+single query that selects only the required columns:
+
+```text
+session.id
+session.userId
+session.expiresAt
+session.revokedAt
+user.id
+user.email
+user.username
+```
+
+The existing primary key on `UserSession.id` covers lookup by `sid`. Add or keep
+indexes for cleanup and user-level revocation:
+
+```text
+@@index([userId])
+@@index([expiresAt])
+@@index([revokedAt])
+```
+
+Tests should include a mismatched `sub` and `sid` case to prove one user's token
+cannot authenticate against another user's session.
 
 ## Frontend Session State
 
@@ -446,7 +560,8 @@ Rules:
 - Never retry a request more than once after refresh.
 - Do not try to refresh when the failing request was `/auth/login`,
   `/auth/refresh`, or `/auth/logout`.
-- Use Axios `withCredentials` or equivalent so the refresh cookie is sent.
+- Use Axios `withCredentials` or equivalent so refresh cookies can be set, sent,
+  and cleared.
 - Keep auth retry logic in the shared API client instead of duplicating it in
   feature APIs.
 
@@ -508,12 +623,18 @@ Backend tests should cover:
 - Login creates a `UserSession`, sets a refresh cookie, and returns an access
   token plus user profile.
 - Login response does not include a refresh token.
+- Login and refresh set the expected HttpOnly refresh cookie attributes.
 - Refresh succeeds with a valid cookie, rotates the refresh token, updates the
   session hash, and returns a new access token.
 - Reusing an old refresh token after rotation fails.
+- A refresh rotation race or failed conditional update returns `401` without
+  revoking the session as suspicious reuse.
 - Logout revokes the current session and clears the refresh cookie.
+- Logout can clear the cookie when only the refresh cookie identifies the
+  session.
 - Access token validation fails after logout.
 - Access token validation fails when the session is revoked or expired.
+- Access token validation fails when `sub` and `sid` do not belong together.
 - Change password rejects an incorrect current password.
 - Change password updates the hash, revokes all user sessions, and clears the
   refresh cookie.
@@ -521,20 +642,26 @@ Backend tests should cover:
   target user's sessions.
 - Permission guards still return `403` for authenticated users without the
   required permission.
+- Credentialed CORS is configured when refresh cookies are enabled.
+- Cookie-sensitive auth endpoints reject unexpected browser origins.
 
 Frontend tests should cover:
 
 - Auth store starts in `checking` and can become `authenticated` or `anonymous`.
 - Login stores access token and user only in memory.
+- Login, refresh, and logout use credentialed requests.
 - Session storage no longer persists access tokens.
 - App startup calls refresh and restores authenticated state on success.
 - App startup becomes anonymous on refresh failure.
 - API client retries one failed authenticated request after successful refresh.
 - Concurrent 401 responses share one refresh request.
+- API client does not try refresh/retry behavior for login, refresh, or logout
+  failures.
 - Refresh failure clears auth state, clears query cache, and navigates to
   `/login`.
 - Logout clears local state even if the logout request fails.
 - Password change success clears state and navigates to `/login`.
+- Administrator self-reset clears local state and navigates to `/login`.
 
 Manual/browser smoke checks should verify:
 
@@ -551,18 +678,19 @@ Recommended implementation order:
 
 ```text
 1. Add UserSession model, migration, config, and token helpers.
-2. Update login to create sessions and set refresh cookies.
-3. Add refresh and logout endpoints.
-4. Update JWT validation to require an active session.
-5. Update backend tests for login, refresh, logout, and revoked sessions.
-6. Refactor frontend auth store away from persisted access tokens.
-7. Add API client refresh/retry behavior with credentialed requests.
-8. Add startup refresh behavior and route checking state.
-9. Add change-password endpoint and frontend flow.
-10. Add administrator reset-password endpoint and user management flow.
+2. Add credentialed CORS and auth endpoint origin validation.
+3. Update login to create sessions and set refresh cookies.
+4. Add refresh and logout endpoints with atomic refresh rotation.
+5. Update JWT validation to require an active session.
+6. Update backend tests for login, refresh, logout, and revoked sessions.
+7. Refactor frontend auth store away from persisted access tokens.
+8. Add API client refresh/retry behavior with credentialed requests.
+9. Add startup refresh behavior and route checking state.
+10. Add change-password endpoint and frontend flow.
+11. Add administrator reset-password endpoint and user management flow.
 ```
 
-Steps 1-8 are the core session lifecycle. Steps 9-10 complete the first password
+Steps 1-9 are the core session lifecycle. Steps 10-11 complete the first password
 lifecycle slice.
 
 ## Future Enhancements
