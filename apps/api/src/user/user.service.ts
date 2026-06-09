@@ -17,7 +17,10 @@ import {
   AUDIT_RESOURCE_TYPES,
 } from '../audit-log/audit-log.constants';
 import { AuditLogService } from '../audit-log/audit-log.service';
-import type { AuditActor, AuditRequestMeta } from '../audit-log/audit-log.types';
+import type {
+  AuditActor,
+  AuditRequestMeta,
+} from '../audit-log/audit-log.types';
 import {
   CreateUserDto,
   ReplaceUserRolesDto,

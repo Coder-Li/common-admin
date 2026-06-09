@@ -12,7 +12,10 @@ import {
   AUDIT_ACTIONS,
   AUDIT_RESOURCE_TYPES,
 } from '../audit-log/audit-log.constants';
-import type { AuditActor, AuditRequestMeta } from '../audit-log/audit-log.types';
+import type {
+  AuditActor,
+  AuditRequestMeta,
+} from '../audit-log/audit-log.types';
 import { ListQueryDto } from '../common/dto/list-query.dto';
 import { UserListQueryDto } from './dto/user.request';
 import { toUserResponse } from './user.mapper';
@@ -501,7 +504,9 @@ describe('UserService', () => {
     const after = makeUser({
       roles: [{ role: { code: 'admin', name: 'Admin' } }],
     });
-    prisma.user.findUnique.mockResolvedValueOnce(before).mockResolvedValue(after);
+    prisma.user.findUnique
+      .mockResolvedValueOnce(before)
+      .mockResolvedValue(after);
     prisma.role.findMany.mockResolvedValue([
       { id: 'role-admin', code: 'admin' },
     ]);
@@ -527,9 +532,9 @@ describe('UserService', () => {
       },
       prisma,
     );
-    expect(permissionService.invalidateUserPermissionContext).toHaveBeenCalledWith(
-      'user-1',
-    );
+    expect(
+      permissionService.invalidateUserPermissionContext,
+    ).toHaveBeenCalledWith('user-1');
   });
 
   it('rejects the business request when audit recording fails inside a Prisma transaction', async () => {
