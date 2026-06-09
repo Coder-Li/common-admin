@@ -446,6 +446,17 @@ describe('Auth flow', () => {
     expect(revokedSession.revokedReason).toBe('logout');
   });
 
+  it('logout succeeds and clears cookie when refresh cookie is missing', async () => {
+    const logoutResponse = await request(httpServer)
+      .post('/api/auth/logout')
+      .expect(201);
+
+    expect(logoutResponse.headers['set-cookie'][0]).toContain(
+      'common_admin_refresh=;',
+    );
+    expect(prisma.userSession.updateMany).not.toHaveBeenCalled();
+  });
+
   it('rejects current-user requests without a bearer token', async () => {
     await request(httpServer).get('/api/users/me').expect(401);
   });

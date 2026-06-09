@@ -84,19 +84,34 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const refreshToken = this.readRefreshCookie(request);
+    const refreshToken = this.readOptionalRefreshCookie(request);
 
-    await this.authService.logoutByRefreshToken(refreshToken);
     this.sessionCookieService.clearRefreshCookie(response);
+
+    if (!refreshToken) {
+      return;
+    }
+
+    try {
+      await this.authService.logoutByRefreshToken(refreshToken);
+    } catch (error) {
+      if (!(error instanceof UnauthorizedException)) {
+        throw error;
+      }
+    }
   }
 
   private readRefreshCookie(request: Request): string {
-    const refreshToken = request.cookies?.[this.tokenConfig.refreshCookieName];
+    const refreshToken = this.readOptionalRefreshCookie(request);
 
     if (!refreshToken) {
       throw new UnauthorizedException();
     }
 
     return refreshToken;
+  }
+
+  private readOptionalRefreshCookie(request: Request): string | undefined {
+    return request.cookies?.[this.tokenConfig.refreshCookieName];
   }
 }
