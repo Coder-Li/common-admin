@@ -1,10 +1,6 @@
-import type { AuthSession } from '../types/auth'
-
 const SESSION_KEY = 'common-admin.session'
 
 interface SessionStorageLike {
-  getItem: (key: string) => string | null
-  setItem: (key: string, value: string) => unknown
   removeItem: (key: string) => unknown
 }
 
@@ -16,35 +12,25 @@ function getBrowserStorage(): SessionStorageLike | null {
   return window.localStorage
 }
 
-export function loadSession(
+export function clearLegacySession(
   storage: SessionStorageLike | null = getBrowserStorage(),
-): AuthSession | null {
-  if (!storage) {
-    return null
-  }
+) {
+  storage?.removeItem(SESSION_KEY)
+}
 
-  const value = storage.getItem(SESSION_KEY)
-  if (!value) {
-    return null
-  }
-
-  try {
-    return JSON.parse(value) as AuthSession
-  } catch {
-    storage.removeItem(SESSION_KEY)
-    return null
-  }
+export function loadSession() {
+  return null
 }
 
 export function saveSession(
-  session: AuthSession,
+  _session?: unknown,
   storage: SessionStorageLike | null = getBrowserStorage(),
 ) {
-  storage?.setItem(SESSION_KEY, JSON.stringify(session))
+  clearLegacySession(storage)
 }
 
 export function clearSession(
   storage: SessionStorageLike | null = getBrowserStorage(),
 ) {
-  storage?.removeItem(SESSION_KEY)
+  clearLegacySession(storage)
 }

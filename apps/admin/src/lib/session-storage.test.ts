@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { clearSession, loadSession, saveSession } from './session-storage'
+import {
+  clearLegacySession,
+  clearSession,
+  loadSession,
+  saveSession,
+} from './session-storage'
 import type { AuthSession } from '../types/auth'
 
 function createStorage() {
@@ -26,41 +31,46 @@ const session: AuthSession = {
 }
 
 describe('session storage', () => {
-  it('saves and loads an auth session', () => {
+  it('does not save auth sessions', () => {
     const storage = createStorage()
 
     saveSession(session, storage)
 
-    expect(loadSession(storage)).toEqual(session)
+    expect(loadSession(storage)).toBeNull()
+    expect(storage.getItem('common-admin.session')).toBeNull()
   })
 
-  it('persists role and permission context with the session', () => {
+  it('removes legacy stored sessions when saving', () => {
     const storage = createStorage()
+    storage.setItem('common-admin.session', JSON.stringify(session))
 
     saveSession(session, storage)
 
-    expect(loadSession(storage)?.user.roles).toEqual([
-      { code: 'admin', name: 'Admin' },
-    ])
-    expect(loadSession(storage)?.user.permissions).toEqual([
-      'user.read',
-      'role.read',
-    ])
+    expect(storage.getItem('common-admin.session')).toBeNull()
   })
 
-  it('returns null when stored session JSON is invalid', () => {
+  it('always returns null for legacy stored sessions', () => {
     const storage = createStorage()
-    storage.setItem('common-admin.session', '{broken')
+    storage.setItem('common-admin.session', JSON.stringify(session))
 
     expect(loadSession(storage)).toBeNull()
   })
 
-  it('clears an auth session', () => {
+  it('clears legacy stored sessions', () => {
     const storage = createStorage()
-    saveSession(session, storage)
+    storage.setItem('common-admin.session', JSON.stringify(session))
 
     clearSession(storage)
 
-    expect(loadSession(storage)).toBeNull()
+    expect(storage.getItem('common-admin.session')).toBeNull()
+  })
+
+  it('exposes a legacy cleanup helper', () => {
+    const storage = createStorage()
+    storage.setItem('common-admin.session', JSON.stringify(session))
+
+    clearLegacySession(storage)
+
+    expect(storage.getItem('common-admin.session')).toBeNull()
   })
 })

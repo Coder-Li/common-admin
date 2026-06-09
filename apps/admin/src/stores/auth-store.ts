@@ -1,8 +1,14 @@
 import { create } from 'zustand'
-import { clearSession, loadSession, saveSession } from '../lib/session-storage'
-import type { AuthSession, UserProfile, UserRoleSummary } from '../types/auth'
+import { clearLegacySession } from '../lib/session-storage'
+import type {
+  AuthSession,
+  AuthStatus,
+  UserProfile,
+  UserRoleSummary,
+} from '../types/auth'
 
 interface AuthState {
+  status: AuthStatus
   accessToken: string | null
   user: UserProfile | null
   roles: UserRoleSummary[]
@@ -10,21 +16,31 @@ interface AuthState {
   isAuthenticated: boolean
   setSession: (session: AuthSession) => void
   setUser: (user: UserProfile) => void
+  setAnonymous: () => void
   reset: () => void
 }
 
-const initialSession = loadSession()
+const anonymousState = {
+  status: 'anonymous' as const,
+  accessToken: null,
+  user: null,
+  roles: [],
+  permissions: [],
+  isAuthenticated: false,
+}
 
 export const useAuthStore = create<AuthState>((set) => ({
-  accessToken: initialSession?.accessToken ?? null,
-  user: initialSession?.user ?? null,
-  roles: initialSession?.user.roles ?? [],
-  permissions: initialSession?.user.permissions ?? [],
-  isAuthenticated: Boolean(initialSession),
+  status: 'checking',
+  accessToken: null,
+  user: null,
+  roles: [],
+  permissions: [],
+  isAuthenticated: false,
   setSession: (session) =>
     set(() => {
-      saveSession(session)
+      clearLegacySession()
       return {
+        status: 'authenticated',
         accessToken: session.accessToken,
         user: session.user,
         roles: session.user.roles,
@@ -33,30 +49,21 @@ export const useAuthStore = create<AuthState>((set) => ({
       }
     }),
   setUser: (user) =>
-    set((state) => {
-      if (state.accessToken) {
-        saveSession({
-          accessToken: state.accessToken,
-          user,
-        })
-      }
-
-      return {
-        user,
-        roles: user.roles,
-        permissions: user.permissions,
-        isAuthenticated: true,
-      }
+    set(() => ({
+      status: 'authenticated',
+      user,
+      roles: user.roles,
+      permissions: user.permissions,
+      isAuthenticated: true,
+    })),
+  setAnonymous: () =>
+    set(() => {
+      clearLegacySession()
+      return anonymousState
     }),
   reset: () =>
     set(() => {
-      clearSession()
-      return {
-        accessToken: null,
-        user: null,
-        roles: [],
-        permissions: [],
-        isAuthenticated: false,
-      }
+      clearLegacySession()
+      return anonymousState
     }),
 }))

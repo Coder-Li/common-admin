@@ -1,3 +1,5 @@
+export type AuthStatus = 'checking' | 'authenticated' | 'anonymous'
+
 export interface UserRoleSummary {
   code: string
   name: string
