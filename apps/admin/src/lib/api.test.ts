@@ -170,6 +170,84 @@ describe('api client', () => {
     expect(onUnauthorized).toHaveBeenCalledOnce()
   })
 
+  it('normal request replay 500 after refresh does not call onUnauthorized', async () => {
+    const unauthorizedError = { response: { status: 401 } }
+    const serverError = { response: { status: 500 } }
+    const get = vi
+      .fn()
+      .mockRejectedValueOnce(unauthorizedError)
+      .mockRejectedValueOnce(serverError)
+    const post = vi.fn().mockResolvedValue({ data: session })
+    const onUnauthorized = vi.fn()
+    const client = createApiClient({
+      client: { get, post },
+      getAccessToken: () => 'access-token',
+      onUnauthorized,
+    })
+
+    await expect(client.me()).rejects.toBe(serverError)
+
+    expect(post).toHaveBeenCalledOnce()
+    expect(get).toHaveBeenCalledTimes(2)
+    expect(onUnauthorized).not.toHaveBeenCalled()
+  })
+
+  it('normal request replay 401 after refresh calls onUnauthorized once', async () => {
+    const initialUnauthorizedError = { response: { status: 401 } }
+    const replayUnauthorizedError = { response: { status: 401 } }
+    const get = vi
+      .fn()
+      .mockRejectedValueOnce(initialUnauthorizedError)
+      .mockRejectedValueOnce(replayUnauthorizedError)
+    const post = vi.fn().mockResolvedValue({ data: session })
+    const onUnauthorized = vi.fn()
+    const client = createApiClient({
+      client: { get, post },
+      getAccessToken: () => 'access-token',
+      onUnauthorized,
+    })
+
+    await expect(client.me()).rejects.toBe(replayUnauthorizedError)
+
+    expect(post).toHaveBeenCalledOnce()
+    expect(get).toHaveBeenCalledTimes(2)
+    expect(onUnauthorized).toHaveBeenCalledOnce()
+  })
+
+  it('login 401 does not call onUnauthorized or refresh', async () => {
+    const error = { response: { status: 401 } }
+    const post = vi.fn().mockRejectedValue(error)
+    const onUnauthorized = vi.fn()
+    const client = createApiClient({ client: { post }, onUnauthorized })
+
+    await expect(
+      client.login({ usernameOrEmail: 'admin@example.com', password: 'bad' }),
+    ).rejects.toBe(error)
+
+    expect(post).toHaveBeenCalledOnce()
+    expect(post).toHaveBeenCalledWith(
+      '/auth/login',
+      { usernameOrEmail: 'admin@example.com', password: 'bad' },
+      { withCredentials: true },
+    )
+    expect(onUnauthorized).not.toHaveBeenCalled()
+  })
+
+  it('refresh 401 calls onUnauthorized', async () => {
+    const error = { response: { status: 401 } }
+    const post = vi.fn().mockRejectedValue(error)
+    const onUnauthorized = vi.fn()
+    const client = createApiClient({ client: { post }, onUnauthorized })
+
+    await expect(client.refresh()).rejects.toBe(error)
+
+    expect(post).toHaveBeenCalledOnce()
+    expect(post).toHaveBeenCalledWith('/auth/refresh', undefined, {
+      withCredentials: true,
+    })
+    expect(onUnauthorized).toHaveBeenCalledOnce()
+  })
+
   it('login/refresh/logout failures are not retried through refresh', async () => {
     const error = { response: { status: 401 } }
     const post = vi.fn().mockRejectedValue(error)
@@ -195,7 +273,7 @@ describe('api client', () => {
     expect(post).toHaveBeenNthCalledWith(3, '/auth/logout', undefined, {
       withCredentials: true,
     })
-    expect(onUnauthorized).toHaveBeenCalledTimes(3)
+    expect(onUnauthorized).toHaveBeenCalledOnce()
   })
 
   it('lists users with query params and bearer auth', async () => {

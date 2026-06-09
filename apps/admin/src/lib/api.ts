@@ -169,8 +169,12 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
 
   async function request<T>(
     operation: () => Promise<{ data: T }>,
-    options: { retryOnUnauthorized?: boolean } = {
+    options: {
+      retryOnUnauthorized?: boolean
+      notifyUnauthorized?: boolean
+    } = {
       retryOnUnauthorized: true,
+      notifyUnauthorized: true,
     },
   ): Promise<T> {
     try {
@@ -179,17 +183,27 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
     } catch (error) {
       if (isUnauthorizedError(error)) {
         if (options.retryOnUnauthorized === false) {
-          onUnauthorized?.()
+          if (options.notifyUnauthorized) {
+            onUnauthorized?.()
+          }
           throw error
         }
 
         try {
           await refreshSession()
-          const response = await operation()
-          return response.data
         } catch (refreshError) {
           onUnauthorized?.()
           throw refreshError
+        }
+
+        try {
+          const response = await operation()
+          return response.data
+        } catch (replayError) {
+          if (isUnauthorizedError(replayError)) {
+            onUnauthorized?.()
+          }
+          throw replayError
         }
       }
       throw error
@@ -222,13 +236,14 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
             credentials,
             credentialedConfig,
           ),
-        { retryOnUnauthorized: false },
+        { retryOnUnauthorized: false, notifyUnauthorized: false },
       )
     },
 
     async refresh(): Promise<AuthSession> {
       return request(() => refreshSession().then((data) => ({ data })), {
         retryOnUnauthorized: false,
+        notifyUnauthorized: true,
       })
     },
 
@@ -238,7 +253,7 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
       }
       return request(
         () => client.post!<void>('/auth/logout', undefined, credentialedConfig),
-        { retryOnUnauthorized: false },
+        { retryOnUnauthorized: false, notifyUnauthorized: false },
       )
     },
 
