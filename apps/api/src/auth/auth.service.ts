@@ -97,4 +97,82 @@ export class AuthService {
 
     return { accessToken, refreshToken, user: profile };
   }
+
+  async refresh(
+    refreshToken: string,
+  ): Promise<AuthResponse & { refreshToken: string }> {
+    const { sessionId, secret } =
+      this.refreshTokenService.parseToken(refreshToken);
+    const session = await this.prisma.userSession.findUnique({
+      where: { id: sessionId },
+      include: { user: { include: { roles: { include: { role: true } } } } },
+    });
+    const now = new Date();
+
+    if (!session || session.revokedAt || session.expiresAt <= now) {
+      throw new UnauthorizedException();
+    }
+
+    const secretMatches = await this.refreshTokenService.verifySecret(
+      secret,
+      session.refreshTokenHash,
+    );
+
+    if (!secretMatches) {
+      throw new UnauthorizedException();
+    }
+
+    const permissionContext =
+      await this.permissionService.resolveUserPermissionContext(session.userId);
+    const profile = toUserProfile(
+      session.user,
+      permissionContext.permissionCodes,
+    );
+    const nextRefreshToken = this.refreshTokenService.createToken(session.id);
+    const { secret: nextSecret } =
+      this.refreshTokenService.parseToken(nextRefreshToken);
+    const nextHash = await this.refreshTokenService.hashSecret(nextSecret);
+    const updateResult = await this.prisma.userSession.updateMany({
+      where: {
+        id: session.id,
+        userId: session.userId,
+        refreshTokenHash: session.refreshTokenHash,
+        revokedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: {
+        refreshTokenHash: nextHash,
+        lastUsedAt: now,
+      },
+    });
+
+    if (updateResult.count !== 1) {
+      throw new UnauthorizedException();
+    }
+
+    const payload: JwtUserPayload = {
+      sub: profile.id,
+      sid: session.id,
+      email: profile.email,
+      username: profile.username,
+    };
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: this.tokenConfig.accessTokenSecret,
+      expiresIn: this.tokenConfig.accessTokenExpiresIn,
+    });
+
+    return { accessToken, refreshToken: nextRefreshToken, user: profile };
+  }
+
+  async logoutBySessionId(sessionId: string): Promise<void> {
+    await this.prisma.userSession.updateMany({
+      where: { id: sessionId, revokedAt: null },
+      data: { revokedAt: new Date(), revokedReason: 'logout' },
+    });
+  }
+
+  async logoutByRefreshToken(refreshToken: string): Promise<void> {
+    const { sessionId } = this.refreshTokenService.parseToken(refreshToken);
+    await this.logoutBySessionId(sessionId);
+  }
 }

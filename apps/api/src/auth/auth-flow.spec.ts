@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import type { Server } from 'node:http';
 import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcryptjs';
+import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import type { Response } from 'supertest';
 import { AppModule } from '../app.module';
@@ -21,6 +22,19 @@ interface LoginResponseBody {
     permissions: string[];
   };
 }
+
+type SessionRecord = {
+  id: string;
+  userId: string;
+  refreshTokenHash: string;
+  userAgent?: string;
+  ipAddress?: string;
+  expiresAt: Date;
+  lastUsedAt?: Date | null;
+  revokedAt?: Date | null;
+  revokedReason?: string | null;
+  user?: ReturnType<typeof persistedUser>;
+};
 
 interface UserListResponseBody {
   items: Array<{
@@ -113,6 +127,7 @@ describe('Auth flow', () => {
       isSuperAdmin: boolean;
     }
   >();
+  const sessions = new Map<string, SessionRecord>();
 
   const permissionService = {
     resolveUserPermissionContext: jest.fn(async (userId: string) => {
@@ -176,6 +191,7 @@ describe('Auth flow', () => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -191,6 +207,7 @@ describe('Auth flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     permissionContexts.clear();
+    sessions.clear();
     [
       prisma.user,
       prisma.role,
@@ -207,6 +224,59 @@ describe('Auth flow', () => {
     prisma.$transaction.mockReset();
     prisma.$transaction.mockImplementation(async (callback: Function) =>
       callback(prisma),
+    );
+    prisma.userSession.create.mockImplementation(
+      async ({ data }: { data: SessionRecord }) => {
+        sessions.set(data.id, { ...data, revokedAt: null });
+        return sessions.get(data.id);
+      },
+    );
+    prisma.userSession.findUnique.mockImplementation(
+      async ({ where }: { where: { id: string } }) => {
+        const session = sessions.get(where.id);
+
+        if (!session) {
+          return null;
+        }
+
+        return {
+          ...session,
+          user:
+            session.user ??
+            (await prisma.user.findUnique({ where: { id: session.userId } })),
+        };
+      },
+    );
+    prisma.userSession.updateMany.mockImplementation(
+      async ({
+        where,
+        data,
+      }: {
+        where: {
+          id: string;
+          userId?: string;
+          refreshTokenHash?: string;
+          revokedAt?: null;
+          expiresAt?: { gt: Date };
+        };
+        data: Partial<SessionRecord>;
+      }) => {
+        const session = sessions.get(where.id);
+
+        if (
+          !session ||
+          (where.userId && session.userId !== where.userId) ||
+          (where.refreshTokenHash &&
+            session.refreshTokenHash !== where.refreshTokenHash) ||
+          (where.revokedAt === null && session.revokedAt) ||
+          (where.expiresAt?.gt && session.expiresAt <= where.expiresAt.gt)
+        ) {
+          return { count: 0 };
+        }
+
+        sessions.set(where.id, { ...session, ...data });
+        return { count: 1 };
+      },
     );
   });
 
@@ -259,6 +329,121 @@ describe('Auth flow', () => {
           permissions: ['user.read'],
         });
       });
+  });
+
+  it('login sets refresh cookie and omits refresh token JSON', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    prisma.user.findFirst.mockResolvedValue(user);
+    prisma.user.findUnique.mockResolvedValue(user);
+
+    const loginResponse = await request(httpServer)
+      .post('/api/auth/login')
+      .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
+      .expect(201);
+
+    expect(loginResponse.headers['set-cookie'][0]).toContain(
+      'common_admin_refresh=',
+    );
+    expect(loginResponse.body).not.toHaveProperty('refreshToken');
+  });
+
+  it('refresh with cookie returns new access token and rotated cookie', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    prisma.user.findFirst.mockResolvedValue(user);
+    prisma.user.findUnique.mockResolvedValue(user);
+    const loginResponse = await request(httpServer)
+      .post('/api/auth/login')
+      .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
+      .expect(201);
+
+    const refreshResponse = await request(httpServer)
+      .post('/api/auth/refresh')
+      .set('Cookie', loginResponse.headers['set-cookie'])
+      .expect(201);
+
+    expect(loginBody(refreshResponse).accessToken).toEqual(expect.any(String));
+    expect(refreshResponse.headers['set-cookie'][0]).toContain(
+      'common_admin_refresh=',
+    );
+    expect(refreshResponse.headers['set-cookie'][0]).not.toBe(
+      loginResponse.headers['set-cookie'][0],
+    );
+    expect(refreshResponse.body).not.toHaveProperty('refreshToken');
+  });
+
+  it('old refresh cookie fails after rotation', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    prisma.user.findFirst.mockResolvedValue(user);
+    prisma.user.findUnique.mockResolvedValue(user);
+    const loginResponse = await request(httpServer)
+      .post('/api/auth/login')
+      .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
+      .expect(201);
+
+    await request(httpServer)
+      .post('/api/auth/refresh')
+      .set('Cookie', loginResponse.headers['set-cookie'])
+      .expect(201);
+
+    await request(httpServer)
+      .post('/api/auth/refresh')
+      .set('Cookie', loginResponse.headers['set-cookie'])
+      .expect(401)
+      .expect((response: Response) => {
+        expect(response.headers['set-cookie'][0]).toContain(
+          'common_admin_refresh=;',
+        );
+      });
+  });
+
+  it('logout clears cookie and revokes session', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    prisma.user.findFirst.mockResolvedValue(user);
+    prisma.user.findUnique.mockResolvedValue(user);
+    const loginResponse = await request(httpServer)
+      .post('/api/auth/login')
+      .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
+      .expect(201);
+
+    const logoutResponse = await request(httpServer)
+      .post('/api/auth/logout')
+      .set('Cookie', loginResponse.headers['set-cookie'])
+      .expect(201);
+    const revokedSession = [...sessions.values()][0];
+
+    expect(logoutResponse.headers['set-cookie'][0]).toContain(
+      'common_admin_refresh=;',
+    );
+    expect(revokedSession.revokedAt).toBeInstanceOf(Date);
+    expect(revokedSession.revokedReason).toBe('logout');
   });
 
   it('rejects current-user requests without a bearer token', async () => {
