@@ -301,6 +301,13 @@ describe('AuthService', () => {
 
     it('revokes a session by refresh token when access token is absent or expired', async () => {
       const refreshToken = refreshTokenService.createToken('session-1');
+      const { secret } = refreshTokenService.parseToken(refreshToken);
+      prisma.userSession.findUnique.mockResolvedValue({
+        id: 'session-1',
+        refreshTokenHash: await refreshTokenService.hashSecret(secret),
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
       prisma.userSession.updateMany.mockResolvedValue({ count: 1 });
       const service = createService();
 
@@ -312,6 +319,26 @@ describe('AuthService', () => {
         where: { id: 'session-1', revokedAt: null },
         data: { revokedAt: expect.any(Date), revokedReason: 'logout' },
       });
+    });
+
+    it('rejects a refresh token with the wrong secret without revoking the session', async () => {
+      const refreshToken = refreshTokenService.createToken('session-1');
+      const validToken = refreshTokenService.createToken('session-1');
+      const { secret: validSecret } =
+        refreshTokenService.parseToken(validToken);
+      prisma.userSession.findUnique.mockResolvedValue({
+        id: 'session-1',
+        refreshTokenHash: await refreshTokenService.hashSecret(validSecret),
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+      const service = createService();
+
+      await expect(
+        service.logoutByRefreshToken(refreshToken),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(prisma.userSession.updateMany).not.toHaveBeenCalled();
     });
 
     it('remains successful when the session is already missing', async () => {

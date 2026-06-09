@@ -172,7 +172,26 @@ export class AuthService {
   }
 
   async logoutByRefreshToken(refreshToken: string): Promise<void> {
-    const { sessionId } = this.refreshTokenService.parseToken(refreshToken);
+    const { sessionId, secret } =
+      this.refreshTokenService.parseToken(refreshToken);
+    const session = await this.prisma.userSession.findUnique({
+      where: { id: sessionId },
+    });
+    const now = new Date();
+
+    if (!session || session.revokedAt || session.expiresAt <= now) {
+      throw new UnauthorizedException();
+    }
+
+    const secretMatches = await this.refreshTokenService.verifySecret(
+      secret,
+      session.refreshTokenHash,
+    );
+
+    if (!secretMatches) {
+      throw new UnauthorizedException();
+    }
+
     await this.logoutBySessionId(sessionId);
   }
 }

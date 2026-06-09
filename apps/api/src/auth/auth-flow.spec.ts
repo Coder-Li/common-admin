@@ -457,6 +457,40 @@ describe('Auth flow', () => {
     expect(prisma.userSession.updateMany).not.toHaveBeenCalled();
   });
 
+  it('logout with forged refresh cookie succeeds without revoking the session', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    prisma.user.findFirst.mockResolvedValue(user);
+    prisma.user.findUnique.mockResolvedValue(user);
+    const loginResponse = await request(httpServer)
+      .post('/api/auth/login')
+      .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
+      .expect(201);
+    const sessionId = [...sessions.keys()][0];
+    const forgedCookie = loginResponse.headers['set-cookie'][0].replace(
+      /common_admin_refresh=[^;]+/,
+      `common_admin_refresh=${sessionId}.forged-secret`,
+    );
+
+    const logoutResponse = await request(httpServer)
+      .post('/api/auth/logout')
+      .set('Cookie', forgedCookie)
+      .expect(201);
+    const session = sessions.get(sessionId);
+
+    expect(logoutResponse.headers['set-cookie'][0]).toContain(
+      'common_admin_refresh=;',
+    );
+    expect(session?.revokedAt).toBeNull();
+    expect(session?.revokedReason).toBeUndefined();
+  });
+
   it('rejects current-user requests without a bearer token', async () => {
     await request(httpServer).get('/api/users/me').expect(401);
   });
