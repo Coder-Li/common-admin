@@ -290,7 +290,7 @@ describe('Auth flow', () => {
         data,
       }: {
         where: {
-          id: string;
+          id?: string;
           userId?: string;
           refreshTokenHash?: string;
           revokedAt?: null;
@@ -298,22 +298,35 @@ describe('Auth flow', () => {
         };
         data: Partial<SessionRecord>;
       }) => {
-        const session = sessions.get(where.id);
+        const matchingSessions = [...sessions.values()].filter((session) => {
+          return (
+            (!where.id || session.id === where.id) &&
+            (!where.userId || session.userId === where.userId) &&
+            (!where.refreshTokenHash ||
+              session.refreshTokenHash === where.refreshTokenHash) &&
+            (where.revokedAt !== null || !session.revokedAt) &&
+            (!where.expiresAt?.gt || session.expiresAt > where.expiresAt.gt)
+          );
+        });
 
-        if (
-          !session ||
-          (where.userId && session.userId !== where.userId) ||
-          (where.refreshTokenHash &&
-            session.refreshTokenHash !== where.refreshTokenHash) ||
-          (where.revokedAt === null && session.revokedAt) ||
-          (where.expiresAt?.gt && session.expiresAt <= where.expiresAt.gt)
-        ) {
+        if (matchingSessions.length === 0) {
           return { count: 0 };
         }
 
-        sessions.set(where.id, { ...session, ...data });
-        return { count: 1 };
+        matchingSessions.forEach((session) => {
+          sessions.set(session.id, { ...session, ...data });
+        });
+        return { count: matchingSessions.length };
       },
+    );
+    prisma.user.update.mockImplementation(
+      async ({
+        where,
+        data,
+      }: {
+        where: { id: string };
+        data: Partial<ReturnType<typeof persistedUser>>;
+      }) => persistedUser({ id: where.id, ...data }),
     );
   });
 
@@ -481,6 +494,77 @@ describe('Auth flow', () => {
     );
     expect(revokedSession.revokedAt).toBeInstanceOf(Date);
     expect(revokedSession.revokedReason).toBe('logout');
+  });
+
+  it('changePassword clears refresh cookie in controller', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    const accessToken = await signIn(user);
+
+    const response = await request(httpServer)
+      .post('/api/auth/change-password')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        currentPassword: 'Admin123!',
+        newPassword: 'NewAdmin123!',
+      })
+      .expect(204);
+
+    expect(response.headers['set-cookie'][0]).toContain(
+      'common_admin_refresh=;',
+    );
+  });
+
+  it('changePassword revokes active sessions and blocks the old access token', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    const firstAccessToken = await signIn(user);
+    const secondAccessToken = await signIn(user);
+
+    await request(httpServer)
+      .post('/api/auth/change-password')
+      .set('Authorization', `Bearer ${firstAccessToken}`)
+      .send({
+        currentPassword: 'Admin123!',
+        newPassword: 'NewAdmin123!',
+      })
+      .expect(204);
+
+    const sessionRecords = [...sessions.values()];
+    expect(sessionRecords).toHaveLength(2);
+    expect(sessionRecords).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          revokedAt: expect.any(Date),
+          revokedReason: 'password_changed',
+        }),
+        expect.objectContaining({
+          revokedAt: expect.any(Date),
+          revokedReason: 'password_changed',
+        }),
+      ]),
+    );
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { passwordHash: expect.any(String) },
+    });
+
+    await request(httpServer)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${secondAccessToken}`)
+      .expect(401);
   });
 
   it('protected request fails after logout', async () => {

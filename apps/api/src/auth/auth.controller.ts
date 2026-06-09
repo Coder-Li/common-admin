@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  HttpCode,
+  HttpStatus,
   Post,
   Req,
   Res,
@@ -13,10 +15,13 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { AuthOriginGuard } from './auth-origin.guard';
 import { AuthResponseDto } from './dto/auth-response.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { SessionCookieService } from './session-cookie.service';
 import { IsPublic } from '../common/decorators/is-public.decorator';
 import { AUTH_TOKEN_CONFIG, AuthTokenConfig } from '../config/auth.config';
+import { CurrentUser } from '../user/current-user.decorator';
+import { JwtUserPayload } from '../user/user.types';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -99,6 +104,22 @@ export class AuthController {
         throw error;
       }
     }
+  }
+
+  @UseGuards(AuthOriginGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async changePassword(
+    @CurrentUser() user: JwtUserPayload,
+    @Body() body: ChangePasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    await this.authService.changePassword(
+      user.sub,
+      body.currentPassword,
+      body.newPassword,
+    );
+    this.sessionCookieService.clearRefreshCookie(response);
   }
 
   private readRefreshCookie(request: Request): string {

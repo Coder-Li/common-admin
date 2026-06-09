@@ -27,12 +27,15 @@ describe('AuthService', () => {
   const prisma = {
     user: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
     },
     userSession: {
       create: jest.fn(),
       findUnique: jest.fn(),
       updateMany: jest.fn(),
     },
+    $transaction: jest.fn(),
   };
 
   const jwtService = {
@@ -46,6 +49,9 @@ describe('AuthService', () => {
   beforeEach(async () => {
     jest.resetAllMocks();
     user.passwordHash = await bcrypt.hash('Admin123!', 4);
+    prisma.$transaction.mockImplementation(async (callback: Function) =>
+      callback(prisma),
+    );
     permissionService.resolveUserPermissionContext.mockResolvedValue({
       userId: 'user-1',
       roleCodes: ['admin'],
@@ -348,6 +354,56 @@ describe('AuthService', () => {
       await expect(
         service.logoutBySessionId('missing-session'),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('changePassword', () => {
+    it('rejects incorrect current password', async () => {
+      prisma.user.findUnique.mockResolvedValue(user);
+      const service = createService();
+
+      await expect(
+        service.changePassword('user-1', 'wrong-password', 'NewAdmin123!'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.userSession.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('hashes new password', async () => {
+      prisma.user.findUnique.mockResolvedValue(user);
+      prisma.userSession.updateMany.mockResolvedValue({ count: 1 });
+      const service = createService();
+
+      await service.changePassword('user-1', 'Admin123!', 'NewAdmin123!');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { passwordHash: expect.any(String) },
+      });
+      const nextHash = prisma.user.update.mock.calls[0][0].data.passwordHash;
+      expect(nextHash).not.toBe('NewAdmin123!');
+      expect(nextHash).not.toBe(user.passwordHash);
+      await expect(bcrypt.compare('NewAdmin123!', nextHash)).resolves.toBe(
+        true,
+      );
+    });
+
+    it('revokes all sessions for current user with password_changed', async () => {
+      prisma.user.findUnique.mockResolvedValue(user);
+      prisma.userSession.updateMany.mockResolvedValue({ count: 2 });
+      const service = createService();
+
+      await service.changePassword('user-1', 'Admin123!', 'NewAdmin123!');
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.userSession.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revokedAt: null },
+        data: {
+          revokedAt: expect.any(Date),
+          revokedReason: 'password_changed',
+        },
+      });
     });
   });
 });
