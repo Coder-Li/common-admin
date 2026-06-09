@@ -164,6 +164,32 @@ model ManagedFile {
   @@index([deletedAt])
 }
 
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorUserId  String?
+  actorEmail   String?  @db.VarChar(255)
+  actorName    String?  @db.VarChar(160)
+
+  action       String   @db.VarChar(80)
+  resourceType String   @db.VarChar(80)
+  resourceId   String?  @db.VarChar(120)
+
+  before       Json?
+  after        Json?
+  metadata     Json?
+
+  ipAddress    String?  @db.VarChar(80)
+  userAgent    String?  @db.VarChar(500)
+
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorUserId])
+  @@index([action])
+  @@index([resourceType])
+  @@index([resourceType, resourceId])
+}
+
 model DictionaryType {
   id          String           @id @default(uuid())
   code        String           @unique @db.VarChar(80)
