@@ -93,6 +93,102 @@ describe('AuditLogService', () => {
     });
   });
 
+  it('record writes through the passed transaction client', async () => {
+    const { prisma, service } = createService();
+    const tx = createPrismaMock();
+    tx.auditLog.create.mockResolvedValue(makeAuditLog());
+
+    await service.record(
+      {
+        action: AUDIT_ACTIONS.CREATE,
+        resourceType: AUDIT_RESOURCE_TYPES.USER,
+      },
+      tx as never,
+    );
+
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: AUDIT_ACTIONS.CREATE,
+        resourceType: AUDIT_RESOURCE_TYPES.USER,
+      },
+    });
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('record omits before, after, and metadata from create payload when absent', async () => {
+    const { prisma, service } = createService();
+    prisma.auditLog.create.mockResolvedValue(makeAuditLog());
+
+    await service.record({
+      action: AUDIT_ACTIONS.DELETE,
+      resourceType: AUDIT_RESOURCE_TYPES.USER,
+      resourceId: 'target-user-1',
+    });
+
+    const createPayload = prisma.auditLog.create.mock.calls[0][0]
+      .data as Record<string, unknown>;
+
+    expect(createPayload).not.toHaveProperty('before');
+    expect(createPayload).not.toHaveProperty('after');
+    expect(createPayload).not.toHaveProperty('metadata');
+  });
+
+  it('record normalizes sanitized payloads to Prisma JSON-safe values', async () => {
+    const { prisma, service } = createService();
+    prisma.auditLog.create.mockResolvedValue(makeAuditLog());
+    const occurredAt = new Date('2026-06-08T09:10:11.000Z');
+
+    await service.record({
+      action: AUDIT_ACTIONS.UPDATE,
+      resourceType: AUDIT_RESOURCE_TYPES.USER,
+      before: {
+        occurredAt,
+        version: BigInt('9007199254740993'),
+        keep: 'value',
+        dropUndefined: undefined,
+        dropFunction: () => 'ignored',
+        dropSymbol: Symbol('ignored'),
+        nested: {
+          password: 'secret',
+          omitted: undefined,
+        },
+      },
+      after: [
+        occurredAt,
+        BigInt(10),
+        undefined,
+        () => 'ignored',
+        Symbol('ignored'),
+        { apiKey: 'secret-api-key', ok: true },
+      ],
+      metadata: null,
+    });
+
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        action: AUDIT_ACTIONS.UPDATE,
+        resourceType: AUDIT_RESOURCE_TYPES.USER,
+        before: {
+          occurredAt: '2026-06-08T09:10:11.000Z',
+          version: '9007199254740993',
+          keep: 'value',
+          nested: {
+            password: '[REDACTED]',
+          },
+        },
+        after: [
+          '2026-06-08T09:10:11.000Z',
+          '10',
+          null,
+          null,
+          null,
+          { apiKey: '[REDACTED]', ok: true },
+        ],
+        metadata: Prisma.JsonNull,
+      },
+    });
+  });
+
   it('listAuditLogs defaults sort, page, and pageSize', async () => {
     const { prisma, service } = createService();
     prisma.auditLog.findMany.mockResolvedValue([makeAuditLog()]);
@@ -124,6 +220,34 @@ describe('AuditLogService', () => {
     });
   });
 
+  it('listAuditLogs omits null database fields from list items', async () => {
+    const { prisma, service } = createService();
+    prisma.auditLog.findMany.mockResolvedValue([
+      makeAuditLog({
+        actorUserId: null,
+        actorEmail: null,
+        actorName: null,
+        resourceId: null,
+        ipAddress: null,
+      }),
+    ]);
+    prisma.auditLog.count.mockResolvedValue(1);
+
+    await expect(service.listAuditLogs({})).resolves.toEqual({
+      items: [
+        {
+          id: 'audit-log-1',
+          action: AUDIT_ACTIONS.UPDATE,
+          resourceType: AUDIT_RESOURCE_TYPES.USER,
+          createdAt: '2026-06-07T01:02:03.000Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    });
+  });
+
   it('invalid sort field throws BadRequestException', async () => {
     const { service } = createService();
 
@@ -137,6 +261,14 @@ describe('AuditLogService', () => {
 
     await expect(
       service.listAuditLogs({ sort: 'createdAt:sideways' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('malformed sort throws BadRequestException', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.listAuditLogs({ sort: 'createdAt:desc:any' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -205,6 +337,30 @@ describe('AuditLogService', () => {
     });
     expect(prisma.auditLog.findUnique).toHaveBeenCalledWith({
       where: { id: 'audit-log-1' },
+    });
+  });
+
+  it('findById omits null database fields from detail records', async () => {
+    const { prisma, service } = createService();
+    prisma.auditLog.findUnique.mockResolvedValue(
+      makeAuditLog({
+        actorUserId: null,
+        actorEmail: null,
+        actorName: null,
+        resourceId: null,
+        before: null,
+        after: null,
+        metadata: null,
+        ipAddress: null,
+        userAgent: null,
+      }),
+    );
+
+    await expect(service.findById('audit-log-1')).resolves.toEqual({
+      id: 'audit-log-1',
+      action: AUDIT_ACTIONS.UPDATE,
+      resourceType: AUDIT_RESOURCE_TYPES.USER,
+      createdAt: '2026-06-07T01:02:03.000Z',
     });
   });
 

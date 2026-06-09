@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type Prisma as PrismaTypes } from '@prisma/client';
 import {
   ListResponse,
   createListResponse,
@@ -22,6 +22,8 @@ import {
 import { AuditLogListQueryDto } from './dto/audit-log.request';
 import type { AuditPrismaClient, RecordAuditLogInput } from './audit-log.types';
 
+type AuditJsonValue = PrismaTypes.InputJsonValue | typeof Prisma.JsonNull;
+
 @Injectable()
 export class AuditLogService {
   constructor(private readonly prisma: PrismaService) {}
@@ -31,21 +33,22 @@ export class AuditLogService {
     tx?: AuditPrismaClient,
   ): Promise<void> {
     const client = tx ?? this.prisma;
+    const data: Prisma.AuditLogCreateInput = {
+      action: input.action,
+      resourceType: input.resourceType,
+      ...this.toOptionalCreateField('actorUserId', input.actor?.userId),
+      ...this.toOptionalCreateField('actorEmail', input.actor?.email),
+      ...this.toOptionalCreateField('actorName', input.actor?.name),
+      ...this.toOptionalCreateField('resourceId', input.resourceId),
+      ...this.toJsonCreateField('before', input.before),
+      ...this.toJsonCreateField('after', input.after),
+      ...this.toJsonCreateField('metadata', input.metadata),
+      ...this.toOptionalCreateField('ipAddress', input.requestMeta?.ipAddress),
+      ...this.toOptionalCreateField('userAgent', input.requestMeta?.userAgent),
+    };
 
     await client.auditLog.create({
-      data: {
-        actorUserId: input.actor?.userId,
-        actorEmail: input.actor?.email,
-        actorName: input.actor?.name,
-        action: input.action,
-        resourceType: input.resourceType,
-        resourceId: input.resourceId,
-        ...this.toJsonCreateField('before', input.before),
-        ...this.toJsonCreateField('after', input.after),
-        ...this.toJsonCreateField('metadata', input.metadata),
-        ipAddress: input.requestMeta?.ipAddress,
-        userAgent: input.requestMeta?.userAgent,
-      },
+      data,
     });
   }
 
@@ -91,9 +94,11 @@ export class AuditLogService {
     field: string;
     direction: 'asc' | 'desc';
   } {
-    const [field, direction] = sort.split(':');
+    const sortParts = sort.split(':');
+    const [field, direction] = sortParts;
 
     if (
+      sortParts.length !== 2 ||
       !field ||
       !AUDIT_LOG_SORT_FIELDS.has(field) ||
       (direction !== 'asc' && direction !== 'desc')
@@ -157,24 +162,72 @@ export class AuditLogService {
     field: 'before' | 'after' | 'metadata',
     value: unknown,
   ):
-    | Record<
-        'before' | 'after' | 'metadata',
-        Prisma.InputJsonValue | typeof Prisma.JsonNull
-      >
+    | Partial<Record<'before' | 'after' | 'metadata', AuditJsonValue>>
     | Record<string, never> {
     if (value === undefined) {
       return {};
     }
 
     if (value === null) {
-      return { [field]: Prisma.JsonNull } as Record<
-        'before' | 'after' | 'metadata',
-        typeof Prisma.JsonNull
-      >;
+      return { [field]: Prisma.JsonNull };
     }
 
     return {
-      [field]: sanitizeAuditPayload(value) as Prisma.InputJsonValue,
-    } as Record<'before' | 'after' | 'metadata', Prisma.InputJsonValue>;
+      [field]: toPrismaJsonValue(sanitizeAuditPayload(value)),
+    };
   }
+
+  private toOptionalCreateField<TField extends string>(
+    field: TField,
+    value: string | undefined,
+  ): Partial<Record<TField, string>> | Record<string, never> {
+    return value === undefined ? {} : { [field]: value };
+  }
+}
+
+function toPrismaJsonValue(value: unknown): PrismaTypes.InputJsonValue {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+
+  if (
+    value === undefined ||
+    typeof value === 'function' ||
+    typeof value === 'symbol'
+  ) {
+    return null;
+  }
+
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number'
+  ) {
+    return value;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => toPrismaJsonValue(item));
+  }
+
+  const normalizedObject: PrismaTypes.InputJsonObject = Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(
+        ([, item]) =>
+          item !== undefined &&
+          typeof item !== 'function' &&
+          typeof item !== 'symbol',
+      )
+      .map(([key, item]) => [key, toPrismaJsonValue(item)]),
+  );
+
+  return normalizedObject;
 }

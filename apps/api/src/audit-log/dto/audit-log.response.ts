@@ -5,14 +5,14 @@ export class AuditLogListItemResponseDto {
   @ApiProperty()
   id!: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  actorUserId!: string | null;
+  @ApiPropertyOptional()
+  actorUserId?: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  actorEmail!: string | null;
+  @ApiPropertyOptional()
+  actorEmail?: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  actorName!: string | null;
+  @ApiPropertyOptional()
+  actorName?: string;
 
   @ApiProperty()
   action!: string;
@@ -20,11 +20,11 @@ export class AuditLogListItemResponseDto {
   @ApiProperty()
   resourceType!: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  resourceId!: string | null;
+  @ApiPropertyOptional()
+  resourceId?: string;
 
-  @ApiPropertyOptional({ nullable: true })
-  ipAddress!: string | null;
+  @ApiPropertyOptional()
+  ipAddress?: string;
 
   @ApiProperty()
   createdAt!: string;
@@ -40,8 +40,8 @@ export class AuditLogResponseDto extends AuditLogListItemResponseDto {
   @ApiPropertyOptional({ type: Object, nullable: true })
   metadata?: unknown;
 
-  @ApiPropertyOptional({ nullable: true })
-  userAgent?: string | null;
+  @ApiPropertyOptional()
+  userAgent?: string;
 }
 
 export class AuditLogListResponseDto implements ListResponse<AuditLogListItemResponseDto> {

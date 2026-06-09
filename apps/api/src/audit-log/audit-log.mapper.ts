@@ -9,13 +9,13 @@ export function toAuditLogListItemResponse(
 ): AuditLogListItemResponseDto {
   return {
     id: auditLog.id,
-    actorUserId: auditLog.actorUserId,
-    actorEmail: auditLog.actorEmail,
-    actorName: auditLog.actorName,
+    ...(auditLog.actorUserId ? { actorUserId: auditLog.actorUserId } : {}),
+    ...(auditLog.actorEmail ? { actorEmail: auditLog.actorEmail } : {}),
+    ...(auditLog.actorName ? { actorName: auditLog.actorName } : {}),
     action: auditLog.action,
     resourceType: auditLog.resourceType,
-    resourceId: auditLog.resourceId,
-    ipAddress: auditLog.ipAddress,
+    ...(auditLog.resourceId ? { resourceId: auditLog.resourceId } : {}),
+    ...(auditLog.ipAddress ? { ipAddress: auditLog.ipAddress } : {}),
     createdAt: auditLog.createdAt.toISOString(),
   };
 }

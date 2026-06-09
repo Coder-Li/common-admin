@@ -1,9 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import { AUDIT_SENSITIVE_KEYS } from './audit-log.constants';
 
 const REDACTED_VALUE = '[REDACTED]';
 
 export function sanitizeAuditPayload<T>(payload: T): T {
   if (payload === null || typeof payload !== 'object') {
+    return payload;
+  }
+
+  if (payload instanceof Date) {
     return payload;
   }
 
