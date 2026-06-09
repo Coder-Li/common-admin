@@ -140,13 +140,14 @@ describe('RolesPage', () => {
     useAuthStore.getState().reset()
   })
 
-  it('lists roles and permission modules', async () => {
+  it('lists roles without the standalone permission catalogue', async () => {
     renderRolesPage()
 
     expect(await screen.findByText('Admin')).toBeInTheDocument()
     expect(screen.getByText('Operator')).toBeInTheDocument()
-    expect(await screen.findByText('user')).toBeInTheDocument()
-    expect(screen.getByText('View users')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Available permissions' }),
+    ).not.toBeInTheDocument()
   })
 
   it('opens create dialog when role.create is granted', async () => {

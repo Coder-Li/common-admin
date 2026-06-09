@@ -5,9 +5,11 @@ import {
   KeyRound,
   Lock,
   Settings,
+  ShieldCheck,
   Users,
   type LucideIcon,
 } from 'lucide-react'
+import { PermissionsPage } from '../features/permissions/PermissionsPage'
 import { DictionariesPage } from '../features/dictionaries/DictionariesPage'
 import { FilesPage } from '../features/files/FilesPage'
 import { RolesPage } from '../features/roles/RolesPage'
@@ -52,6 +54,13 @@ export const adminRoutes: AdminRoute[] = [
     requiredPermissions: ['role.read'],
     icon: KeyRound,
     component: RolesPage,
+  },
+  {
+    path: '/permissions',
+    labelKey: 'nav.permissions',
+    requiredPermissions: ['permission.read'],
+    icon: ShieldCheck,
+    component: PermissionsPage,
   },
   {
     path: '/dictionaries',

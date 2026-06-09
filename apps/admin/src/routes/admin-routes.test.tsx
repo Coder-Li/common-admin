@@ -14,11 +14,15 @@ describe('admin routes', () => {
       '/dashboard',
       '/users',
       '/roles',
+      '/permissions',
       '/dictionaries',
       '/files',
       '/settings',
     ])
     expect(findAdminRoute('/roles')?.requiredPermissions).toEqual(['role.read'])
+    expect(findAdminRoute('/permissions')?.requiredPermissions).toEqual([
+      'permission.read',
+    ])
   })
 
   it('filters visible routes by required permissions', () => {

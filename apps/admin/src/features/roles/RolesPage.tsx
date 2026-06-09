@@ -264,36 +264,6 @@ export function RolesPage() {
         total={rolesQuery.data?.total ?? 0}
       />
 
-      {canReadPermissions ? (
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
-          <h3 className="text-base font-semibold text-slate-950">
-            {t('roles.permissions.available')}
-          </h3>
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            {(modulesQuery.data ?? []).map((module) => (
-              <section
-                className="rounded-md border border-slate-200 p-4"
-                key={module.module}
-              >
-                <h4 className="mb-3 text-sm font-semibold text-slate-950">
-                  {module.module}
-                </h4>
-                <ul className="grid gap-2">
-                  {module.permissions.map((permission) => (
-                    <li
-                      className="rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700"
-                      key={permission.code}
-                    >
-                      {permission.name}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
       {formState ? (
         <div
           aria-modal="true"
