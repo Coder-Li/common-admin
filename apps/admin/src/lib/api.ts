@@ -23,6 +23,12 @@ import type {
   UpdateDictionaryItemRequest,
   UpdateDictionaryTypeRequest,
 } from '../features/dictionaries/dictionaries.types'
+import type {
+  FileListQuery,
+  FileListResponse,
+  FileRecord,
+  UpdateFileRequest,
+} from '../features/files/files.types'
 
 export interface LoginCredentials {
   usernameOrEmail: string
@@ -39,6 +45,7 @@ export interface ListResponse<TItem> {
 interface RequestConfig {
   headers?: Record<string, string>
   params?: object
+  responseType?: 'blob'
 }
 
 interface HttpClient {
@@ -197,6 +204,66 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
         }
         return request(() =>
           client.delete!<void>(`/users/${id}`, authenticatedConfig()),
+        )
+      },
+    },
+
+    files: {
+      async list(query: FileListQuery): Promise<FileListResponse> {
+        if (!client.get) {
+          throw new Error('HTTP get client is not configured')
+        }
+        return request(() =>
+          client.get!<FileListResponse>(
+            '/files',
+            authenticatedConfig(undefined, query),
+          ),
+        )
+      },
+
+      async upload(formData: FormData): Promise<FileRecord> {
+        if (!client.post) {
+          throw new Error('HTTP post client is not configured')
+        }
+        return request(() =>
+          client.post!<FileRecord>('/files', formData, authenticatedConfig()),
+        )
+      },
+
+      async update(
+        id: string,
+        payload: UpdateFileRequest,
+      ): Promise<FileRecord> {
+        if (!client.patch) {
+          throw new Error('HTTP patch client is not configured')
+        }
+        return request(() =>
+          client.patch!<FileRecord>(
+            `/files/${id}`,
+            payload,
+            authenticatedConfig(),
+          ),
+        )
+      },
+
+      async delete(id: string): Promise<void> {
+        if (!client.delete) {
+          throw new Error('HTTP delete client is not configured')
+        }
+        return request(() =>
+          client.delete!<void>(`/files/${id}`, authenticatedConfig()),
+        )
+      },
+
+      async download(id: string): Promise<Blob> {
+        if (!client.get) {
+          throw new Error('HTTP get client is not configured')
+        }
+        return request(() =>
+          client.get!<Blob>(`/files/${id}/download`, {
+            ...authenticatedConfig(),
+            responseType: 'blob',
+          }),
         )
       },
     },

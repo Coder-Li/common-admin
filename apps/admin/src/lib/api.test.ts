@@ -379,4 +379,108 @@ describe('api client', () => {
 
     expect(onUnauthorized).toHaveBeenCalledOnce()
   })
+
+  it('lists files with query params and bearer auth', async () => {
+    const get = vi.fn().mockResolvedValue({
+      data: {
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+      },
+    })
+    const client = createApiClient({
+      client: { get },
+      getAccessToken: () => 'access-token',
+    })
+    const query = {
+      page: 1,
+      pageSize: 20,
+      search: 'report',
+      sort: 'createdAt:desc',
+      mimeType: 'application/pdf',
+      storageDriver: 'LOCAL' as const,
+    }
+
+    const response = await client.files.list(query)
+
+    expect(get).toHaveBeenCalledWith('/files', {
+      params: query,
+      headers: { Authorization: 'Bearer access-token' },
+    })
+    expect(response.items).toEqual([])
+  })
+
+  it('uploads files with FormData and bearer auth', async () => {
+    const post = vi.fn().mockResolvedValue({
+      data: {
+        id: 'file-1',
+        displayName: 'Report',
+      },
+    })
+    const client = createApiClient({
+      client: { post },
+      getAccessToken: () => 'access-token',
+    })
+    const formData = new FormData()
+    formData.append('displayName', 'Report')
+
+    const response = await client.files.upload(formData)
+
+    expect(post).toHaveBeenCalledWith('/files', formData, {
+      headers: { Authorization: 'Bearer access-token' },
+    })
+    expect(response.id).toBe('file-1')
+  })
+
+  it('updates files with bearer auth', async () => {
+    const patch = vi.fn().mockResolvedValue({
+      data: {
+        id: 'file-1',
+        displayName: 'Updated',
+      },
+    })
+    const client = createApiClient({
+      client: { patch },
+      getAccessToken: () => 'access-token',
+    })
+    const payload = { displayName: 'Updated', description: null }
+
+    const response = await client.files.update('file-1', payload)
+
+    expect(patch).toHaveBeenCalledWith('/files/file-1', payload, {
+      headers: { Authorization: 'Bearer access-token' },
+    })
+    expect(response.displayName).toBe('Updated')
+  })
+
+  it('deletes files with bearer auth', async () => {
+    const deleteRequest = vi.fn().mockResolvedValue({ data: undefined })
+    const client = createApiClient({
+      client: { delete: deleteRequest },
+      getAccessToken: () => 'access-token',
+    })
+
+    await expect(client.files.delete('file-1')).resolves.toBeUndefined()
+
+    expect(deleteRequest).toHaveBeenCalledWith('/files/file-1', {
+      headers: { Authorization: 'Bearer access-token' },
+    })
+  })
+
+  it('downloads files as blobs with bearer auth', async () => {
+    const blob = new Blob(['hello'], { type: 'text/plain' })
+    const get = vi.fn().mockResolvedValue({ data: blob })
+    const client = createApiClient({
+      client: { get },
+      getAccessToken: () => 'access-token',
+    })
+
+    await expect(client.files.download('file-1')).resolves.toBe(blob)
+
+    expect(get).toHaveBeenCalledWith('/files/file-1/download', {
+      headers: { Authorization: 'Bearer access-token' },
+      responseType: 'blob',
+    })
+  })
 })
