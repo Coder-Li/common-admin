@@ -24,6 +24,7 @@ import { CurrentUser } from './current-user.decorator';
 import {
   CreateUserDto,
   ReplaceUserRolesDto,
+  ResetUserPasswordDto,
   UpdateUserDto,
   UserListQueryDto,
 } from './dto/user.request';
@@ -79,6 +80,18 @@ export class UserController {
     @Body() body: UpdateUserDto,
   ): Promise<UserResponseDto> {
     return this.userService.updateUser(id, body);
+  }
+
+  @ApiOkResponse({ type: UserResponseDto })
+  @ApiForbiddenResponse({ description: 'Permission required' })
+  @ApiNotFoundResponse({ description: 'User not found' })
+  @Permissions('user.update')
+  @Post(':id/reset-password')
+  resetPassword(
+    @Param('id') id: string,
+    @Body() body: ResetUserPasswordDto,
+  ): Promise<UserResponseDto> {
+    return this.userService.resetPassword(id, body.newPassword);
   }
 
   @ApiOkResponse({ type: UserResponseDto })

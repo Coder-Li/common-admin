@@ -117,6 +117,33 @@ export class UserService {
     }
   }
 
+  async resetPassword(
+    id: string,
+    newPassword: string,
+  ): Promise<UserResponseDto> {
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const now = new Date();
+        const user = await tx.user.update({
+          where: { id },
+          data: { passwordHash },
+          include: { roles: { include: { role: true } } },
+        });
+
+        await tx.userSession.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: now, revokedReason: 'admin_reset_password' },
+        });
+
+        return toUserResponse(user);
+      });
+    } catch (error) {
+      this.handlePrismaWriteError(error);
+    }
+  }
+
   async deleteUser(id: string): Promise<void> {
     try {
       await this.prisma.user.delete({ where: { id } });

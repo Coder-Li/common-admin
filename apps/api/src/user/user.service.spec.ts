@@ -7,6 +7,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 import { ListQueryDto } from '../common/dto/list-query.dto';
 import { UserListQueryDto } from './dto/user.request';
 import { toUserResponse } from './user.mapper';
@@ -136,6 +137,9 @@ describe('UserService', () => {
       createMany: jest.fn(),
       count: jest.fn(),
     },
+    userSession: {
+      updateMany: jest.fn(),
+    },
     $transaction: jest.fn(async (callback: Function) =>
       callback(createPrismaMock()),
     ),
@@ -172,6 +176,12 @@ describe('UserService', () => {
   const uniqueConstraintError = () =>
     new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
       code: 'P2002',
+      clientVersion: 'test',
+    });
+
+  const recordNotFoundError = () =>
+    new Prisma.PrismaClientKnownRequestError('Record not found', {
+      code: 'P2025',
       clientVersion: 'test',
     });
 
@@ -253,6 +263,68 @@ describe('UserService', () => {
       data: { firstName: 'Augusta' },
       include: expect.any(Object),
     });
+  });
+
+  it('resetPassword hashes the new password', async () => {
+    const { prisma, service } = createService();
+    prisma.user.update.mockResolvedValue(makeUser());
+    prisma.userSession.updateMany.mockResolvedValue({ count: 0 });
+
+    await service.resetPassword('user-1', 'NewSecure123!');
+
+    const updateArgs = firstMockArg<{
+      data: { passwordHash: string };
+    }>(prisma.user.update);
+    expect(updateArgs.data.passwordHash).not.toBe('NewSecure123!');
+    await expect(
+      bcrypt.compare('NewSecure123!', updateArgs.data.passwordHash),
+    ).resolves.toBe(true);
+  });
+
+  it('resetPassword revokes all target user sessions with admin_reset_password', async () => {
+    const { prisma, service } = createService();
+    prisma.user.update.mockResolvedValue(makeUser());
+    prisma.userSession.updateMany.mockResolvedValue({ count: 2 });
+
+    await service.resetPassword('user-1', 'NewSecure123!');
+
+    expect(prisma.userSession.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', revokedAt: null },
+      data: {
+        revokedAt: expect.any(Date),
+        revokedReason: 'admin_reset_password',
+      },
+    });
+  });
+
+  it('resetPassword returns public user response without passwordHash', async () => {
+    const { prisma, service } = createService();
+    prisma.user.update.mockResolvedValue(makeUser());
+    prisma.userSession.updateMany.mockResolvedValue({ count: 0 });
+
+    const response = await service.resetPassword('user-1', 'NewSecure123!');
+
+    expect(response).toEqual({
+      id: 'user-1',
+      email: 'ada@example.com',
+      username: 'ada',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      roles: [{ code: 'admin', name: 'Admin' }],
+      createdAt: '2026-06-07T01:02:03.000Z',
+      updatedAt: '2026-06-07T04:05:06.000Z',
+    });
+    expect(response).not.toHaveProperty('passwordHash');
+  });
+
+  it('resetPassword throws NotFoundException for missing user', async () => {
+    const { prisma, service } = createService();
+    prisma.user.update.mockRejectedValue(recordNotFoundError());
+
+    await expect(
+      service.resetPassword('missing-user', 'NewSecure123!'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.userSession.updateMany).not.toHaveBeenCalled();
   });
 
   it('replaceRoles replaces full role set atomically', async () => {

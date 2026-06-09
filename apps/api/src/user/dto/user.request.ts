@@ -110,3 +110,10 @@ export class ReplaceUserRolesDto {
   @IsString({ each: true })
   roleCodes!: string[];
 }
+
+export class ResetUserPasswordDto {
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  newPassword!: string;
+}

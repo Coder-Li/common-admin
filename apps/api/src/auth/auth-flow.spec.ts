@@ -567,6 +567,81 @@ describe('Auth flow', () => {
       .expect(401);
   });
 
+  it("admin reset password revokes target user's existing access token", async () => {
+    const adminUser = persistedUser({
+      id: 'admin-1',
+      email: 'admin@example.com',
+      username: 'admin',
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+      roles: [{ role: { code: 'admin', name: 'Admin' } }],
+    });
+    const targetUser = persistedUser({
+      id: 'target-1',
+      email: 'target@example.com',
+      username: 'target',
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+      roles: [{ role: { code: 'standard', name: 'Standard' } }],
+    });
+    permissionContexts.set('admin-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.update'],
+      isSuperAdmin: false,
+    });
+    permissionContexts.set('target-1', {
+      roleCodes: ['standard'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    const targetAccessToken = await signIn(targetUser);
+    const adminAccessToken = await signIn(adminUser);
+    prisma.user.update.mockImplementationOnce(
+      async ({
+        where,
+        data,
+      }: {
+        where: { id: string };
+        data: Partial<ReturnType<typeof persistedUser>>;
+      }) => persistedUser({ ...targetUser, id: where.id, ...data }),
+    );
+
+    await request(httpServer)
+      .post('/api/users/target-1/reset-password')
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .send({ newPassword: 'ResetTarget123!' })
+      .expect(201)
+      .expect((response: Response) => {
+        expect(response.body).toMatchObject({
+          id: 'target-1',
+          email: 'target@example.com',
+          username: 'target',
+        });
+        expect(response.body).not.toHaveProperty('passwordHash');
+      });
+
+    const targetSessions = [...sessions.values()].filter(
+      (session) => session.userId === 'target-1',
+    );
+    const adminSessions = [...sessions.values()].filter(
+      (session) => session.userId === 'admin-1',
+    );
+    expect(targetSessions).toEqual([
+      expect.objectContaining({
+        revokedAt: expect.any(Date),
+        revokedReason: 'admin_reset_password',
+      }),
+    ]);
+    expect(adminSessions).toEqual([
+      expect.objectContaining({
+        revokedAt: null,
+      }),
+    ]);
+
+    await request(httpServer)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${targetAccessToken}`)
+      .expect(401);
+  });
+
   it('protected request fails after logout', async () => {
     const user = persistedUser({
       passwordHash: await bcrypt.hash('Admin123!', 4),
