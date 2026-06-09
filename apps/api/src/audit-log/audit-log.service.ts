@@ -23,6 +23,13 @@ import { AuditLogListQueryDto } from './dto/audit-log.request';
 import type { AuditPrismaClient, RecordAuditLogInput } from './audit-log.types';
 
 type AuditJsonValue = PrismaTypes.InputJsonValue | typeof Prisma.JsonNull;
+type JsonCompatible =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonCompatible[]
+  | { [key: string]: JsonCompatible };
 
 @Injectable()
 export class AuditLogService {
@@ -173,19 +180,25 @@ export class AuditLogService {
     }
 
     return {
-      [field]: toPrismaJsonValue(sanitizeAuditPayload(value)),
+      [field]: toAuditJsonValue(sanitizeAuditPayload(value)),
     };
   }
 
   private toOptionalCreateField<TField extends string>(
     field: TField,
     value: string | undefined,
-  ): Partial<Record<TField, string>> | Record<string, never> {
+  ): Record<string, string> | Record<string, never> {
     return value === undefined ? {} : { [field]: value };
   }
 }
 
-function toPrismaJsonValue(value: unknown): PrismaTypes.InputJsonValue {
+function toAuditJsonValue(value: unknown): AuditJsonValue {
+  const normalized = toJsonCompatibleValue(value);
+
+  return normalized === null ? Prisma.JsonNull : normalized;
+}
+
+function toJsonCompatibleValue(value: unknown): JsonCompatible {
   if (value instanceof Date) {
     return value.toISOString();
   }
@@ -215,10 +228,10 @@ function toPrismaJsonValue(value: unknown): PrismaTypes.InputJsonValue {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => toPrismaJsonValue(item));
+    return value.map((item) => toJsonCompatibleValue(item));
   }
 
-  const normalizedObject: PrismaTypes.InputJsonObject = Object.fromEntries(
+  return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
       .filter(
         ([, item]) =>
@@ -226,8 +239,6 @@ function toPrismaJsonValue(value: unknown): PrismaTypes.InputJsonValue {
           typeof item !== 'function' &&
           typeof item !== 'symbol',
       )
-      .map(([key, item]) => [key, toPrismaJsonValue(item)]),
+      .map(([key, item]) => [key, toJsonCompatibleValue(item)]),
   );
-
-  return normalizedObject;
 }
