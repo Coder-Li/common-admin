@@ -9,13 +9,21 @@ function getBrowserStorage(): SessionStorageLike | null {
     return null
   }
 
-  return window.localStorage
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
 }
 
 export function clearLegacySession(
   storage: SessionStorageLike | null = getBrowserStorage(),
 ) {
-  storage?.removeItem(SESSION_KEY)
+  try {
+    storage?.removeItem(SESSION_KEY)
+  } catch {
+    // Legacy cleanup is best-effort now that auth state is memory-only.
+  }
 }
 
 export function loadSession() {

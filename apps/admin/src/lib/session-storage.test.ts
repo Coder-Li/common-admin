@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   clearLegacySession,
   clearSession,
@@ -31,6 +31,10 @@ const session: AuthSession = {
 }
 
 describe('session storage', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('does not save auth sessions', () => {
     const storage = createStorage()
 
@@ -72,5 +76,42 @@ describe('session storage', () => {
     clearLegacySession(storage)
 
     expect(storage.getItem('common-admin.session')).toBeNull()
+  })
+
+  it('ignores legacy session removal failures', () => {
+    const storage = {
+      removeItem: () => {
+        throw new Error('storage unavailable')
+      },
+    }
+
+    expect(() => clearLegacySession(storage)).not.toThrow()
+    expect(() => saveSession(session, storage)).not.toThrow()
+    expect(() => clearSession(storage)).not.toThrow()
+  })
+
+  it('ignores browser storage access failures', () => {
+    const restrictedWindow = {}
+    Object.defineProperty(restrictedWindow, 'localStorage', {
+      get: () => {
+        throw new Error('storage access denied')
+      },
+    })
+    vi.stubGlobal('window', restrictedWindow)
+
+    expect(() => clearLegacySession()).not.toThrow()
+    expect(() => saveSession(session)).not.toThrow()
+    expect(() => clearSession()).not.toThrow()
+  })
+
+  it('does not touch storage when loading sessions', () => {
+    const storage = {
+      removeItem: vi.fn(() => {
+        throw new Error('storage unavailable')
+      }),
+    }
+
+    expect(loadSession()).toBeNull()
+    expect(storage.removeItem).not.toHaveBeenCalled()
   })
 })
