@@ -254,10 +254,18 @@ export function AuditLogsPage() {
         <AuditLogDetailsDialog
           auditLog={details}
           labels={{
+            action: t('auditLogs.details.action'),
             after: t('auditLogs.details.after'),
+            actor: t('auditLogs.details.actor'),
             before: t('auditLogs.details.before'),
+            close: t('auditLogs.details.close'),
+            ipAddress: t('auditLogs.details.ipAddress'),
             metadata: t('auditLogs.details.metadata'),
+            resource: t('auditLogs.details.resource'),
+            resourceId: t('auditLogs.details.resourceId'),
+            time: t('auditLogs.details.time'),
             title: t('auditLogs.details.title'),
+            userAgent: t('auditLogs.details.userAgent'),
           }}
           onClose={() => setDetails(null)}
         />

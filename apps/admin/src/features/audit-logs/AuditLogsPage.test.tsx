@@ -12,6 +12,7 @@ import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
+import { LOCALE_STORAGE_KEY } from '../../i18n/locale-storage'
 import { useAuthStore } from '../../stores/auth-store'
 import type {
   AuditLogListQuery,
@@ -109,6 +110,7 @@ describe('AuditLogsPage', () => {
   beforeEach(() => {
     auditLogsApiMock.getAuditLog.mockReset()
     auditLogsApiMock.listAuditLogs.mockReset()
+    window.localStorage.clear()
   })
 
   afterEach(() => {
@@ -207,6 +209,55 @@ describe('AuditLogsPage', () => {
     expect(screen.queryByRole('button', { name: 'Actions' })).toBeNull()
   })
 
+  it('queries the list again when filters change', async () => {
+    const user = userEvent.setup()
+    auditLogsApiMock.listAuditLogs.mockResolvedValue(listResponse([auditLog]))
+
+    renderAuditLogsPage()
+    await screen.findByText('admin@example.com')
+
+    await user.selectOptions(screen.getByLabelText('Action'), 'update')
+
+    await waitFor(() => {
+      expect(auditLogsApiMock.listAuditLogs).toHaveBeenLastCalledWith(
+        expect.objectContaining<AuditLogListQuery>({
+          action: 'update',
+          page: 1,
+          pageSize: 20,
+        }),
+      )
+    })
+
+    await user.selectOptions(screen.getByLabelText('Resource'), 'user')
+
+    await waitFor(() => {
+      expect(auditLogsApiMock.listAuditLogs).toHaveBeenLastCalledWith(
+        expect.objectContaining<AuditLogListQuery>({
+          action: 'update',
+          page: 1,
+          pageSize: 20,
+          resourceType: 'user',
+        }),
+      )
+    })
+
+    await user.type(screen.getByLabelText('From'), '2026-06-01')
+    await user.type(screen.getByLabelText('To'), '2026-06-09')
+
+    await waitFor(() => {
+      expect(auditLogsApiMock.listAuditLogs).toHaveBeenLastCalledWith(
+        expect.objectContaining<AuditLogListQuery>({
+          action: 'update',
+          dateFrom: '2026-06-01',
+          dateTo: '2026-06-09',
+          page: 1,
+          pageSize: 20,
+          resourceType: 'user',
+        }),
+      )
+    })
+  })
+
   it('loads and renders audit log details', async () => {
     const user = userEvent.setup()
     auditLogsApiMock.listAuditLogs.mockResolvedValue(listResponse([auditLog]))
@@ -229,6 +280,35 @@ describe('AuditLogsPage', () => {
     expect(within(dialog).getByText(/"status": "inactive"/)).toBeInTheDocument()
     expect(within(dialog).getByText(/"status": "active"/)).toBeInTheDocument()
     expect(within(dialog).getByText(/"requestId": "request-1"/)).toBeInTheDocument()
+  })
+
+  it('renders localized Chinese audit log details labels', async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, 'zh-CN')
+    auditLogsApiMock.listAuditLogs.mockResolvedValue(listResponse([auditLog]))
+    auditLogsApiMock.getAuditLog.mockResolvedValue(auditLog)
+
+    renderAuditLogsPage()
+    await screen.findByText('admin@example.com')
+
+    await user.click(screen.getByRole('button', { name: '查看详情' }))
+
+    const dialog = await screen.findByRole('dialog', {
+      name: '审计日志详情',
+    })
+    expect(
+      within(dialog).getByRole('button', { name: '关闭' }),
+    ).toBeInTheDocument()
+    expect(within(dialog).getByText('时间')).toBeInTheDocument()
+    expect(within(dialog).getByText('操作者')).toBeInTheDocument()
+    expect(within(dialog).getByText('动作')).toBeInTheDocument()
+    expect(within(dialog).getByText('资源')).toBeInTheDocument()
+    expect(within(dialog).getByText('资源 ID')).toBeInTheDocument()
+    expect(within(dialog).getByText('IP')).toBeInTheDocument()
+    expect(within(dialog).getByText('用户代理')).toBeInTheDocument()
+    expect(within(dialog).getByText('之前')).toBeInTheDocument()
+    expect(within(dialog).getByText('之后')).toBeInTheDocument()
+    expect(within(dialog).getByText('元数据')).toBeInTheDocument()
   })
 
   it('does not render create, edit, or delete controls', async () => {

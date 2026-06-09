@@ -3,10 +3,18 @@ import type { AuditLogRecord } from './audit-logs.types'
 import { formatAuditDateTime } from './audit-logs.columns'
 
 interface AuditLogDetailsDialogLabels {
+  action: string
   after: string
+  actor: string
   before: string
+  close: string
+  ipAddress: string
   metadata: string
+  resource: string
+  resourceId: string
+  time: string
   title: string
+  userAgent: string
 }
 
 interface AuditLogDetailsDialogProps {
@@ -62,7 +70,7 @@ export function AuditLogDetailsDialog({
             {labels.title}
           </h3>
           <button
-            aria-label="Close"
+            aria-label={labels.close}
             className="inline-flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-100"
             onClick={onClose}
             type="button"
@@ -72,20 +80,23 @@ export function AuditLogDetailsDialog({
         </div>
 
         <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <DetailField label="Time" value={formatAuditDateTime(auditLog.createdAt)} />
           <DetailField
-            label="Actor"
+            label={labels.time}
+            value={formatAuditDateTime(auditLog.createdAt)}
+          />
+          <DetailField
+            label={labels.actor}
             value={
               auditLog.actorName ??
               auditLog.actorEmail ??
               auditLog.actorUserId
             }
           />
-          <DetailField label="Action" value={auditLog.action} />
-          <DetailField label="Resource" value={auditLog.resourceType} />
-          <DetailField label="Resource ID" value={auditLog.resourceId} />
-          <DetailField label="IP" value={auditLog.ipAddress} />
-          <DetailField label="User agent" value={auditLog.userAgent} />
+          <DetailField label={labels.action} value={auditLog.action} />
+          <DetailField label={labels.resource} value={auditLog.resourceType} />
+          <DetailField label={labels.resourceId} value={auditLog.resourceId} />
+          <DetailField label={labels.ipAddress} value={auditLog.ipAddress} />
+          <DetailField label={labels.userAgent} value={auditLog.userAgent} />
         </dl>
 
         <div className="mt-5 grid gap-4">
