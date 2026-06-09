@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/require-await */
 import { RefreshTokenService } from './refresh-token.service';
 
 describe('RefreshTokenService', () => {

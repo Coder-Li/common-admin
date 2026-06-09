@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-function-type, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await, @typescript-eslint/unbound-method */
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -177,8 +178,7 @@ describe('AuthService', () => {
     async function createSession() {
       const refreshToken = refreshTokenService.createToken('session-1');
       const { secret } = refreshTokenService.parseToken(refreshToken);
-      const refreshTokenHash =
-        await refreshTokenService.hashSecret(secret);
+      const refreshTokenHash = await refreshTokenService.hashSecret(secret);
 
       return {
         refreshToken,

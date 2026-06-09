@@ -19,9 +19,10 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { SessionCookieService } from './session-cookie.service';
 import { IsPublic } from '../common/decorators/is-public.decorator';
-import { AUTH_TOKEN_CONFIG, AuthTokenConfig } from '../config/auth.config';
+import { AUTH_TOKEN_CONFIG } from '../config/auth.config';
+import type { AuthTokenConfig } from '../config/auth.config';
 import { CurrentUser } from '../user/current-user.decorator';
-import { JwtUserPayload } from '../user/user.types';
+import type { JwtUserPayload } from '../user/user.types';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -47,10 +48,7 @@ export class AuthController {
       ipAddress: request.ip,
     });
 
-    this.sessionCookieService.setRefreshCookie(
-      response,
-      session.refreshToken,
-    );
+    this.sessionCookieService.setRefreshCookie(response, session.refreshToken);
 
     return { accessToken: session.accessToken, user: session.user };
   }
@@ -133,6 +131,7 @@ export class AuthController {
   }
 
   private readOptionalRefreshCookie(request: Request): string | undefined {
-    return request.cookies?.[this.tokenConfig.refreshCookieName];
+    const cookies = request.cookies as Record<string, string> | undefined;
+    return cookies?.[this.tokenConfig.refreshCookieName];
   }
 }

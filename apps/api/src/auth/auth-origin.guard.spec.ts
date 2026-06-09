@@ -26,9 +26,9 @@ describe('AuthOriginGuard', () => {
   });
 
   it('allows configured browser origins', () => {
-    expect(createGuard().canActivate(createContext('http://localhost:5173'))).toBe(
-      true,
-    );
+    expect(
+      createGuard().canActivate(createContext('http://localhost:5173')),
+    ).toBe(true);
   });
 
   it('rejects unexpected browser origins', () => {

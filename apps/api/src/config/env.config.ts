@@ -35,7 +35,9 @@ const envSchema = z.object({
       return value;
     }, z.coerce.boolean())
     .default(false),
-  AUTH_REFRESH_COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+  AUTH_REFRESH_COOKIE_SAME_SITE: z
+    .enum(['lax', 'strict', 'none'])
+    .default('lax'),
   AUTH_REFRESH_COOKIE_DOMAIN: z.string().default(''),
   FILE_STORAGE_DRIVER: z.enum(['local']).default('local'),
   LOCAL_STORAGE_ROOT: z.string().min(1).default('./storage/uploads'),

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Response } from 'express';
-import { AUTH_TOKEN_CONFIG, AuthTokenConfig } from '../config/auth.config';
+import { AUTH_TOKEN_CONFIG } from '../config/auth.config';
+import type { AuthTokenConfig } from '../config/auth.config';
 
 @Injectable()
 export class SessionCookieService {
@@ -32,7 +33,14 @@ export class SessionCookieService {
   }
 
   private clearOptions() {
-    const { maxAge: _maxAge, ...options } = this.cookieOptions();
-    return options;
+    return {
+      httpOnly: true,
+      secure: this.config.refreshCookieSecure,
+      sameSite: this.config.refreshCookieSameSite,
+      path: '/api/auth',
+      ...(this.config.refreshCookieDomain
+        ? { domain: this.config.refreshCookieDomain }
+        : {}),
+    } as const;
   }
 }

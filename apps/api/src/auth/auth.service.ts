@@ -65,8 +65,7 @@ export class AuthService {
     const sessionId = randomUUID();
     const refreshToken = this.refreshTokenService.createToken(sessionId);
     const { secret } = this.refreshTokenService.parseToken(refreshToken);
-    const refreshTokenHash =
-      await this.refreshTokenService.hashSecret(secret);
+    const refreshTokenHash = await this.refreshTokenService.hashSecret(secret);
     const expiresAt = new Date(
       Date.now() +
         this.tokenConfig.refreshTokenExpiresInDays * 24 * 60 * 60 * 1000,
