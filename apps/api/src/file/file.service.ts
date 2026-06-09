@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { FileVisibility, ManagedFile, Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 import { createListResponse } from '../common/dto/list-response.dto';
 import type { AppEnv } from '../config/env.config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -182,7 +183,7 @@ export class FileService {
 
   async getDownload(id: string): Promise<{
     file: ManagedFile;
-    stream: NodeJS.ReadableStream;
+    stream: Readable;
     size: number;
     downloadName: string;
   }> {

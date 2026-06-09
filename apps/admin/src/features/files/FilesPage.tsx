@@ -23,6 +23,11 @@ import {
 import { createFileColumns } from './files.columns'
 import type { FileListQuery, FileRecord, UpdateFileRequest } from './files.types'
 
+type FileTableQuery = FileListQuery & {
+  page: number
+  pageSize: number
+}
+
 function mutationErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : undefined
 }
@@ -58,7 +63,7 @@ export function FilesPage() {
   const [editTarget, setEditTarget] = useState<FileRecord | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<FileRecord | null>(null)
 
-  const filesQuery = useServerTableQuery<FileRecord, object, FileListQuery>({
+  const filesQuery = useServerTableQuery<FileRecord, object, FileTableQuery>({
     resource: 'files',
     state: {
       filters: {},
@@ -67,7 +72,7 @@ export function FilesPage() {
       search,
       sort: toSortParam(sorting),
     },
-    queryFn: listFiles,
+    queryFn: (query) => listFiles(query),
   })
 
   const invalidateFiles = () =>

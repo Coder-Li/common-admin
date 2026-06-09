@@ -1,4 +1,5 @@
 import type { FileStorageDriver } from '@prisma/client';
+import type { Readable } from 'node:stream';
 
 export interface StoredObject {
   bucket: string | null;
@@ -7,7 +8,7 @@ export interface StoredObject {
 }
 
 export interface StorageReadResult {
-  stream: NodeJS.ReadableStream;
+  stream: Readable;
   size: number;
 }
 
