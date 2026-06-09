@@ -19,6 +19,27 @@ describe('validateEnv', () => {
     ).toBe('production-secret-change-me');
   });
 
+  it('provides auth refresh defaults', () => {
+    const env = validateEnv({});
+
+    expect(env.AUTH_REFRESH_TOKEN_EXPIRES_IN_DAYS).toBe(14);
+    expect(env.AUTH_REFRESH_COOKIE_NAME).toBe('common_admin_refresh');
+    expect(env.AUTH_REFRESH_COOKIE_SECURE).toBe(false);
+    expect(env.AUTH_REFRESH_COOKIE_SAME_SITE).toBe('lax');
+    expect(env.AUTH_REFRESH_COOKIE_DOMAIN).toBe('');
+  });
+
+  it('rejects sameSite none without secure cookies in production', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_ACCESS_TOKEN_SECRET: 'production-secret-change-me',
+        AUTH_REFRESH_COOKIE_SAME_SITE: 'none',
+        AUTH_REFRESH_COOKIE_SECURE: 'false',
+      }),
+    ).toThrow('AUTH_REFRESH_COOKIE_SECURE must be true');
+  });
+
   it('includes local file storage defaults', () => {
     expect(validateEnv({})).toMatchObject({
       FILE_STORAGE_DRIVER: 'local',

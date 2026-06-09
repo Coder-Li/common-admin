@@ -16,6 +16,27 @@ const envSchema = z.object({
     .min(16)
     .default('local-access-secret-change-me'),
   JWT_ACCESS_TOKEN_EXPIRES_IN: z.string().default('15m'),
+  AUTH_REFRESH_TOKEN_EXPIRES_IN_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(14),
+  AUTH_REFRESH_COOKIE_NAME: z.string().min(1).default('common_admin_refresh'),
+  AUTH_REFRESH_COOKIE_SECURE: z
+    .preprocess((value) => {
+      if (value === 'true') {
+        return true;
+      }
+
+      if (value === 'false') {
+        return false;
+      }
+
+      return value;
+    }, z.coerce.boolean())
+    .default(false),
+  AUTH_REFRESH_COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+  AUTH_REFRESH_COOKIE_DOMAIN: z.string().default(''),
   FILE_STORAGE_DRIVER: z.enum(['local']).default('local'),
   LOCAL_STORAGE_ROOT: z.string().min(1).default('./storage/uploads'),
   FILE_MAX_SIZE_MB: z.coerce.number().int().positive().default(20),
@@ -51,6 +72,16 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     env.JWT_ACCESS_TOKEN_SECRET === 'local-access-secret-change-me'
   ) {
     throw new Error('JWT_ACCESS_TOKEN_SECRET must be configured in production');
+  }
+
+  if (
+    env.NODE_ENV === 'production' &&
+    env.AUTH_REFRESH_COOKIE_SAME_SITE === 'none' &&
+    !env.AUTH_REFRESH_COOKIE_SECURE
+  ) {
+    throw new Error(
+      'AUTH_REFRESH_COOKIE_SECURE must be true when SameSite=None in production',
+    );
   }
 
   return env;
