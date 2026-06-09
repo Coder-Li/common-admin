@@ -29,6 +29,8 @@ const anonymousState = {
   isAuthenticated: false,
 }
 
+clearLegacySession()
+
 export const useAuthStore = create<AuthState>((set) => ({
   status: 'checking',
   accessToken: null,

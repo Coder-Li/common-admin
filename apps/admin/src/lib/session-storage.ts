@@ -26,7 +26,7 @@ export function clearLegacySession(
   }
 }
 
-export function loadSession() {
+export function loadSession(_storage?: unknown) {
   return null
 }
 

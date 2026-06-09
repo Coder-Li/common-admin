@@ -32,6 +32,16 @@ describe('auth store', () => {
     expect(freshAuthStore.getState().isAuthenticated).toBe(false)
   })
 
+  it('removes legacy common-admin.session on initialization', async () => {
+    window.localStorage.setItem('common-admin.session', JSON.stringify(session))
+    vi.resetModules()
+
+    const { useAuthStore: freshAuthStore } = await import('./auth-store')
+
+    expect(freshAuthStore.getState().status).toBe('checking')
+    expect(window.localStorage.getItem('common-admin.session')).toBeNull()
+  })
+
   it('setSession makes status authenticated and stores token in memory', () => {
     useAuthStore.getState().setSession(session)
 
