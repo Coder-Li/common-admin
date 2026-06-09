@@ -2,6 +2,15 @@ import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { FileStorageDriver, FileVisibility } from '@prisma/client';
 import { Readable } from 'node:stream';
+import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+} from '../audit-log/audit-log.constants';
+import type {
+  AuditActor,
+  AuditRequestMeta,
+  RecordAuditLogInput,
+} from '../audit-log/audit-log.types';
 import type { AppEnv } from '../config/env.config';
 import type { PrismaService } from '../prisma/prisma.service';
 import {
@@ -146,7 +155,9 @@ describe('FileService', () => {
       create: jest.Mock;
       update: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
+  type TransactionCallback<T> = (tx: MockPrisma) => T | Promise<T>;
 
   type MockStorage = {
     driver: FileStorageDriver;
@@ -203,6 +214,9 @@ describe('FileService', () => {
       create: jest.fn(),
       update: jest.fn(),
     },
+    $transaction: jest.fn(<T>(callback: TransactionCallback<T>) =>
+      callback(createPrismaMock()),
+    ),
   });
 
   const createStorageMock = (): MockStorage => ({
@@ -225,12 +239,20 @@ describe('FileService', () => {
 
   const createService = (configOverrides: Partial<AppEnv> = {}) => {
     const prisma = createPrismaMock();
+    const tx = createPrismaMock();
+    prisma.$transaction.mockImplementation(
+      <T>(callback: TransactionCallback<T>) => callback(tx),
+    );
     const storage = createStorageMock();
     const config = createConfigMock(configOverrides);
+    const auditLogService = {
+      record: jest.fn(),
+    };
     const service = new FileService(
       prisma as unknown as PrismaService,
       config,
       storage,
+      auditLogService as never,
     );
 
     storage.save.mockResolvedValue({
@@ -243,7 +265,18 @@ describe('FileService', () => {
     });
     storage.delete.mockResolvedValue(undefined);
 
-    return { config, prisma, service, storage };
+    return { auditLogService, config, prisma, service, storage, tx };
+  };
+
+  const auditActor: AuditActor = {
+    userId: 'actor-1',
+    email: 'actor@example.com',
+    name: 'actor',
+  };
+
+  const auditRequestMeta: AuditRequestMeta = {
+    ipAddress: '127.0.0.1',
+    userAgent: 'jest',
   };
 
   function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
@@ -254,6 +287,12 @@ describe('FileService', () => {
     }
 
     return firstCall[0] as TArg;
+  }
+
+  function firstAuditInput(auditLogService: {
+    record: jest.Mock;
+  }): RecordAuditLogInput {
+    return firstMockArg<RecordAuditLogInput>(auditLogService.record);
   }
 
   describe('listFiles', () => {
@@ -369,9 +408,17 @@ describe('FileService', () => {
     });
 
     it('normalizes original name and falls back to uploaded-file', async () => {
-      const { prisma, service } = createService({
+      const { prisma, service, tx } = createService({
         FILE_ALLOWED_MIME_TYPES: 'text/plain',
       });
+      tx.managedFile.create.mockResolvedValue(
+        makeFile({
+          originalName: 'uploaded-file',
+          displayName: 'uploaded-file',
+          mimeType: 'text/plain',
+          extension: 'txt',
+        }),
+      );
       prisma.managedFile.create.mockResolvedValue(
         makeFile({
           originalName: 'uploaded-file',
@@ -392,7 +439,7 @@ describe('FileService', () => {
 
       const createArgs = firstMockArg<{
         data: { originalName: string; displayName: string };
-      }>(prisma.managedFile.create);
+      }>(tx.managedFile.create);
 
       expect(createArgs.data).toMatchObject({
         originalName: 'uploaded-file',
@@ -401,7 +448,8 @@ describe('FileService', () => {
     });
 
     it('derives extension without a leading dot', async () => {
-      const { prisma, storage, service } = createService();
+      const { prisma, storage, service, tx } = createService();
+      tx.managedFile.create.mockResolvedValue(makeFile());
       prisma.managedFile.create.mockResolvedValue(makeFile());
 
       await service.createFile(makeUpload({ originalname: 'report.pdf' }), {});
@@ -412,7 +460,8 @@ describe('FileService', () => {
     });
 
     it('stores content and persists metadata with a SHA-256 checksum', async () => {
-      const { prisma, storage, service } = createService();
+      const { prisma, storage, service, tx } = createService();
+      tx.managedFile.create.mockResolvedValue(makeFile());
       prisma.managedFile.create.mockResolvedValue(makeFile());
 
       await service.createFile(
@@ -432,7 +481,7 @@ describe('FileService', () => {
       }>(storage.save);
       const createArgs = firstMockArg<{
         data: Record<string, unknown>;
-      }>(prisma.managedFile.create);
+      }>(tx.managedFile.create);
 
       expect(saveArgs).toMatchObject({
         buffer: Buffer.from('hello'),
@@ -453,8 +502,9 @@ describe('FileService', () => {
     });
 
     it('deletes the stored object if Prisma create fails', async () => {
-      const { prisma, storage, service } = createService();
+      const { prisma, storage, service, tx } = createService();
       const error = new Error('db failed');
+      tx.managedFile.create.mockRejectedValue(error);
       prisma.managedFile.create.mockRejectedValue(error);
 
       await expect(service.createFile(makeUpload(), {})).rejects.toThrow(error);
@@ -465,11 +515,68 @@ describe('FileService', () => {
           '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
       });
     });
+
+    it('records a create audit with sanitized after snapshot after storage save', async () => {
+      const { auditLogService, prisma, service, storage, tx } = createService();
+      const persisted = makeFile({
+        bucket: 'private-bucket',
+        objectKey: '2026/06/private.pdf',
+        checksum: 'secret-checksum',
+      });
+      tx.managedFile.create.mockResolvedValue(persisted);
+      prisma.managedFile.create.mockResolvedValue(persisted);
+
+      await service.createFile(
+        makeUpload(),
+        { displayName: ' Report ' },
+        'user-1',
+        auditActor,
+        auditRequestMeta,
+      );
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(storage.save.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.$transaction.mock.invocationCallOrder[0],
+      );
+      expect(prisma.managedFile.create).not.toHaveBeenCalled();
+      expect(auditLogService.record).toHaveBeenCalledWith(
+        {
+          action: AUDIT_ACTIONS.CREATE,
+          resourceType: AUDIT_RESOURCE_TYPES.FILE,
+          resourceId: 'file-1',
+          actor: auditActor,
+          requestMeta: auditRequestMeta,
+          after: toFileResponse(persisted),
+        },
+        tx,
+      );
+      const auditInput = firstAuditInput(auditLogService);
+      expect(JSON.stringify(auditInput.after)).not.toMatch(
+        /bucket|objectKey|checksum|private-bucket|private\.pdf|secret-checksum/i,
+      );
+    });
+
+    it('does not audit rejected upload or MIME validation paths', async () => {
+      const { auditLogService, service } = createService();
+
+      await expect(service.createFile(undefined, {})).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      await expect(
+        service.createFile(makeUpload({ mimetype: 'application/zip' }), {}),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(auditLogService.record).not.toHaveBeenCalled();
+    });
   });
 
   describe('updateFile', () => {
     it('trims fields and rejects empty updates', async () => {
-      const { prisma, service } = createService();
+      const { prisma, service, tx } = createService();
+      tx.managedFile.findFirst.mockResolvedValue(makeFile());
+      tx.managedFile.update.mockResolvedValue(
+        makeFile({ displayName: 'Updated', description: null }),
+      );
       prisma.managedFile.update.mockResolvedValue(
         makeFile({ displayName: 'Updated', description: null }),
       );
@@ -483,7 +590,7 @@ describe('FileService', () => {
         description: null,
       });
 
-      expect(prisma.managedFile.update).toHaveBeenCalledWith({
+      expect(tx.managedFile.update).toHaveBeenCalledWith({
         where: { id: 'file-1', deletedAt: null },
         data: {
           displayName: 'Updated',
@@ -491,12 +598,83 @@ describe('FileService', () => {
         },
       });
     });
+
+    it('reads before, updates metadata, and records before and after audit in the same transaction', async () => {
+      const { auditLogService, prisma, service, tx } = createService();
+      const before = makeFile({
+        displayName: 'Before',
+        bucket: 'private-bucket',
+        objectKey: 'before-key',
+        checksum: 'before-checksum',
+      });
+      const after = makeFile({
+        displayName: 'After',
+        metadata: { reviewed: true },
+        bucket: 'private-bucket',
+        objectKey: 'after-key',
+        checksum: 'after-checksum',
+      });
+      tx.managedFile.findFirst.mockResolvedValue(before);
+      tx.managedFile.update.mockResolvedValue(after);
+      prisma.managedFile.update.mockResolvedValue(after);
+
+      await service.updateFile(
+        'file-1',
+        { displayName: ' After ', metadata: { reviewed: true } },
+        auditActor,
+        auditRequestMeta,
+      );
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.managedFile.findFirst).toHaveBeenCalledWith({
+        where: { id: 'file-1', deletedAt: null },
+      });
+      expect(tx.managedFile.update).toHaveBeenCalledWith({
+        where: { id: 'file-1', deletedAt: null },
+        data: {
+          displayName: 'After',
+          metadata: { reviewed: true },
+        },
+      });
+      expect(prisma.managedFile.findFirst).not.toHaveBeenCalled();
+      expect(prisma.managedFile.update).not.toHaveBeenCalled();
+      expect(auditLogService.record).toHaveBeenCalledWith(
+        {
+          action: AUDIT_ACTIONS.UPDATE,
+          resourceType: AUDIT_RESOURCE_TYPES.FILE,
+          resourceId: 'file-1',
+          actor: auditActor,
+          requestMeta: auditRequestMeta,
+          before: toFileResponse(before),
+          after: toFileResponse(after),
+        },
+        tx,
+      );
+      const auditInput = firstAuditInput(auditLogService);
+      expect(JSON.stringify(auditInput)).not.toMatch(
+        /bucket|objectKey|checksum|before-key|after-key|before-checksum|after-checksum/i,
+      );
+    });
+
+    it('does not audit empty updates', async () => {
+      const { auditLogService, prisma, service } = createService();
+
+      await expect(service.updateFile('file-1', {})).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(auditLogService.record).not.toHaveBeenCalled();
+    });
   });
 
   describe('deleteFile', () => {
     it('calls storage delete before setting deletedAt', async () => {
-      const { prisma, storage, service } = createService();
+      const { prisma, storage, service, tx } = createService();
       prisma.managedFile.findFirst.mockResolvedValue(makeFile());
+      tx.managedFile.update.mockResolvedValue(
+        makeFile({ deletedAt: new Date() }),
+      );
       prisma.managedFile.update.mockResolvedValue(
         makeFile({ deletedAt: new Date() }),
       );
@@ -509,13 +687,14 @@ describe('FileService', () => {
         checksum:
           '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
       });
+      expect(tx.managedFile.update).toHaveBeenCalled();
       expect(storage.delete.mock.invocationCallOrder[0]).toBeLessThan(
-        prisma.managedFile.update.mock.invocationCallOrder[0],
+        tx.managedFile.update.mock.invocationCallOrder[0],
       );
       const updateArgs = firstMockArg<{
         where: { id: string };
         data: { deletedAt: Date };
-      }>(prisma.managedFile.update);
+      }>(tx.managedFile.update);
 
       expect(updateArgs.where).toEqual({ id: 'file-1' });
       expect(updateArgs.data.deletedAt).toBeInstanceOf(Date);
@@ -531,11 +710,54 @@ describe('FileService', () => {
       );
       expect(prisma.managedFile.update).not.toHaveBeenCalled();
     });
+
+    it('soft deletes and records before audit in the same transaction after storage delete', async () => {
+      const { auditLogService, prisma, storage, service, tx } = createService();
+      const before = makeFile({
+        bucket: 'private-bucket',
+        objectKey: 'delete-key',
+        checksum: 'delete-checksum',
+      });
+      prisma.managedFile.findFirst.mockResolvedValue(before);
+      tx.managedFile.update.mockResolvedValue(
+        makeFile({ deletedAt: new Date('2026-06-09T05:06:07.000Z') }),
+      );
+      prisma.managedFile.update.mockResolvedValue(
+        makeFile({ deletedAt: new Date('2026-06-09T05:06:07.000Z') }),
+      );
+
+      await service.deleteFile('file-1', auditActor, auditRequestMeta);
+
+      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(storage.delete.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.$transaction.mock.invocationCallOrder[0],
+      );
+      expect(tx.managedFile.update).toHaveBeenCalledWith({
+        where: { id: 'file-1' },
+        data: { deletedAt: expect.any(Date) as Date },
+      });
+      expect(prisma.managedFile.update).not.toHaveBeenCalled();
+      expect(auditLogService.record).toHaveBeenCalledWith(
+        {
+          action: AUDIT_ACTIONS.DELETE,
+          resourceType: AUDIT_RESOURCE_TYPES.FILE,
+          resourceId: 'file-1',
+          actor: auditActor,
+          requestMeta: auditRequestMeta,
+          before: toFileResponse(before),
+        },
+        tx,
+      );
+      const auditInput = firstAuditInput(auditLogService);
+      expect(JSON.stringify(auditInput.before)).not.toMatch(
+        /bucket|objectKey|checksum|delete-key|delete-checksum/i,
+      );
+    });
   });
 
   describe('getDownload', () => {
     it('returns storage read result and file metadata', async () => {
-      const { prisma, service } = createService();
+      const { auditLogService, prisma, service } = createService();
       prisma.managedFile.findFirst.mockResolvedValue(
         makeFile({ displayName: 'Quarterly Report' }),
       );
@@ -545,6 +767,7 @@ describe('FileService', () => {
       expect(download.file.id).toBe('file-1');
       expect(download.size).toBe(5);
       expect(download.downloadName).toBe('Quarterly Report.pdf');
+      expect(auditLogService.record).not.toHaveBeenCalled();
     });
   });
 });

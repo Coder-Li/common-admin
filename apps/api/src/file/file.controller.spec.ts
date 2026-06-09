@@ -36,6 +36,24 @@ describe('FileController', () => {
     createdAt: '2026-06-09T01:02:03.000Z',
     updatedAt: '2026-06-09T04:05:06.000Z',
   };
+  const user = {
+    sub: 'actor-1',
+    email: 'actor@example.com',
+    username: 'actor',
+  };
+  const request = {
+    ip: '127.0.0.1',
+    headers: { 'user-agent': 'jest' },
+  };
+  const auditActor = {
+    userId: 'actor-1',
+    email: 'actor@example.com',
+    name: 'actor',
+  };
+  const auditRequestMeta = {
+    ipAddress: '127.0.0.1',
+    userAgent: 'jest',
+  };
 
   const createService = () => {
     const listFiles = jest.fn().mockResolvedValue({
@@ -87,7 +105,7 @@ describe('FileController', () => {
     ).toEqual(permissions);
   });
 
-  it('GET /files calls FileService.listFiles() with FileListQueryDto', async () => {
+  it('GET /files calls FileService.listFiles() with FileListQueryDto and no audit metadata', async () => {
     const service = createService();
     const controller = new FileController(service as unknown as FileService);
     const query = new FileListQueryDto();
@@ -96,47 +114,69 @@ describe('FileController', () => {
       items: [responseDto],
     });
     expect(service.listFiles).toHaveBeenCalledWith(query);
+    expect(service.createFile).not.toHaveBeenCalled();
+    expect(service.updateFile).not.toHaveBeenCalled();
+    expect(service.deleteFile).not.toHaveBeenCalled();
   });
 
-  it('GET /files/:id calls FileService.findById()', async () => {
+  it('GET /files/:id calls FileService.findById() without audit metadata', async () => {
     const service = createService();
     const controller = new FileController(service as unknown as FileService);
 
     await expect(controller.getFile('file-1')).resolves.toBe(responseDto);
     expect(service.findById).toHaveBeenCalledWith('file-1');
+    expect(service.createFile).not.toHaveBeenCalled();
+    expect(service.updateFile).not.toHaveBeenCalled();
+    expect(service.deleteFile).not.toHaveBeenCalled();
   });
 
-  it('upload calls FileService.createFile() with the multipart file, body DTO, and current user id', async () => {
+  it('upload calls FileService.createFile() with the multipart file, body DTO, current user id, actor, and request metadata', async () => {
     const service = createService();
     const controller = new FileController(service as unknown as FileService);
     const file = { originalname: 'report.pdf' } as Express.Multer.File;
     const body = { displayName: 'Report' };
-    const user = { sub: 'user-1' };
 
     await expect(
-      controller.uploadFile(file, body, user as never),
+      controller.uploadFile(file, body, user as never, request as never),
     ).resolves.toBe(responseDto);
-    expect(service.createFile).toHaveBeenCalledWith(file, body, 'user-1');
+    expect(service.createFile).toHaveBeenCalledWith(
+      file,
+      body,
+      'actor-1',
+      auditActor,
+      auditRequestMeta,
+    );
   });
 
-  it('PATCH /files/:id calls FileService.updateFile() with UpdateFileDto', async () => {
+  it('PATCH /files/:id calls FileService.updateFile() with actor and request metadata', async () => {
     const service = createService();
     const controller = new FileController(service as unknown as FileService);
     const body = new UpdateFileDto();
     body.displayName = 'Updated';
 
-    await expect(controller.updateFile('file-1', body)).resolves.toBe(
-      responseDto,
+    await expect(
+      controller.updateFile('file-1', body, user as never, request as never),
+    ).resolves.toBe(responseDto);
+    expect(service.updateFile).toHaveBeenCalledWith(
+      'file-1',
+      body,
+      auditActor,
+      auditRequestMeta,
     );
-    expect(service.updateFile).toHaveBeenCalledWith('file-1', body);
   });
 
-  it('DELETE /files/:id calls FileService.deleteFile()', async () => {
+  it('DELETE /files/:id calls FileService.deleteFile() with actor and request metadata', async () => {
     const service = createService();
     const controller = new FileController(service as unknown as FileService);
 
-    await expect(controller.deleteFile('file-1')).resolves.toBeUndefined();
-    expect(service.deleteFile).toHaveBeenCalledWith('file-1');
+    await expect(
+      controller.deleteFile('file-1', user as never, request as never),
+    ).resolves.toBeUndefined();
+    expect(service.deleteFile).toHaveBeenCalledWith(
+      'file-1',
+      auditActor,
+      auditRequestMeta,
+    );
   });
 
   it('propagates upload BadRequestException from the service', async () => {
@@ -146,11 +186,11 @@ describe('FileController', () => {
     service.createFile.mockRejectedValue(error);
 
     await expect(
-      controller.uploadFile(undefined, {}, { sub: 'user-1' }),
+      controller.uploadFile(undefined, {}, user as never, request as never),
     ).rejects.toBe(error);
   });
 
-  it('download sets Content-Type, Content-Length, and Content-Disposition', async () => {
+  it('download sets Content-Type, Content-Length, and Content-Disposition without audit metadata', async () => {
     const service = createService();
     const controller = new FileController(service as unknown as FileService);
     const response = { setHeader: jest.fn() };
@@ -170,6 +210,10 @@ describe('FileController', () => {
       'Content-Disposition',
       expect.stringContaining('Report.pdf'),
     );
+    expect(service.getDownload).toHaveBeenCalledWith('file-1');
+    expect(service.createFile).not.toHaveBeenCalled();
+    expect(service.updateFile).not.toHaveBeenCalled();
+    expect(service.deleteFile).not.toHaveBeenCalled();
   });
 
   it('delete returns 204 through controller metadata', () => {

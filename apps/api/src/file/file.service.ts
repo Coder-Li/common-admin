@@ -9,6 +9,15 @@ import { FileVisibility, ManagedFile, Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
+import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+} from '../audit-log/audit-log.constants';
+import { AuditLogService } from '../audit-log/audit-log.service';
+import type {
+  AuditActor,
+  AuditRequestMeta,
+} from '../audit-log/audit-log.types';
 import { createListResponse } from '../common/dto/list-response.dto';
 import type { AppEnv } from '../config/env.config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -46,6 +55,7 @@ export class FileService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<AppEnv, true>,
     @Inject(FILE_STORAGE) private readonly storage: StorageService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async listFiles(query: FileListQueryDto): Promise<FileListResponseDto> {
@@ -82,6 +92,8 @@ export class FileService {
     file: Express.Multer.File | undefined,
     metadataDto: UploadFileMetadataDto,
     uploadedById?: string,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
   ): Promise<FileResponseDto> {
     if (!file) {
       throw new BadRequestException('File upload is required');
@@ -108,34 +120,54 @@ export class FileService {
     });
 
     try {
-      const persisted = await this.prisma.managedFile.create({
-        data: {
-          originalName,
-          displayName,
-          mimeType: file.mimetype,
-          extension,
-          size: BigInt(file.size),
-          storageDriver: this.storage.driver,
-          bucket: stored.bucket,
-          objectKey: stored.objectKey,
-          checksum,
-          visibility: FileVisibility.PRIVATE,
-          ...(description !== undefined ? { description } : {}),
-          ...(metadataDto.metadata !== undefined
-            ? { metadata: metadataDto.metadata as Prisma.InputJsonValue }
-            : {}),
-          ...(uploadedById ? { uploadedById } : {}),
-        },
-      });
+      return await this.prisma.$transaction(async (tx) => {
+        const persisted = await tx.managedFile.create({
+          data: {
+            originalName,
+            displayName,
+            mimeType: file.mimetype,
+            extension,
+            size: BigInt(file.size),
+            storageDriver: this.storage.driver,
+            bucket: stored.bucket,
+            objectKey: stored.objectKey,
+            checksum,
+            visibility: FileVisibility.PRIVATE,
+            ...(description !== undefined ? { description } : {}),
+            ...(metadataDto.metadata !== undefined
+              ? { metadata: metadataDto.metadata as Prisma.InputJsonValue }
+              : {}),
+            ...(uploadedById ? { uploadedById } : {}),
+          },
+        });
+        const response = toFileResponse(persisted);
 
-      return toFileResponse(persisted);
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.CREATE,
+            resourceType: AUDIT_RESOURCE_TYPES.FILE,
+            resourceId: persisted.id,
+            actor,
+            requestMeta,
+            after: response,
+          },
+          tx,
+        );
+
+        return response;
+      });
     } catch (error) {
       await this.cleanupStoredObject({ ...stored, checksum });
       throw error;
     }
   }
 
-  async updateFile(id: string, dto: UpdateFileDto): Promise<FileResponseDto> {
+  async updateFile(
+    id: string,
+    dto: UpdateFileDto,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
+  ): Promise<FileResponseDto> {
     if (!hasUpdateFileFields(dto)) {
       throw new BadRequestException('At least one file field must be provided');
     }
@@ -156,12 +188,36 @@ export class FileService {
     };
 
     try {
-      const file = await this.prisma.managedFile.update({
-        where: { id, deletedAt: null },
-        data,
-      });
+      return await this.prisma.$transaction(async (tx) => {
+        const before = await tx.managedFile.findFirst({
+          where: { id, deletedAt: null },
+        });
 
-      return toFileResponse(file);
+        if (!before) {
+          throw new NotFoundException('File not found');
+        }
+
+        const file = await tx.managedFile.update({
+          where: { id, deletedAt: null },
+          data,
+        });
+        const response = toFileResponse(file);
+
+        await this.auditLogService.record(
+          {
+            action: AUDIT_ACTIONS.UPDATE,
+            resourceType: AUDIT_RESOURCE_TYPES.FILE,
+            resourceId: id,
+            actor,
+            requestMeta,
+            before: toFileResponse(before),
+            after: response,
+          },
+          tx,
+        );
+
+        return response;
+      });
     } catch (error) {
       if (isPrismaNotFound(error)) {
         throw new NotFoundException('File not found');
@@ -171,13 +227,30 @@ export class FileService {
     }
   }
 
-  async deleteFile(id: string): Promise<void> {
+  async deleteFile(
+    id: string,
+    actor?: AuditActor,
+    requestMeta?: AuditRequestMeta,
+  ): Promise<void> {
     const file = await this.findExistingFile(id);
 
     await this.storage.delete(toStoredObject(file));
-    await this.prisma.managedFile.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.managedFile.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+      await this.auditLogService.record(
+        {
+          action: AUDIT_ACTIONS.DELETE,
+          resourceType: AUDIT_RESOURCE_TYPES.FILE,
+          resourceId: id,
+          actor,
+          requestMeta,
+          before: toFileResponse(file),
+        },
+        tx,
+      );
     });
   }
 

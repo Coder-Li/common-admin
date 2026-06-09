@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
   StreamableFile,
   UploadedFile,
@@ -26,7 +27,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+import {
+  buildAuditActor,
+  getAuditRequestMeta,
+} from '../audit-log/audit-log-request-meta';
 import { Permissions } from '../auth/permissions.decorator';
 import { CurrentUser } from '../user/current-user.decorator';
 import type { JwtUserPayload } from '../user/user.types';
@@ -68,8 +73,15 @@ export class FileController {
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() body: UploadFileMetadataDto,
     @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<FileResponseDto> {
-    return this.fileService.createFile(file, body, user.sub);
+    return this.fileService.createFile(
+      file,
+      body,
+      user.sub,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiOkResponse({ description: 'File download stream' })
@@ -108,8 +120,15 @@ export class FileController {
   updateFile(
     @Param('id') id: string,
     @Body() body: UpdateFileDto,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
   ): Promise<FileResponseDto> {
-    return this.fileService.updateFile(id, body);
+    return this.fileService.updateFile(
+      id,
+      body,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 
   @ApiNoContentResponse({ description: 'File deleted' })
@@ -118,8 +137,16 @@ export class FileController {
   @Permissions('file.delete')
   @HttpCode(204)
   @Delete(':id')
-  deleteFile(@Param('id') id: string): Promise<void> {
-    return this.fileService.deleteFile(id);
+  deleteFile(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUserPayload,
+    @Req() request: Request,
+  ): Promise<void> {
+    return this.fileService.deleteFile(
+      id,
+      buildAuditActor(user),
+      getAuditRequestMeta(request),
+    );
   }
 }
 
