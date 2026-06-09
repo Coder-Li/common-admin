@@ -125,6 +125,12 @@ describe('Auth flow', () => {
       findMany: jest.fn(),
       update: jest.fn(),
     },
+    auditLog: {
+      count: jest.fn(),
+      create: jest.fn(),
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+    },
     $transaction: jest.fn(),
     $connect: jest.fn(),
     $disconnect: jest.fn(),
@@ -229,6 +235,7 @@ describe('Auth flow', () => {
       prisma.dictionaryType,
       prisma.dictionaryItem,
       prisma.managedFile,
+      prisma.auditLog,
     ].forEach((model) => {
       Object.values(model).forEach((mock) => {
         mock.mockReset();
@@ -760,6 +767,82 @@ describe('Auth flow', () => {
       .get('/api/users/me')
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(401);
+  });
+
+  it('audit log list rejects unauthenticated requests', async () => {
+    await request(httpServer).get('/api/audit-logs').expect(401);
+  });
+
+  it('audit log list rejects authenticated users without audit log read permission', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    const accessToken = await signIn(user);
+
+    await request(httpServer)
+      .get('/api/audit-logs')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(403);
+  });
+
+  it('audit log list allows users with audit log read permission', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['audit_log.read'],
+      isSuperAdmin: false,
+    });
+    const accessToken = await signIn(user);
+    prisma.auditLog.findMany.mockResolvedValue([
+      {
+        id: 'audit-log-1',
+        actorUserId: 'user-1',
+        actorEmail: 'admin@example.com',
+        actorName: 'Admin User',
+        action: 'user.create',
+        resourceType: 'user',
+        resourceId: 'target-user-1',
+        before: null,
+        after: null,
+        metadata: null,
+        ipAddress: '127.0.0.1',
+        userAgent: 'test-agent',
+        createdAt: new Date('2026-01-02T00:00:00.000Z'),
+      },
+    ]);
+    prisma.auditLog.count.mockResolvedValue(1);
+
+    await request(httpServer)
+      .get('/api/audit-logs')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(response.body).toMatchObject({
+          items: [
+            {
+              id: 'audit-log-1',
+              actorUserId: 'user-1',
+              actorEmail: 'admin@example.com',
+              actorName: 'Admin User',
+              action: 'user.create',
+              resourceType: 'user',
+              resourceId: 'target-user-1',
+              ipAddress: '127.0.0.1',
+              createdAt: '2026-01-02T00:00:00.000Z',
+            },
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+        });
+      });
   });
 
   it('users/me returns fresh email/username from database after token was signed', async () => {

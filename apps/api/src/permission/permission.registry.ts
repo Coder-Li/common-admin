@@ -185,4 +185,12 @@ export const PERMISSION_REGISTRY = [
     defaultRoles: [],
     sortOrder: 610,
   },
+  {
+    code: 'audit_log.read',
+    module: 'audit_log',
+    action: 'read',
+    name: 'View audit logs',
+    defaultRoles: [],
+    sortOrder: 700,
+  },
 ] as const satisfies readonly PermissionRegistryEntry[];
