@@ -7,11 +7,11 @@ import { canAll } from './permissions'
 export interface RouteResolution {
   path: string
   redirectTo: string | null
-  status: 'ok' | 'login' | 'forbidden' | 'not_found'
+  status: 'ok' | 'checking' | 'login' | 'forbidden' | 'not_found'
 }
 
 interface RouteAuthState {
-  isAuthenticated: boolean
+  status: 'checking' | 'authenticated' | 'anonymous'
   permissions: readonly string[]
 }
 
@@ -19,22 +19,23 @@ export function resolveRoute(
   path: string,
   auth: RouteAuthState,
 ): RouteResolution {
+  const isAuthenticated = auth.status === 'authenticated'
   const firstVisibleRoute = getFirstVisibleRoute(auth.permissions)
   const fallbackPath = firstVisibleRoute?.path ?? '/403'
 
   if (path === '/') {
     return {
       path,
-      redirectTo: auth.isAuthenticated ? fallbackPath : '/login',
-      status: auth.isAuthenticated ? 'ok' : 'login',
+      redirectTo: isAuthenticated ? fallbackPath : '/login',
+      status: isAuthenticated ? 'ok' : 'login',
     }
   }
 
   if (path === '/login') {
     return {
       path,
-      redirectTo: auth.isAuthenticated ? fallbackPath : null,
-      status: auth.isAuthenticated ? 'ok' : 'login',
+      redirectTo: isAuthenticated ? fallbackPath : null,
+      status: isAuthenticated ? 'ok' : 'login',
     }
   }
 
@@ -50,12 +51,16 @@ export function resolveRoute(
   if (!route) {
     return {
       path,
-      redirectTo: auth.isAuthenticated ? '/404' : '/login',
-      status: auth.isAuthenticated ? 'not_found' : 'login',
+      redirectTo: isAuthenticated ? '/404' : '/login',
+      status: isAuthenticated ? 'not_found' : 'login',
     }
   }
 
-  if (!auth.isAuthenticated) {
+  if (auth.status === 'checking') {
+    return { path, redirectTo: null, status: 'checking' }
+  }
+
+  if (!isAuthenticated) {
     return { path, redirectTo: '/login', status: 'login' }
   }
 

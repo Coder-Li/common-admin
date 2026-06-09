@@ -7,6 +7,7 @@ import { clearQueryCache } from '../../app/query-client'
 import { LanguageSwitcher } from '../../i18n/LanguageSwitcher'
 import { useI18n } from '../../i18n/useI18n'
 import { navigateTo } from '../../lib/navigation'
+import { getFirstVisibleRoute } from '../../routes/admin-routes'
 import { useAuthStore } from '../../stores/auth-store'
 import { ThemeSwitcher } from '../../theme/ThemeSwitcher'
 
@@ -25,7 +26,8 @@ export function LoginView() {
       const session = await api.login({ usernameOrEmail, password })
       clearQueryCache()
       setSession(session)
-      navigateTo('/dashboard')
+      const firstRoute = getFirstVisibleRoute(session.user.permissions)
+      navigateTo(firstRoute?.path ?? '/403')
       toast.success(t('auth.welcomeBack', { firstName: session.user.firstName }))
     } catch {
       toast.error(t('auth.invalidCredentials'))

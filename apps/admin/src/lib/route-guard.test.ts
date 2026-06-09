@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { resolveRoute } from './route-guard'
 
-const anonymous = { isAuthenticated: false, permissions: [] }
+const checking = { status: 'checking' as const, permissions: [] }
+const anonymous = { status: 'anonymous' as const, permissions: [] }
 const admin = {
-  isAuthenticated: true,
+  status: 'authenticated' as const,
   permissions: [
     'dashboard.view',
     'user.read',
@@ -26,10 +27,18 @@ describe('route guard', () => {
   it('keeps authenticated users away from the login page using the first visible route', () => {
     expect(
       resolveRoute('/login', {
-        isAuthenticated: true,
+        status: 'authenticated',
         permissions: ['user.read'],
       }).redirectTo,
     ).toBe('/users')
+  })
+
+  it('waits on protected routes while auth is checking', () => {
+    expect(resolveRoute('/users', checking)).toEqual({
+      path: '/users',
+      redirectTo: null,
+      status: 'checking',
+    })
   })
 
   it('protects backend pages from anonymous users', () => {
@@ -42,7 +51,7 @@ describe('route guard', () => {
   it('redirects authenticated users without route permission to forbidden', () => {
     expect(
       resolveRoute('/users', {
-        isAuthenticated: true,
+        status: 'authenticated',
         permissions: ['dashboard.view'],
       }),
     ).toMatchObject({
