@@ -153,6 +153,7 @@ describe('Auth flow', () => {
     invalidateUserPermissionContext: jest.fn(),
     invalidateAllPermissionContexts: jest.fn(),
   };
+  const allowedOrigin = 'http://localhost:5173';
 
   function persistedUser(overrides: Record<string, unknown> = {}) {
     const roles = (overrides.roles as Array<{
@@ -180,6 +181,7 @@ describe('Auth flow', () => {
 
     const loginResponse = await request(httpServer)
       .post('/api/auth/login')
+      .set('Origin', allowedOrigin)
       .send({ usernameOrEmail: user.email, password: 'Admin123!' })
       .expect(201);
 
@@ -348,6 +350,7 @@ describe('Auth flow', () => {
 
     const loginResponse = await request(httpServer)
       .post('/api/auth/login')
+      .set('Origin', allowedOrigin)
       .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
       .expect(201);
     const body = loginBody(loginResponse);
@@ -395,6 +398,7 @@ describe('Auth flow', () => {
 
     const loginResponse = await request(httpServer)
       .post('/api/auth/login')
+      .set('Origin', allowedOrigin)
       .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
       .expect(201);
 
@@ -417,11 +421,13 @@ describe('Auth flow', () => {
     prisma.user.findUnique.mockResolvedValue(user);
     const loginResponse = await request(httpServer)
       .post('/api/auth/login')
+      .set('Origin', allowedOrigin)
       .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
       .expect(201);
 
     const refreshResponse = await request(httpServer)
       .post('/api/auth/refresh')
+      .set('Origin', allowedOrigin)
       .set('Cookie', loginResponse.headers['set-cookie'])
       .expect(201);
 
@@ -448,16 +454,19 @@ describe('Auth flow', () => {
     prisma.user.findUnique.mockResolvedValue(user);
     const loginResponse = await request(httpServer)
       .post('/api/auth/login')
+      .set('Origin', allowedOrigin)
       .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
       .expect(201);
 
     await request(httpServer)
       .post('/api/auth/refresh')
+      .set('Origin', allowedOrigin)
       .set('Cookie', loginResponse.headers['set-cookie'])
       .expect(201);
 
     await request(httpServer)
       .post('/api/auth/refresh')
+      .set('Origin', allowedOrigin)
       .set('Cookie', loginResponse.headers['set-cookie'])
       .expect(401)
       .expect((response: Response) => {
@@ -480,11 +489,13 @@ describe('Auth flow', () => {
     prisma.user.findUnique.mockResolvedValue(user);
     const loginResponse = await request(httpServer)
       .post('/api/auth/login')
+      .set('Origin', allowedOrigin)
       .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
       .expect(201);
 
     const logoutResponse = await request(httpServer)
       .post('/api/auth/logout')
+      .set('Origin', allowedOrigin)
       .set('Cookie', loginResponse.headers['set-cookie'])
       .expect(201);
     const revokedSession = [...sessions.values()][0];
@@ -509,6 +520,7 @@ describe('Auth flow', () => {
 
     const response = await request(httpServer)
       .post('/api/auth/change-password')
+      .set('Origin', allowedOrigin)
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         currentPassword: 'Admin123!',
@@ -535,6 +547,7 @@ describe('Auth flow', () => {
 
     await request(httpServer)
       .post('/api/auth/change-password')
+      .set('Origin', allowedOrigin)
       .set('Authorization', `Bearer ${firstAccessToken}`)
       .send({
         currentPassword: 'Admin123!',
@@ -655,12 +668,14 @@ describe('Auth flow', () => {
     prisma.user.findUnique.mockResolvedValue(user);
     const loginResponse = await request(httpServer)
       .post('/api/auth/login')
+      .set('Origin', allowedOrigin)
       .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
       .expect(201);
     const accessToken = loginBody(loginResponse).accessToken;
 
     await request(httpServer)
       .post('/api/auth/logout')
+      .set('Origin', allowedOrigin)
       .set('Cookie', loginResponse.headers['set-cookie'])
       .expect(201);
 
@@ -807,6 +822,31 @@ describe('Auth flow', () => {
     expect(prisma.userSession.updateMany).not.toHaveBeenCalled();
   });
 
+  it('logout revokes the bearer session when refresh cookie is missing', async () => {
+    const user = persistedUser({
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    permissionContexts.set('user-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    const accessToken = await signIn(user);
+    const { sid } = decodeAccessToken(accessToken);
+
+    const logoutResponse = await request(httpServer)
+      .post('/api/auth/logout')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(201);
+    const session = sessions.get(sid);
+
+    expect(logoutResponse.headers['set-cookie'][0]).toContain(
+      'common_admin_refresh=;',
+    );
+    expect(session?.revokedAt).toBeInstanceOf(Date);
+    expect(session?.revokedReason).toBe('logout');
+  });
+
   it('logout with forged refresh cookie succeeds without revoking the session', async () => {
     const user = persistedUser({
       passwordHash: await bcrypt.hash('Admin123!', 4),
@@ -820,6 +860,7 @@ describe('Auth flow', () => {
     prisma.user.findUnique.mockResolvedValue(user);
     const loginResponse = await request(httpServer)
       .post('/api/auth/login')
+      .set('Origin', allowedOrigin)
       .send({ usernameOrEmail: 'admin@example.com', password: 'Admin123!' })
       .expect(201);
     const sessionId = [...sessions.keys()][0];
@@ -830,6 +871,7 @@ describe('Auth flow', () => {
 
     const logoutResponse = await request(httpServer)
       .post('/api/auth/logout')
+      .set('Origin', allowedOrigin)
       .set('Cookie', forgedCookie)
       .expect(201);
     const session = sessions.get(sessionId);

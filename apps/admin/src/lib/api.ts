@@ -248,8 +248,15 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
       if (!client.post) {
         throw new Error('HTTP post client is not configured')
       }
+      const accessToken = getAccessToken?.()
       return request(
-        () => client.post!<void>('/auth/logout', undefined, credentialedConfig),
+        () =>
+          client.post!<void>('/auth/logout', undefined, {
+            ...credentialedConfig,
+            ...(accessToken
+              ? { headers: { Authorization: `Bearer ${accessToken}` } }
+              : {}),
+          }),
         { retryOnUnauthorized: false, notifyUnauthorized: false },
       )
     },

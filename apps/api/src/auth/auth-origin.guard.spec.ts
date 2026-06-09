@@ -13,6 +13,16 @@ describe('AuthOriginGuard', () => {
       switchToHttp: () => ({
         getRequest: () => ({
           headers: origin === undefined ? {} : { origin },
+          cookies: {},
+        }),
+      }),
+    }) as unknown as ExecutionContext;
+
+  const createContextWithCookie = (origin?: string) =>
+    ({
+      switchToHttp: () => ({
+        getRequest: () => ({
+          headers: origin === undefined ? {} : { origin },
           cookies: { common_admin_refresh: 'session.secret' },
         }),
       }),
@@ -39,5 +49,11 @@ describe('AuthOriginGuard', () => {
 
   it('allows requests without origin headers', () => {
     expect(createGuard().canActivate(createContext())).toBe(true);
+  });
+
+  it('rejects requests without origin headers when refresh cookie is present', () => {
+    expect(() => createGuard().canActivate(createContextWithCookie())).toThrow(
+      new ForbiddenException('Origin is required for cookie auth endpoints'),
+    );
   });
 });

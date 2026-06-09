@@ -10,6 +10,7 @@ import {
   UseGuards,
   Inject,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -29,6 +30,7 @@ import type { JwtUserPayload } from '../user/user.types';
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly jwtService: JwtService,
     private readonly sessionCookieService: SessionCookieService,
     @Inject(AUTH_TOKEN_CONFIG)
     private readonly tokenConfig: AuthTokenConfig,
@@ -87,9 +89,19 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
+    const accessToken = this.readBearerToken(request);
     const refreshToken = this.readOptionalRefreshCookie(request);
 
     this.sessionCookieService.clearRefreshCookie(response);
+
+    if (accessToken) {
+      const sid = await this.readSessionIdFromAccessToken(accessToken);
+
+      if (sid) {
+        await this.authService.logoutBySessionId(sid);
+        return;
+      }
+    }
 
     if (!refreshToken) {
       return;
@@ -133,5 +145,38 @@ export class AuthController {
   private readOptionalRefreshCookie(request: Request): string | undefined {
     const cookies = request.cookies as Record<string, string> | undefined;
     return cookies?.[this.tokenConfig.refreshCookieName];
+  }
+
+  private readBearerToken(request: Request): string | undefined {
+    const authorization = request.headers.authorization;
+
+    if (typeof authorization !== 'string') {
+      return undefined;
+    }
+
+    const [scheme, token] = authorization.split(' ');
+
+    if (scheme?.toLowerCase() !== 'bearer' || !token) {
+      return undefined;
+    }
+
+    return token;
+  }
+
+  private async readSessionIdFromAccessToken(
+    accessToken: string,
+  ): Promise<string | undefined> {
+    try {
+      const payload = await this.jwtService.verifyAsync<JwtUserPayload>(
+        accessToken,
+        {
+          secret: this.tokenConfig.accessTokenSecret,
+        },
+      );
+
+      return payload.sid;
+    } catch {
+      return undefined;
+    }
   }
 }

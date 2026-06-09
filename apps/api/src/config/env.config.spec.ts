@@ -40,6 +40,16 @@ describe('validateEnv', () => {
     ).toThrow('AUTH_REFRESH_COOKIE_SECURE must be true');
   });
 
+  it('rejects wildcard allowed origins in production', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_ACCESS_TOKEN_SECRET: 'production-secret-change-me',
+        ALLOWED_ORIGINS: '*',
+      }),
+    ).toThrow('ALLOWED_ORIGINS cannot include wildcard');
+  });
+
   it('includes local file storage defaults', () => {
     expect(validateEnv({})).toMatchObject({
       FILE_STORAGE_DRIVER: 'local',

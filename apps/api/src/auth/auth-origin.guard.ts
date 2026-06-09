@@ -28,6 +28,12 @@ export class AuthOriginGuard implements CanActivate {
     const origin = request.headers.origin;
 
     if (!origin) {
+      if (Object.keys(request.cookies ?? {}).length > 0) {
+        throw new ForbiddenException(
+          'Origin is required for cookie auth endpoints',
+        );
+      }
+
       return true;
     }
 

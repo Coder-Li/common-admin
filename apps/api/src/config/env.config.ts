@@ -86,5 +86,14 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     );
   }
 
+  if (
+    env.NODE_ENV === 'production' &&
+    env.ALLOWED_ORIGINS.split(',')
+      .map((origin) => origin.trim())
+      .includes('*')
+  ) {
+    throw new Error('ALLOWED_ORIGINS cannot include wildcard in production');
+  }
+
   return env;
 }

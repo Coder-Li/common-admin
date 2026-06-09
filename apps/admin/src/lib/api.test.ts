@@ -51,9 +51,24 @@ describe('api client', () => {
     })
   })
 
-  it('logout posts with credentials config', async () => {
+  it('logout posts with credentials and bearer auth when token is available', async () => {
     const post = vi.fn().mockResolvedValue({ data: undefined })
-    const client = createApiClient({ post })
+    const client = createApiClient({
+      client: { post },
+      getAccessToken: () => 'access-token',
+    })
+
+    await expect(client.logout()).resolves.toBeUndefined()
+
+    expect(post).toHaveBeenCalledWith('/auth/logout', undefined, {
+      headers: { Authorization: 'Bearer access-token' },
+      withCredentials: true,
+    })
+  })
+
+  it('logout still posts with credentials when no bearer token is available', async () => {
+    const post = vi.fn().mockResolvedValue({ data: undefined })
+    const client = createApiClient({ client: { post } })
 
     await expect(client.logout()).resolves.toBeUndefined()
 
