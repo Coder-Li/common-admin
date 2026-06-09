@@ -43,6 +43,15 @@ export interface LoginCredentials {
   password: string
 }
 
+export interface ChangePasswordRequest {
+  currentPassword: string
+  newPassword: string
+}
+
+export interface ResetUserPasswordRequest {
+  password: string
+}
+
 export interface ListResponse<TItem> {
   items: TItem[]
   total: number
@@ -54,6 +63,7 @@ interface RequestConfig {
   headers?: Record<string, string>
   params?: object
   responseType?: 'blob'
+  withCredentials?: boolean
 }
 
 interface HttpClient {
@@ -82,12 +92,14 @@ interface HttpClient {
 interface ApiClientOptions {
   client?: HttpClient
   getAccessToken?: () => string | null
+  setSession?: (session: AuthSession) => void
   onUnauthorized?: () => void
 }
 
 interface ResolvedApiClientOptions {
   client: HttpClient
   getAccessToken?: () => string | null
+  setSession?: (session: AuthSession) => void
   onUnauthorized?: () => void
 }
 
@@ -115,11 +127,13 @@ function resolveOptions(options?: ApiClientOptions | HttpClient): ResolvedApiCli
   if (
     'client' in options ||
     'getAccessToken' in options ||
+    'setSession' in options ||
     'onUnauthorized' in options
   ) {
     return {
       client: options.client ?? http,
       getAccessToken: options.getAccessToken,
+      setSession: options.setSession,
       onUnauthorized: options.onUnauthorized,
     }
   }
@@ -128,15 +142,55 @@ function resolveOptions(options?: ApiClientOptions | HttpClient): ResolvedApiCli
 }
 
 export function createApiClient(options?: ApiClientOptions | HttpClient) {
-  const { client, getAccessToken, onUnauthorized } = resolveOptions(options)
+  const { client, getAccessToken, setSession, onUnauthorized } =
+    resolveOptions(options)
+  const credentialedConfig: RequestConfig = { withCredentials: true }
+  let refreshPromise: Promise<AuthSession> | null = null
 
-  async function request<T>(operation: () => Promise<{ data: T }>): Promise<T> {
+  async function refreshSession(): Promise<AuthSession> {
+    if (!client.post) {
+      throw new Error('HTTP post client is not configured')
+    }
+
+    if (!refreshPromise) {
+      refreshPromise = client
+        .post<AuthSession>('/auth/refresh', undefined, credentialedConfig)
+        .then((response) => {
+          setSession?.(response.data)
+          return response.data
+        })
+        .finally(() => {
+          refreshPromise = null
+        })
+    }
+
+    return refreshPromise
+  }
+
+  async function request<T>(
+    operation: () => Promise<{ data: T }>,
+    options: { retryOnUnauthorized?: boolean } = {
+      retryOnUnauthorized: true,
+    },
+  ): Promise<T> {
     try {
       const response = await operation()
       return response.data
     } catch (error) {
       if (isUnauthorizedError(error)) {
-        onUnauthorized?.()
+        if (options.retryOnUnauthorized === false) {
+          onUnauthorized?.()
+          throw error
+        }
+
+        try {
+          await refreshSession()
+          const response = await operation()
+          return response.data
+        } catch (refreshError) {
+          onUnauthorized?.()
+          throw refreshError
+        }
       }
       throw error
     }
@@ -161,7 +215,43 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
       if (!client.post) {
         throw new Error('HTTP post client is not configured')
       }
-      return request(() => client.post!<AuthSession>('/auth/login', credentials))
+      return request(
+        () =>
+          client.post!<AuthSession>(
+            '/auth/login',
+            credentials,
+            credentialedConfig,
+          ),
+        { retryOnUnauthorized: false },
+      )
+    },
+
+    async refresh(): Promise<AuthSession> {
+      return request(() => refreshSession().then((data) => ({ data })), {
+        retryOnUnauthorized: false,
+      })
+    },
+
+    async logout(): Promise<void> {
+      if (!client.post) {
+        throw new Error('HTTP post client is not configured')
+      }
+      return request(
+        () => client.post!<void>('/auth/logout', undefined, credentialedConfig),
+        { retryOnUnauthorized: false },
+      )
+    },
+
+    async changePassword(payload: ChangePasswordRequest): Promise<void> {
+      if (!client.post) {
+        throw new Error('HTTP post client is not configured')
+      }
+      return request(() =>
+        client.post!<void>('/auth/change-password', payload, {
+          ...authenticatedConfig(),
+          ...credentialedConfig,
+        }),
+      )
     },
 
     async me(accessToken = getAccessToken?.()): Promise<UserProfile> {
@@ -231,6 +321,22 @@ export function createApiClient(options?: ApiClientOptions | HttpClient) {
           client.put!<UserRecord>(
             `/users/${id}/roles`,
             { roleCodes },
+            authenticatedConfig(),
+          ),
+        )
+      },
+
+      async resetPassword(
+        id: string,
+        payload: ResetUserPasswordRequest,
+      ): Promise<void> {
+        if (!client.post) {
+          throw new Error('HTTP post client is not configured')
+        }
+        return request(() =>
+          client.post!<void>(
+            `/users/${id}/reset-password`,
+            payload,
             authenticatedConfig(),
           ),
         )

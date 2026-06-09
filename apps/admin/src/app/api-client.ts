@@ -5,8 +5,9 @@ import { clearQueryCache } from './query-client'
 
 export const api = createApiClient({
   getAccessToken: () => useAuthStore.getState().accessToken,
+  setSession: (session) => useAuthStore.getState().setSession(session),
   onUnauthorized: () => {
-    useAuthStore.getState().reset()
+    useAuthStore.getState().setAnonymous()
     clearQueryCache()
     navigateTo('/login', 'replace')
   },

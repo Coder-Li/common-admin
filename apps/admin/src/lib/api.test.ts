@@ -2,31 +2,33 @@ import { describe, expect, it, vi } from 'vitest'
 import { createApiClient } from './api'
 
 describe('api client', () => {
-  it('posts login credentials to auth endpoint', async () => {
+  const session = {
+    accessToken: 'access-token',
+    user: {
+      id: 'user-1',
+      email: 'admin@example.com',
+      username: 'admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      roles: [{ code: 'admin', name: 'Admin' }],
+      permissions: ['user.read'],
+    },
+  }
+
+  it('login posts with credentials config', async () => {
     const post = vi.fn().mockResolvedValue({
-      data: {
-        accessToken: 'access-token',
-        user: {
-          id: 'user-1',
-          email: 'admin@example.com',
-          username: 'admin',
-          firstName: 'Admin',
-          lastName: 'User',
-          roles: [{ code: 'admin', name: 'Admin' }],
-          permissions: ['user.read'],
-        },
-      },
+      data: session,
     })
     const client = createApiClient({ post })
-
-    const response = await client.login({
+    const credentials = {
       usernameOrEmail: 'admin@example.com',
       password: 'Admin123!',
-    })
+    }
 
-    expect(post).toHaveBeenCalledWith('/auth/login', {
-      usernameOrEmail: 'admin@example.com',
-      password: 'Admin123!',
+    const response = await client.login(credentials)
+
+    expect(post).toHaveBeenCalledWith('/auth/login', credentials, {
+      withCredentials: true,
     })
     expect(post).not.toHaveBeenCalledWith(
       '/auth/login',
@@ -36,6 +38,28 @@ describe('api client', () => {
       }),
     )
     expect(response.accessToken).toBe('access-token')
+  })
+
+  it('refresh posts with credentials config', async () => {
+    const post = vi.fn().mockResolvedValue({ data: session })
+    const client = createApiClient({ post })
+
+    await expect(client.refresh()).resolves.toEqual(session)
+
+    expect(post).toHaveBeenCalledWith('/auth/refresh', undefined, {
+      withCredentials: true,
+    })
+  })
+
+  it('logout posts with credentials config', async () => {
+    const post = vi.fn().mockResolvedValue({ data: undefined })
+    const client = createApiClient({ post })
+
+    await expect(client.logout()).resolves.toBeUndefined()
+
+    expect(post).toHaveBeenCalledWith('/auth/logout', undefined, {
+      withCredentials: true,
+    })
   })
 
   it('uses bearer token for current user requests', async () => {
@@ -63,19 +87,106 @@ describe('api client', () => {
     expect(response.email).toBe('admin@example.com')
   })
 
-  it('calls onUnauthorized when a request returns 401', async () => {
+  it('401 from normal request triggers refresh then retries original request once', async () => {
     const error = { response: { status: 401 } }
-    const get = vi.fn().mockRejectedValue(error)
+    const get = vi
+      .fn()
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce({ data: session.user })
+    const post = vi.fn().mockResolvedValue({ data: session })
+    const setSession = vi.fn()
     const onUnauthorized = vi.fn()
     const client = createApiClient({
-      client: { get },
+      client: { get, post },
+      getAccessToken: () => 'expired-token',
+      setSession,
+      onUnauthorized,
+    })
+
+    await expect(client.me()).resolves.toEqual(session.user)
+
+    expect(post).toHaveBeenCalledOnce()
+    expect(post).toHaveBeenCalledWith('/auth/refresh', undefined, {
+      withCredentials: true,
+    })
+    expect(setSession).toHaveBeenCalledWith(session)
+    expect(get).toHaveBeenCalledTimes(2)
+    expect(onUnauthorized).not.toHaveBeenCalled()
+  })
+
+  it('concurrent 401 responses share one refresh request', async () => {
+    const error = { response: { status: 401 } }
+    const get = vi
+      .fn()
+      .mockRejectedValueOnce(error)
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce({ data: session.user })
+      .mockResolvedValueOnce({ data: session.user })
+    const post = vi.fn().mockResolvedValue({ data: session })
+    const setSession = vi.fn()
+    const client = createApiClient({
+      client: { get, post },
+      getAccessToken: () => 'expired-token',
+      setSession,
+    })
+
+    await expect(Promise.all([client.me(), client.me()])).resolves.toEqual([
+      session.user,
+      session.user,
+    ])
+
+    expect(post).toHaveBeenCalledOnce()
+    expect(post).toHaveBeenCalledWith('/auth/refresh', undefined, {
+      withCredentials: true,
+    })
+    expect(setSession).toHaveBeenCalledOnce()
+    expect(get).toHaveBeenCalledTimes(4)
+  })
+
+  it('refresh failure calls onUnauthorized', async () => {
+    const unauthorizedError = { response: { status: 401 } }
+    const refreshError = new Error('refresh failed')
+    const get = vi.fn().mockRejectedValue(unauthorizedError)
+    const post = vi.fn().mockRejectedValue(refreshError)
+    const onUnauthorized = vi.fn()
+    const client = createApiClient({
+      client: { get, post },
       getAccessToken: () => 'expired-token',
       onUnauthorized,
     })
 
-    await expect(client.me()).rejects.toBe(error)
+    await expect(client.me()).rejects.toBe(refreshError)
 
+    expect(post).toHaveBeenCalledOnce()
     expect(onUnauthorized).toHaveBeenCalledOnce()
+  })
+
+  it('login/refresh/logout failures are not retried through refresh', async () => {
+    const error = { response: { status: 401 } }
+    const post = vi.fn().mockRejectedValue(error)
+    const onUnauthorized = vi.fn()
+    const client = createApiClient({ client: { post }, onUnauthorized })
+
+    await expect(
+      client.login({ usernameOrEmail: 'admin@example.com', password: 'bad' }),
+    ).rejects.toBe(error)
+    await expect(client.refresh()).rejects.toBe(error)
+    await expect(client.logout()).rejects.toBe(error)
+
+    expect(post).toHaveBeenCalledTimes(3)
+    expect(post).toHaveBeenNthCalledWith(
+      1,
+      '/auth/login',
+      { usernameOrEmail: 'admin@example.com', password: 'bad' },
+      { withCredentials: true },
+    )
+    expect(post).toHaveBeenNthCalledWith(2, '/auth/refresh', undefined, {
+      withCredentials: true,
+    })
+    expect(post).toHaveBeenNthCalledWith(3, '/auth/logout', undefined, {
+      withCredentials: true,
+    })
+    expect(onUnauthorized).toHaveBeenCalledTimes(3)
   })
 
   it('lists users with query params and bearer auth', async () => {
@@ -207,6 +318,46 @@ describe('api client', () => {
     expect(put).toHaveBeenCalledWith(
       '/users/user-1/roles',
       { roleCodes: ['admin'] },
+      {
+        headers: { Authorization: 'Bearer access-token' },
+      },
+    )
+  })
+
+  it('changePassword posts with bearer auth and credentials', async () => {
+    const post = vi.fn().mockResolvedValue({ data: undefined })
+    const client = createApiClient({
+      client: { post },
+      getAccessToken: () => 'access-token',
+    })
+    const payload = {
+      currentPassword: 'OldPassword123!',
+      newPassword: 'NewPassword123!',
+    }
+
+    await expect(client.changePassword(payload)).resolves.toBeUndefined()
+
+    expect(post).toHaveBeenCalledWith('/auth/change-password', payload, {
+      headers: { Authorization: 'Bearer access-token' },
+      withCredentials: true,
+    })
+  })
+
+  it('admin reset password posts to /users/:id/reset-password', async () => {
+    const post = vi.fn().mockResolvedValue({ data: undefined })
+    const client = createApiClient({
+      client: { post },
+      getAccessToken: () => 'access-token',
+    })
+    const payload = { password: 'NewPassword123!' }
+
+    await expect(
+      client.users.resetPassword('user-1', payload),
+    ).resolves.toBeUndefined()
+
+    expect(post).toHaveBeenCalledWith(
+      '/users/user-1/reset-password',
+      payload,
       {
         headers: { Authorization: 'Bearer access-token' },
       },
@@ -398,12 +549,13 @@ describe('api client', () => {
     })
   })
 
-  it('calls onUnauthorized when a dictionary request returns 401', async () => {
+  it('calls onUnauthorized when a dictionary request refresh fails', async () => {
     const error = { response: { status: 401 } }
     const get = vi.fn().mockRejectedValue(error)
+    const post = vi.fn().mockRejectedValue(error)
     const onUnauthorized = vi.fn()
     const client = createApiClient({
-      client: { get },
+      client: { get, post },
       getAccessToken: () => 'expired-token',
       onUnauthorized,
     })
