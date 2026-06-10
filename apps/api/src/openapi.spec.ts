@@ -2,6 +2,7 @@ import { SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { AppModule } from './app.module';
 import { assertPrefixFreeOpenApiPaths, createOpenApiDocument } from './openapi';
+import { PrismaService } from './prisma/prisma.service';
 
 const expectedOperationIds = [
   'checkHealth',
@@ -120,7 +121,13 @@ describe('OpenAPI operation ids', () => {
   it('defines each generated endpoint operation id exactly once', async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue({
+        $connect: jest.fn(),
+        $disconnect: jest.fn(),
+      })
+      .compile();
     const app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
 
