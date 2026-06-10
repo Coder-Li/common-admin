@@ -16,7 +16,7 @@ Current RBAC integration points:
 - Backend decorator:
   `apps/api/src/auth/permissions.decorator.ts`
 - Frontend route/menu metadata:
-  `apps/admin/src/routes/admin-routes.tsx` or the project-local equivalent
+  `apps/admin/src/routes/admin-route-registry.tsx` or the project-local equivalent
 - Frontend permission helpers:
   `apps/admin/src/lib/permissions.ts`
 - Frontend role management:

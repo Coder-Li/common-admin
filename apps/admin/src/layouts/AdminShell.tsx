@@ -1,17 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
-import { Lock, LogOut } from 'lucide-react'
+import { Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router'
+import { Circle, Lock, LogOut } from 'lucide-react'
 import { api } from '../app/api-client'
 import { clearQueryCache } from '../app/query-client'
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher'
 import { useI18n } from '../i18n/useI18n'
-import { navigateTo } from '../lib/navigation'
-import { findAdminRoute, getVisibleAdminRoutes } from '../routes/admin-routes'
+import {
+  findAdminRouteByPath,
+  getBreadcrumbsForRoute,
+  getVisibleAdminMenuGroups,
+} from '../routes/admin-route-registry'
 import { useAuthStore } from '../stores/auth-store'
 import { ThemeSwitcher } from '../theme/ThemeSwitcher'
-
-interface AdminShellProps {
-  currentPath: string
-}
 
 function navItemClass(isActive: boolean) {
   return [
@@ -22,15 +22,16 @@ function navItemClass(isActive: boolean) {
   ].join(' ')
 }
 
-export function AdminShell({ currentPath }: AdminShellProps) {
+export function AdminShell() {
   const { t } = useI18n()
+  const navigate = useNavigate()
+  const location = useLocation()
   const accessToken = useAuthStore((state) => state.accessToken)
-  const user = useAuthStore((state) => state.user)
   const permissions = useAuthStore((state) => state.permissions)
   const setUser = useAuthStore((state) => state.setUser)
   const reset = useAuthStore((state) => state.reset)
 
-  const meQuery = useQuery({
+  useQuery({
     queryKey: ['me', accessToken],
     enabled: Boolean(accessToken),
     queryFn: async () => {
@@ -46,31 +47,39 @@ export function AdminShell({ currentPath }: AdminShellProps) {
     } finally {
       reset()
       clearQueryCache()
-      navigateTo('/login')
+      void navigate({ to: '/login' })
     }
   }
 
-  const visibleRoutes = getVisibleAdminRoutes(permissions)
-  const currentRoute = findAdminRoute(currentPath) ?? visibleRoutes[0]
-  const pageTitle = currentRoute ? t(currentRoute.labelKey) : ''
-  const PageComponent = currentRoute?.component
+  const visibleGroups = getVisibleAdminMenuGroups(permissions)
+  const currentRoute = findAdminRouteByPath(location.pathname)
+  const breadcrumbs = currentRoute
+    ? getBreadcrumbsForRoute(currentRoute.id).map((breadcrumb) =>
+        t(breadcrumb.labelKey),
+      )
+    : []
+  const pageTitle = currentRoute
+    ? t(currentRoute.titleKey ?? currentRoute.labelKey)
+    : ''
 
-  function renderNavItem(route: (typeof visibleRoutes)[number], mobile = false) {
-    const Icon = route.icon
+  function renderNavItem(
+    route: (typeof visibleGroups)[number]['children'][number],
+    mobile = false,
+  ) {
+    const Icon = route.icon ?? Circle
     const testPrefix = mobile ? 'mobile-nav' : 'nav'
-    const testId = `${testPrefix}-${route.path.replace('/', '')}`
+    const isActive = location.pathname === route.path
 
     return (
-      <button
-        className={navItemClass(currentPath === route.path)}
-        data-testid={testId}
+      <Link
+        className={navItemClass(isActive)}
+        data-testid={`${testPrefix}-${route.id}`}
         key={`${testPrefix}-${route.path}`}
-        onClick={() => navigateTo(route.path)}
-        type="button"
+        to={route.path}
       >
         <Icon size={16} />
         {t(route.labelKey)}
-      </button>
+      </Link>
     )
   }
 
@@ -89,21 +98,32 @@ export function AdminShell({ currentPath }: AdminShellProps) {
           </div>
         </div>
 
-        <nav className="mt-8 grid gap-1 text-sm">
-          {visibleRoutes.map((route) => renderNavItem(route))}
+        <nav className="mt-8 grid gap-5 text-sm">
+          {visibleGroups.map((group) => (
+            <div data-testid={`nav-group-${group.id}`} key={group.id}>
+              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">
+                {t(group.labelKey)}
+              </p>
+              <div className="grid gap-1">
+                {group.children.map((route) => renderNavItem(route))}
+              </div>
+            </div>
+          ))}
         </nav>
       </aside>
 
       <section className="md:pl-64">
         <nav className="flex gap-2 overflow-x-auto border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3 md:hidden">
-          {visibleRoutes.map((route) => renderNavItem(route, true))}
+          {visibleGroups.map((group) =>
+            group.children.map((route) => renderNavItem(route, true)),
+          )}
         </nav>
 
         <header className="flex h-16 items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold">{pageTitle}</h1>
             <p className="truncate text-xs text-[var(--color-text-muted)]">
-              {t('page.apiActive')}
+              {breadcrumbs.length > 0 ? breadcrumbs.join(' / ') : t('page.apiActive')}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -125,9 +145,7 @@ export function AdminShell({ currentPath }: AdminShellProps) {
           </div>
         </header>
 
-        {PageComponent ? (
-          <PageComponent isLoading={meQuery.isLoading} user={user} />
-        ) : null}
+        <Outlet />
       </section>
     </main>
   )

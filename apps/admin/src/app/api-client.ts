@@ -1,5 +1,4 @@
 import { createApiClient } from '../lib/api'
-import { navigateTo } from '../lib/navigation'
 import { useAuthStore } from '../stores/auth-store'
 import { clearQueryCache } from './query-client'
 
@@ -9,6 +8,5 @@ export const api = createApiClient({
   onUnauthorized: () => {
     useAuthStore.getState().setAnonymous()
     clearQueryCache()
-    navigateTo('/login', 'replace')
   },
 })

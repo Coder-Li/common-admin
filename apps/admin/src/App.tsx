@@ -1,8 +1,8 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
-import { AppContent } from './AppContent'
 import { queryClient } from './app/query-client'
 import { I18nProvider } from './i18n/I18nProvider'
+import { AdminRouterProvider } from './routes/router'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { useTheme } from './theme/useTheme'
 
@@ -17,7 +17,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <I18nProvider>
-          <AppContent />
+          <AdminRouterProvider />
           <ThemedToaster />
         </I18nProvider>
       </ThemeProvider>

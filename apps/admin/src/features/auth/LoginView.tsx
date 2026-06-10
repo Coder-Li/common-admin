@@ -1,18 +1,19 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { LogIn, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../../app/api-client'
 import { clearQueryCache } from '../../app/query-client'
 import { LanguageSwitcher } from '../../i18n/LanguageSwitcher'
 import { useI18n } from '../../i18n/useI18n'
-import { navigateTo } from '../../lib/navigation'
-import { getFirstVisibleRoute } from '../../routes/admin-routes'
+import { getFirstAccessibleRoute } from '../../routes/admin-route-registry'
 import { useAuthStore } from '../../stores/auth-store'
 import { ThemeSwitcher } from '../../theme/ThemeSwitcher'
 
 export function LoginView() {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const [usernameOrEmail, setUsernameOrEmail] = useState('admin@example.com')
   const [password, setPassword] = useState('Admin123!')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -22,15 +23,23 @@ export function LoginView() {
     event.preventDefault()
     setIsSubmitting(true)
 
+    let session
     try {
-      const session = await api.login({ usernameOrEmail, password })
-      clearQueryCache()
-      setSession(session)
-      const firstRoute = getFirstVisibleRoute(session.user.permissions)
-      navigateTo(firstRoute?.path ?? '/403')
-      toast.success(t('auth.welcomeBack', { firstName: session.user.firstName }))
+      session = await api.login({ usernameOrEmail, password })
     } catch {
       toast.error(t('auth.invalidCredentials'))
+      setIsSubmitting(false)
+      return
+    }
+
+    try {
+      clearQueryCache()
+      setSession(session)
+      const firstRoute = getFirstAccessibleRoute(session.user.permissions)
+      await navigate({ to: firstRoute?.path ?? '/403' })
+      toast.success(t('auth.welcomeBack', { firstName: session.user.firstName }))
+    } catch {
+      return
     } finally {
       setIsSubmitting(false)
     }

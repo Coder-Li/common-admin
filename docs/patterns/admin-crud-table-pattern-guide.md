@@ -33,7 +33,7 @@ Backend:
 
 Frontend:
 
-- `apps/admin/src/routes/admin-routes.tsx`
+- `apps/admin/src/routes/admin-route-registry.tsx`
 - `apps/admin/src/lib/permissions.ts`
 - `apps/admin/src/lib/crud/list-query.ts`
 - `apps/admin/src/lib/crud/useServerTableQuery.ts`
@@ -201,7 +201,7 @@ For each admin CRUD resource, add permission registry entries and use the same
 codes across:
 
 - backend controller decorators with `@Permissions('<resource>.<action>')`
-- `apps/admin/src/routes/admin-routes.tsx` route/menu metadata
+- `apps/admin/src/routes/admin-route-registry.tsx` route/menu metadata
 - frontend page action gates through `apps/admin/src/lib/permissions.ts`
 - optional feature-local permission constants
 
@@ -336,14 +336,13 @@ Pages should:
 
 ### Route And Menu Wiring
 
-The current app uses custom path state through `AppContent`, `resolveRoute`,
-`AdminShell`, and permission-aware route metadata in
-`apps/admin/src/routes/admin-routes.tsx`.
+The current app uses TanStack Router with permission-aware route/menu metadata in
+`apps/admin/src/routes/admin-route-registry.tsx`.
 
 Rules:
 
-- Do not introduce a TanStack Router route refactor for standard CRUD pages.
-- Add the page to `apps/admin/src/routes/admin-routes.tsx` with
+- Do not introduce a separate routing abstraction for standard CRUD pages.
+- Add the page to `apps/admin/src/routes/admin-route-registry.tsx` with
   `requiredPermissions`.
 - Let `AdminShell` render navigation from the route metadata instead of adding
   hard-coded role or permission branches.
@@ -455,7 +454,7 @@ Backend reference files:
 - apps/api/src/auth/auth-flow.spec.ts
 
 Frontend reference files:
-- apps/admin/src/routes/admin-routes.tsx
+- apps/admin/src/routes/admin-route-registry.tsx
 - apps/admin/src/lib/permissions.ts
 - apps/admin/src/lib/crud/list-query.ts
 - apps/admin/src/lib/crud/useServerTableQuery.ts

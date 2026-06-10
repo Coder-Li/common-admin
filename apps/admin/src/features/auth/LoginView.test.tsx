@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createMemoryHistory } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import {
   cleanup,
@@ -11,10 +12,11 @@ import {
 import '@testing-library/jest-dom/vitest'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AppContent } from '../../AppContent'
+import { toast } from 'sonner'
+import { AdminRouterProvider } from '../../routes/router'
+import { createAdminRouter } from '../../routes/router-factory'
 import { I18nProvider } from '../../i18n/I18nProvider'
 import { LOCALE_STORAGE_KEY } from '../../i18n/locale-storage'
-import { navigateTo } from '../../lib/navigation'
 import { useAuthStore } from '../../stores/auth-store'
 import type { AuthSession } from '../../types/auth'
 import { ThemeProvider } from '../../theme/ThemeProvider'
@@ -33,8 +35,11 @@ vi.mock('../../app/query-client', () => ({
   clearQueryCache: vi.fn(),
 }))
 
-vi.mock('../../lib/navigation', () => ({
-  navigateTo: vi.fn(),
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
 }))
 
 function mockBrowserLanguages(languages: readonly string[]) {
@@ -56,12 +61,19 @@ function renderLoginView() {
   )
 }
 
-function renderAppContent() {
-  return render(
-    <TestProviders>
-      <AppContent />
-    </TestProviders>,
-  )
+function renderLoginRouter() {
+  const router = createAdminRouter({
+    history: createMemoryHistory({ initialEntries: ['/login'] }),
+  })
+
+  return {
+    router,
+    ...render(
+      <TestProviders>
+        <AdminRouterProvider router={router} />
+      </TestProviders>,
+    ),
+  }
 }
 
 function TestProviders({ children }: { children: ReactNode }) {
@@ -116,13 +128,14 @@ describe('LoginView i18n', () => {
   })
 
   beforeEach(() => {
+    window.scrollTo = vi.fn()
     window.localStorage.clear()
     window.history.replaceState({}, '', '/login')
     mockBrowserLanguages(['fr-FR', 'en-US'])
     vi.mocked(api.login).mockReset()
     vi.mocked(api.me).mockReset()
-    vi.mocked(api.refresh).mockReset()
-    vi.mocked(navigateTo).mockReset()
+    vi.mocked(toast.error).mockReset()
+    vi.mocked(toast.success).mockReset()
     useAuthStore.getState().reset()
   })
 
@@ -160,73 +173,31 @@ describe('LoginView i18n', () => {
   it('redirects to the first visible route after login', async () => {
     const user = userEvent.setup()
     vi.mocked(api.login).mockResolvedValue(usersOnlySession)
-    renderLoginView()
+    vi.mocked(api.me).mockResolvedValue(usersOnlySession.user)
+    const { router } = renderLoginRouter()
 
-    await user.click(screen.getByRole('button', { name: /sign in/i }))
+    await user.click(await screen.findByRole('button', { name: /sign in/i }))
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Users' }),
+    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/users')
+    })
+  })
+
+  it('does not report invalid credentials when navigation fails after login succeeds', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.login).mockResolvedValue(usersOnlySession)
+    vi.mocked(api.me).mockResolvedValue(usersOnlySession.user)
+    const { router } = renderLoginRouter()
+    vi.spyOn(router, 'navigate').mockRejectedValueOnce(new Error('navigation failed'))
+
+    await user.click(await screen.findByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
-      expect(navigateTo).toHaveBeenCalledWith('/users')
+      expect(api.login).toHaveBeenCalledOnce()
     })
-  })
-})
-
-describe('AppContent startup refresh', () => {
-  afterEach(() => {
-    cleanup()
-    document.documentElement.removeAttribute('data-theme')
-    document.documentElement.style.colorScheme = ''
-  })
-
-  beforeEach(() => {
-    window.localStorage.clear()
-    window.history.replaceState({}, '', '/dashboard')
-    mockBrowserLanguages(['fr-FR', 'en-US'])
-    vi.mocked(api.login).mockReset()
-    vi.mocked(api.me).mockReset()
-    vi.mocked(api.refresh).mockReset()
-    vi.mocked(navigateTo).mockReset()
-    useAuthStore.setState({
-      status: 'checking',
-      accessToken: null,
-      user: null,
-      roles: [],
-      permissions: [],
-      isAuthenticated: false,
-    })
-  })
-
-  it('calls refresh on startup while auth is checking', async () => {
-    vi.mocked(api.refresh).mockResolvedValue(session)
-    vi.mocked(api.me).mockResolvedValue(session.user)
-
-    renderAppContent()
-
-    await waitFor(() => {
-      expect(api.refresh).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  it('stores a refreshed session and renders an authenticated route', async () => {
-    vi.mocked(api.refresh).mockResolvedValue(session)
-    vi.mocked(api.me).mockResolvedValue(session.user)
-
-    renderAppContent()
-
-    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
-    expect(useAuthStore.getState().status).toBe('authenticated')
-    expect(useAuthStore.getState().user?.email).toBe('admin@example.com')
-  })
-
-  it('marks anonymous and redirects to login when refresh fails', async () => {
-    vi.mocked(api.refresh).mockRejectedValue(new Error('expired'))
-
-    renderAppContent()
-
-    await waitFor(() => {
-      expect(useAuthStore.getState().status).toBe('anonymous')
-    })
-    await waitFor(() => {
-      expect(navigateTo).toHaveBeenCalledWith('/login', 'replace')
-    })
+    expect(toast.error).not.toHaveBeenCalledWith('Invalid credentials')
   })
 })
