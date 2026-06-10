@@ -20,7 +20,7 @@
 - Current user role enum: `apps/api/src/user/role.enum.ts`
 - Current Prisma schema: `apps/api/prisma/schema.prisma`
 - Current seed: `apps/api/prisma/seed.ts`
-- Current frontend route guard: `apps/admin/src/lib/route-guard.ts`
+- Current frontend route guard: `apps/admin/src/routes/router-factory.ts`
 - Current admin shell: `apps/admin/src/layouts/AdminShell.tsx`
 - Current auth store: `apps/admin/src/stores/auth-store.ts`
 
@@ -101,16 +101,16 @@
 - Modify `apps/admin/src/stores/auth-store.test.ts`: cover new session shape.
 - Create `apps/admin/src/lib/permissions.ts`: `can`, `canAll`, `canAny`, and permission constants helpers.
 - Create `apps/admin/src/lib/permissions.test.ts`: helper tests.
-- Create `apps/admin/src/routes/admin-routes.tsx`: route/menu metadata and route lookup helpers.
-- Create `apps/admin/src/routes/admin-routes.test.tsx`: route filtering and first visible route tests.
-- Modify `apps/admin/src/lib/route-guard.ts`: route resolution based on auth state and permission context.
-- Modify `apps/admin/src/lib/route-guard.test.ts`: `/403`, unauthenticated, and unauthorized tests.
+- Create `apps/admin/src/routes/admin-route-registry.tsx`: route/menu metadata and route lookup helpers.
+- Create `apps/admin/src/routes/admin-route-registry.test.tsx`: route filtering and first visible route tests.
+- Modify `apps/admin/src/routes/router-factory.ts`: route resolution based on auth state and permission context.
+- Modify `apps/admin/src/routes/router.test.tsx`: `/403`, unauthenticated, and unauthorized tests.
 - Create `apps/admin/src/pages/ForbiddenPage.tsx`: no-permission page.
 - Create `apps/admin/src/pages/NotFoundPage.tsx`: unknown-route page if keeping separate from current fallback.
 
 ### Frontend Feature Migration
 
-- Modify `apps/admin/src/AppContent.tsx`: pass permissions to route guard and render `/403`.
+- Modify `apps/admin/src/routes/router.tsx`: pass permissions to route guard and render `/403`.
 - Modify `apps/admin/src/layouts/AdminShell.tsx`: render navigation and pages from `adminRoutes`.
 - Modify `apps/admin/src/layouts/AdminShell.test.tsx`: permission-aware menu and page rendering tests.
 - Modify `apps/admin/src/app/api-client.ts` or `apps/admin/src/lib/api.ts`: update auth/user/role/permission API contracts.
@@ -1295,13 +1295,13 @@ git commit -m "feat(admin): store permission context"
 ### Task 11: Add Permission-Aware Routes And Guard
 
 **Files:**
-- Create: `apps/admin/src/routes/admin-routes.tsx`
-- Create: `apps/admin/src/routes/admin-routes.test.tsx`
-- Modify: `apps/admin/src/lib/route-guard.ts`
-- Modify: `apps/admin/src/lib/route-guard.test.ts`
+- Create: `apps/admin/src/routes/admin-route-registry.tsx`
+- Create: `apps/admin/src/routes/admin-route-registry.test.tsx`
+- Modify: `apps/admin/src/routes/router-factory.ts`
+- Modify: `apps/admin/src/routes/router.test.tsx`
 - Create: `apps/admin/src/pages/ForbiddenPage.tsx`
 - Create: `apps/admin/src/pages/NotFoundPage.tsx`
-- Modify: `apps/admin/src/AppContent.tsx`
+- Modify: `apps/admin/src/routes/router.tsx`
 
 - [x] **Step 1: Write failing route tests**
 
@@ -1318,14 +1318,14 @@ Tests:
 Run:
 
 ```bash
-pnpm --filter admin test -- admin-routes.test.tsx route-guard.test.ts
+pnpm --filter admin test -- admin-route-registry.test.tsx router.test.tsx
 ```
 
 Expected: FAIL because route metadata does not exist.
 
 - [x] **Step 3: Add route metadata**
 
-Create `apps/admin/src/routes/admin-routes.tsx` with route objects:
+Create `apps/admin/src/routes/admin-route-registry.tsx` with route objects:
 
 ```ts
 export const adminRoutes = [
@@ -1342,10 +1342,10 @@ Import lucide icons and components as needed. If `RolesPage` does not exist yet,
 
 - [x] **Step 4: Update route guard**
 
-Change `resolveRoute` signature to include permissions:
+Change `router guards` signature to include permissions:
 
 ```ts
-resolveRoute(path: string, auth: { isAuthenticated: boolean; permissions: string[] })
+router guards(path: string, auth: { isAuthenticated: boolean; permissions: string[] })
 ```
 
 Return route results:
@@ -1360,9 +1360,9 @@ Keep the existing simple behavior if the project does not want a status field, b
 
 Create simple pages using existing `PlaceholderPage` style.
 
-- [x] **Step 6: Update AppContent**
+- [x] **Step 6: Update AdminRouterProvider**
 
-Pass permissions from `useAuthStore` into `resolveRoute`. Render:
+Pass permissions from `useAuthStore` into `router guards`. Render:
 
 - `LoginView` for `/login`
 - `ForbiddenPage` for `/403`
@@ -1374,7 +1374,7 @@ Pass permissions from `useAuthStore` into `resolveRoute`. Render:
 Run:
 
 ```bash
-pnpm --filter admin test -- admin-routes.test.tsx route-guard.test.ts
+pnpm --filter admin test -- admin-route-registry.test.tsx router.test.tsx
 ```
 
 Expected: PASS.
@@ -1382,7 +1382,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit route foundation**
 
 ```bash
-git add apps/admin/src/routes apps/admin/src/lib/route-guard.ts apps/admin/src/lib/route-guard.test.ts apps/admin/src/pages/ForbiddenPage.tsx apps/admin/src/pages/NotFoundPage.tsx apps/admin/src/AppContent.tsx
+git add apps/admin/src/routes apps/admin/src/routes/router-factory.ts apps/admin/src/routes/router.test.tsx apps/admin/src/pages/ForbiddenPage.tsx apps/admin/src/pages/NotFoundPage.tsx apps/admin/src/routes/router.tsx
 git commit -m "feat(admin): add permission-aware routes"
 ```
 
@@ -1545,7 +1545,7 @@ git commit -m "feat(admin): add role api wrappers"
 - Create: `apps/admin/src/features/roles/RolePermissionPanel.tsx`
 - Create: `apps/admin/src/features/roles/RolesPage.tsx`
 - Create: `apps/admin/src/features/roles/RolesPage.test.tsx`
-- Modify: `apps/admin/src/routes/admin-routes.tsx`
+- Modify: `apps/admin/src/routes/admin-route-registry.tsx`
 - Modify: `apps/admin/src/i18n/messages.ts`
 
 - [x] **Step 1: Write failing page tests**
@@ -1598,7 +1598,7 @@ Hide actions through `can`/`canAll`.
 
 - [x] **Step 6: Wire route**
 
-Update `apps/admin/src/routes/admin-routes.tsx` to render `RolesPage` for `/roles`.
+Update `apps/admin/src/routes/admin-route-registry.tsx` to render `RolesPage` for `/roles`.
 
 - [x] **Step 7: Add i18n copy**
 
@@ -1609,7 +1609,7 @@ Add concise English and Chinese labels for role list, form fields, status, syste
 Run:
 
 ```bash
-pnpm --filter admin test -- RolesPage.test.tsx admin-routes.test.tsx AdminShell.test.tsx
+pnpm --filter admin test -- RolesPage.test.tsx admin-route-registry.test.tsx AdminShell.test.tsx
 ```
 
 Expected: PASS.
@@ -1617,7 +1617,7 @@ Expected: PASS.
 - [ ] **Step 9: Commit roles page**
 
 ```bash
-git add apps/admin/src/features/roles apps/admin/src/routes/admin-routes.tsx apps/admin/src/i18n/messages.ts
+git add apps/admin/src/features/roles apps/admin/src/routes/admin-route-registry.tsx apps/admin/src/i18n/messages.ts
 git commit -m "feat(admin): add role management page"
 ```
 

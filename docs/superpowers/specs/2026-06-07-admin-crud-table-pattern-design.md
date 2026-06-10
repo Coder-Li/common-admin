@@ -254,7 +254,7 @@ Responsibilities:
 
 The first implementation may keep table state local to the page. URL-synced list state is useful for shareable admin workflows, but it should be added after the basic users CRUD path is stable.
 
-The current app uses custom path state through `AppContent`, `resolveRoute`, and `AdminShell`, even though TanStack Router is installed. Do not introduce TanStack Router routing for this feature. Replace the existing `/users` placeholder branch in `AdminShell` with `UsersPage`.
+The current app uses TanStack Router through `AdminRouterProvider`, route guards, and `AdminShell`. Standard CRUD pages should add route/menu metadata to the shared registry rather than introducing a separate routing system. Replace or extend the existing `/users` page wiring with `UsersPage`.
 
 The existing `createApiClient` should be extended for CRUD instead of bypassed. Add authenticated request support for `get`, `post`, `patch`, and `delete`, and use Axios `params` for list query serialization. Existing `login` and `me` behavior must remain compatible.
 

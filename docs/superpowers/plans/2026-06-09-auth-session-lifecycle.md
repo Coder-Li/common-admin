@@ -17,7 +17,7 @@
 - Current user module: `apps/api/src/user/`
 - Current frontend API client: `apps/admin/src/lib/api.ts`
 - Current auth store: `apps/admin/src/stores/auth-store.ts`
-- Current route guard: `apps/admin/src/lib/route-guard.ts`
+- Current route guard: `apps/admin/src/routes/router-factory.ts`
 
 ## File Structure
 
@@ -64,9 +64,9 @@
 - Modify `apps/admin/src/lib/api.ts`: credentialed auth endpoints, refresh/retry flow, logout, change password, admin reset password.
 - Modify `apps/admin/src/lib/api.test.ts`: credentialed calls, one refresh retry, concurrent refresh, auth endpoint exclusions.
 - Modify `apps/admin/src/app/api-client.ts`: wire refresh success/failure callbacks and cache clearing.
-- Modify `apps/admin/src/AppContent.tsx`: run startup refresh and handle `checking` state.
-- Modify `apps/admin/src/lib/route-guard.ts`: accept status-aware auth state.
-- Modify `apps/admin/src/lib/route-guard.test.ts`: checking, anonymous, authenticated, forbidden cases.
+- Modify `apps/admin/src/routes/router.tsx`: run startup refresh and handle `checking` state.
+- Modify `apps/admin/src/routes/router-factory.ts`: accept status-aware auth state.
+- Modify `apps/admin/src/routes/router.test.tsx`: checking, anonymous, authenticated, forbidden cases.
 - Modify `apps/admin/src/features/auth/LoginView.tsx`: use memory session and default route redirect.
 - Modify `apps/admin/src/features/auth/LoginView.test.tsx`: login still works with new auth store.
 - Modify `apps/admin/src/layouts/AdminShell.tsx`: call server logout before local reset; handle password-change later if UI is added.
@@ -1493,7 +1493,7 @@ setSession: (session) => useAuthStore.getState().setSession(session),
 onUnauthorized: () => {
   useAuthStore.getState().setAnonymous()
   clearQueryCache()
-  navigateTo('/login', 'replace')
+  // Router guards observe auth state and redirect to /login.
 },
 ```
 
@@ -1517,9 +1517,9 @@ git commit -m "feat(admin): add refresh retry api client"
 ### Task 13: Add Startup Refresh And Status-Aware Routing
 
 **Files:**
-- Modify: `apps/admin/src/AppContent.tsx`
-- Modify: `apps/admin/src/lib/route-guard.ts`
-- Modify: `apps/admin/src/lib/route-guard.test.ts`
+- Modify: `apps/admin/src/routes/router.tsx`
+- Modify: `apps/admin/src/routes/router-factory.ts`
+- Modify: `apps/admin/src/routes/router.test.tsx`
 - Modify: `apps/admin/src/features/auth/LoginView.tsx`
 - Modify: `apps/admin/src/features/auth/LoginView.test.tsx`
 
@@ -1546,7 +1546,7 @@ authenticated missing permission -> /403
 Run:
 
 ```bash
-pnpm --filter admin test -- route-guard.test.ts
+pnpm --filter admin test -- router.test.tsx
 ```
 
 Expected: FAIL.
@@ -1561,12 +1561,12 @@ status: 'ok' | 'checking' | 'login' | 'forbidden' | 'not_found'
 
 Use `auth.status === 'authenticated'` instead of `isAuthenticated`.
 
-- [ ] **Step 3: Write failing AppContent/Login tests**
+- [ ] **Step 3: Write failing AdminRouterProvider/Login tests**
 
 Add tests that:
 
 ```text
-AppContent calls api.refresh on startup when status is checking
+AdminRouterProvider calls api.refresh on startup when status is checking
 refresh success stores session and renders authenticated route
 refresh failure marks anonymous and shows/redirects login
 LoginView redirects to first visible route after login
@@ -1580,7 +1580,7 @@ pnpm --filter admin test -- LoginView.test.tsx
 
 Expected: FAIL for changed behavior.
 
-- [ ] **Step 4: Implement startup refresh in `AppContent`**
+- [ ] **Step 4: Implement startup refresh in `AdminRouterProvider`**
 
 Use `status` from auth store:
 
@@ -1607,7 +1607,7 @@ After login:
 
 ```ts
 const firstRoute = getFirstVisibleRoute(session.user.permissions);
-navigateTo(firstRoute?.path ?? '/403');
+navigate({ to: firstRoute?.path ?? '/403' });
 ```
 
 - [ ] **Step 6: Run route/auth UI tests**
@@ -1615,7 +1615,7 @@ navigateTo(firstRoute?.path ?? '/403');
 Run:
 
 ```bash
-pnpm --filter admin test -- route-guard.test.ts LoginView.test.tsx
+pnpm --filter admin test -- router.test.tsx LoginView.test.tsx
 ```
 
 Expected: PASS.
@@ -1623,7 +1623,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit startup routing**
 
 ```bash
-git add apps/admin/src/AppContent.tsx apps/admin/src/lib/route-guard.ts apps/admin/src/lib/route-guard.test.ts apps/admin/src/features/auth/LoginView.tsx apps/admin/src/features/auth/LoginView.test.tsx
+git add apps/admin/src/routes/router.tsx apps/admin/src/routes/router-factory.ts apps/admin/src/routes/router.test.tsx apps/admin/src/features/auth/LoginView.tsx apps/admin/src/features/auth/LoginView.test.tsx
 git commit -m "feat(admin): restore sessions on startup"
 ```
 
@@ -1667,7 +1667,7 @@ async function signOut() {
   } finally {
     reset()
     clearQueryCache()
-    navigateTo('/login')
+    navigate({ to: '/login' })
   }
 }
 ```
@@ -1785,7 +1785,7 @@ Expected: PASS.
 Run:
 
 ```bash
-pnpm --filter admin test -- api.test.ts auth-store.test.ts session-storage.test.ts route-guard.test.ts LoginView.test.tsx AdminShell.test.tsx UsersPage.test.tsx
+pnpm --filter admin test -- api.test.ts auth-store.test.ts session-storage.test.ts router.test.tsx LoginView.test.tsx AdminShell.test.tsx UsersPage.test.tsx
 ```
 
 Expected: PASS.

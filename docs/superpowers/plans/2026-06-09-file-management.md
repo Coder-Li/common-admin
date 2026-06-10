@@ -55,8 +55,8 @@
 - Create `apps/admin/src/features/files/FilesPage.tsx`: query state, table, upload/edit/delete/download flows.
 - Create `apps/admin/src/features/files/FilesPage.test.tsx`: page behavior tests.
 - Modify `apps/admin/src/layouts/AdminShell.tsx`: add Files navigation and route rendering.
-- Modify `apps/admin/src/lib/route-guard.ts`: protect `/files`.
-- Modify `apps/admin/src/lib/route-guard.test.ts`: cover `/files` routing.
+- Modify `apps/admin/src/routes/router-factory.ts`: protect `/files`.
+- Modify `apps/admin/src/routes/router.test.tsx`: cover `/files` routing.
 - Modify `apps/admin/src/i18n/messages.ts`: add English and Chinese file UI copy.
 
 ## Chunk 1: Backend Data Model And Configuration
@@ -963,8 +963,8 @@ git commit -m "feat(admin): add file management page"
 
 **Files:**
 - Modify: `apps/admin/src/layouts/AdminShell.tsx`
-- Modify: `apps/admin/src/lib/route-guard.ts`
-- Modify: `apps/admin/src/lib/route-guard.test.ts`
+- Modify: `apps/admin/src/routes/router-factory.ts`
+- Modify: `apps/admin/src/routes/router.test.tsx`
 - Modify: `apps/admin/src/i18n/messages.ts`
 - Modify: `apps/admin/src/layouts/AdminShell.test.tsx`
 
@@ -980,7 +980,7 @@ Add tests that:
 Run:
 
 ```bash
-pnpm --filter admin test -- route-guard.test.ts AdminShell.test.tsx
+pnpm --filter admin test -- router.test.tsx AdminShell.test.tsx
 ```
 
 Expected: FAIL because `/files` is not wired yet.
@@ -1020,7 +1020,7 @@ Add English and Chinese keys for:
 Run:
 
 ```bash
-pnpm --filter admin test -- route-guard.test.ts AdminShell.test.tsx
+pnpm --filter admin test -- router.test.tsx AdminShell.test.tsx
 ```
 
 Expected: PASS.
@@ -1030,7 +1030,7 @@ Expected: PASS.
 Run:
 
 ```bash
-pnpm --filter admin test -- api.test.ts FilesPage.test.tsx route-guard.test.ts AdminShell.test.tsx
+pnpm --filter admin test -- api.test.ts FilesPage.test.tsx router.test.tsx AdminShell.test.tsx
 ```
 
 Expected: PASS.
@@ -1038,7 +1038,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit frontend route wiring**
 
 ```bash
-git add apps/admin/src/layouts/AdminShell.tsx apps/admin/src/layouts/AdminShell.test.tsx apps/admin/src/lib/route-guard.ts apps/admin/src/lib/route-guard.test.ts apps/admin/src/i18n/messages.ts
+git add apps/admin/src/layouts/AdminShell.tsx apps/admin/src/layouts/AdminShell.test.tsx apps/admin/src/routes/router-factory.ts apps/admin/src/routes/router.test.tsx apps/admin/src/i18n/messages.ts
 git commit -m "feat(admin): wire file management navigation"
 ```
 

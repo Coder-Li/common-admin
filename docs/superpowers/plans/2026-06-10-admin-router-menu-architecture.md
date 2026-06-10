@@ -13,10 +13,10 @@
 ## Source Documents
 
 - Spec: `docs/superpowers/specs/2026-06-10-admin-router-menu-architecture-design.md`
-- Current route registry: `apps/admin/src/routes/admin-routes.tsx`
-- Current route tests: `apps/admin/src/routes/admin-routes.test.tsx`
-- Current handwritten guard: `apps/admin/src/lib/route-guard.ts`
-- Current app dispatcher: `apps/admin/src/AppContent.tsx`
+- Legacy flat route registry: replaced by `apps/admin/src/routes/admin-route-registry.tsx`
+- Legacy route tests: replaced by `apps/admin/src/routes/admin-route-registry.test.tsx`
+- Legacy handwritten guard: replaced by `apps/admin/src/routes/router-factory.ts`
+- Legacy app dispatcher: replaced by `apps/admin/src/routes/router.tsx`
 - Current shell: `apps/admin/src/layouts/AdminShell.tsx`
 - Current login view: `apps/admin/src/features/auth/LoginView.tsx`
 - RBAC route/menu guidance: `docs/patterns/admin-rbac-crud-permission-pattern-guide.md`
@@ -34,23 +34,23 @@
 
 ### Modify
 
-- `apps/admin/src/App.tsx`: replace `AppContent` with TanStack `RouterProvider` host while preserving QueryClient, Theme, I18n, and Toaster providers.
+- `apps/admin/src/App.tsx`: replace the legacy app dispatcher with TanStack `RouterProvider` host while preserving QueryClient, Theme, I18n, and Toaster providers.
 - `apps/admin/src/layouts/AdminShell.tsx`: remove `currentPath`, render grouped nav, breadcrumbs, title, and `<Outlet />`, and use router navigation for logout.
 - `apps/admin/src/layouts/AdminShell.test.tsx`: update tests to render through a test router instead of passing `currentPath`.
-- `apps/admin/src/features/auth/LoginView.tsx`: replace `navigateTo` and old route imports with router navigation and new first-accessible-route helper.
+- `apps/admin/src/features/auth/LoginView.tsx`: replace legacy navigation and old route imports with router navigation and new first-accessible-route helper.
 - `apps/admin/src/features/auth/LoginView.test.tsx`: update login redirect assertions and move startup refresh tests to router tests.
 - `apps/admin/src/i18n/messages.ts`: add menu group labels in `en-US` and `zh-CN`.
 - `docs/patterns/admin-rbac-crud-permission-pattern-guide.md`: update the route metadata file reference.
 
 ### Delete
 
-- `apps/admin/src/AppContent.tsx`
-- `apps/admin/src/lib/location-store.ts`
-- `apps/admin/src/lib/navigation.ts`
-- `apps/admin/src/lib/route-guard.ts`
-- `apps/admin/src/lib/route-guard.test.ts`
-- `apps/admin/src/routes/admin-routes.tsx`
-- `apps/admin/src/routes/admin-routes.test.tsx`
+- legacy app dispatcher
+- legacy location subscription helper
+- legacy imperative navigation helper
+- legacy route guard implementation
+- legacy route guard tests
+- legacy flat route registry
+- legacy flat route registry tests
 
 Do not keep compatibility wrappers for the deleted handwritten routing files.
 
@@ -169,8 +169,8 @@ Expected: PASS.
 
 **Files:**
 - Create: `apps/admin/src/routes/admin-route-registry.tsx`
-- Modify/Delete: `apps/admin/src/routes/admin-routes.tsx`
-- Modify/Delete: `apps/admin/src/routes/admin-routes.test.tsx`
+- Modify/Delete: legacy flat route registry
+- Modify/Delete: legacy flat route registry tests
 - Test: `apps/admin/src/routes/admin-route-registry.test.tsx` or extend `route-meta.test.ts`
 
 - [ ] **Step 1: Write failing registry tests**
@@ -210,7 +210,7 @@ Expected: FAIL because the new registry does not exist.
 
 Create `apps/admin/src/routes/admin-route-registry.tsx`.
 
-Move the current route definitions from `admin-routes.tsx` into named constants:
+Move the current route definitions from the legacy flat registry into named constants:
 
 ```ts
 const dashboardRoute: AdminRouteMeta = { id: 'dashboard', path: '/dashboard', ... }
@@ -236,7 +236,7 @@ Use alias names if helper names would collide with imported helper functions.
 
 - [ ] **Step 4: Delete old route registry tests**
 
-Remove `apps/admin/src/routes/admin-routes.test.tsx` after equivalent coverage exists in the new tests.
+Remove the legacy flat route registry tests after equivalent coverage exists in the new tests.
 
 - [ ] **Step 5: Run route tests**
 
@@ -367,7 +367,7 @@ Expected: FAIL because `router.tsx` is not implemented.
 **Files:**
 - Create/Modify: `apps/admin/src/routes/router.tsx`
 - Modify: `apps/admin/src/App.tsx`
-- Modify/Delete: `apps/admin/src/AppContent.tsx`
+- Modify/Delete: legacy app dispatcher
 
 - [ ] **Step 1: Create router context types**
 
@@ -386,7 +386,7 @@ Use the project `AuthStatus` type from `apps/admin/src/types/auth.ts`.
 
 - [ ] **Step 2: Create shared loading component**
 
-Add a small `AuthLoadingPage` component that renders the same full-screen loading UI currently in `AppContent`:
+Add a small `AuthLoadingPage` component that renders the same full-screen loading UI used by the legacy app dispatcher:
 
 ```tsx
 <main className="grid min-h-screen place-items-center bg-[var(--color-app)] text-sm text-[var(--color-text-muted)]">
@@ -450,9 +450,9 @@ In `router.tsx` or `App.tsx`, create a host component that:
 
 Use a stable permissions key such as `permissions.join('\u0000')` for the invalidation effect dependency.
 
-- [ ] **Step 8: Replace AppContent in App**
+- [ ] **Step 8: Replace Legacy Dispatcher in App**
 
-Modify `apps/admin/src/App.tsx` to render the router host instead of `AppContent`, keeping existing providers and `ThemedToaster`.
+Modify `apps/admin/src/App.tsx` to render the router host instead of the legacy dispatcher, keeping existing providers and `ThemedToaster`.
 
 - [ ] **Step 9: Run router tests**
 
@@ -470,9 +470,9 @@ Expected: PASS.
 - Modify: `apps/admin/src/features/auth/LoginView.test.tsx`
 - Test: `apps/admin/src/routes/router.test.tsx`
 
-- [ ] **Step 1: Delete old AppContent startup tests**
+- [ ] **Step 1: Delete old dispatcher startup tests**
 
-Remove the `AppContent startup refresh` describe block from `LoginView.test.tsx`.
+Remove the legacy dispatcher startup refresh describe block from `LoginView.test.tsx`.
 
 - [ ] **Step 2: Ensure equivalent router tests exist**
 
@@ -505,18 +505,18 @@ Run:
 git status --short
 ```
 
-Expected: Chunk 2 changes only, plus any deleted `AppContent.tsx` if already removed.
+Expected: Chunk 2 changes only, plus any deleted legacy dispatcher if already removed.
 
 - [ ] **Step 2: Commit**
 
 Run:
 
 ```bash
-git add apps/admin/src/App.tsx apps/admin/src/AppContent.tsx apps/admin/src/routes apps/admin/src/features/auth/LoginView.test.tsx
+git add apps/admin/src/App.tsx apps/admin/src/routes apps/admin/src/features/auth/LoginView.test.tsx
 git commit -m "feat(admin): route through tanstack router"
 ```
 
-Expected: commit succeeds. If `AppContent.tsx` was deleted, `git add` should stage the deletion.
+Expected: commit succeeds. If the legacy dispatcher was deleted, `git add` should stage the deletion.
 
 ## Chunk 3: Shell, Login, And Navigation Migration
 
@@ -558,7 +558,7 @@ expect(screen.getByRole('heading', { name: 'Files' })).toBeInTheDocument()
 
 - [ ] **Step 3: Update logout assertions**
 
-Replace `navigateTo('/login')` assertions with router navigation assertions. Prefer:
+Replace legacy navigation assertions with router navigation assertions. Prefer:
 
 ```ts
 await waitFor(() => {
@@ -602,7 +602,7 @@ Hide a group when no child routes are visible.
 
 - [ ] **Step 3: Use TanStack links/navigation**
 
-Replace button `onClick={() => navigateTo(route.path)}` with either:
+Replace legacy button navigation with either:
 
 ```tsx
 <Link to={route.path}>...</Link>
@@ -657,7 +657,7 @@ Expected: PASS.
 
 - [ ] **Step 1: Update failing login redirect test**
 
-Change the login redirect test to assert the resulting route/screen rather than `navigateTo`.
+Change the login redirect test to assert the resulting route/screen rather than the legacy navigation helper.
 
 For a user with only `user.read`, assert the app reaches `/users` or renders the Users page heading after login.
 
@@ -666,8 +666,8 @@ For a user with only `user.read`, assert the app reaches `/users` or renders the
 Remove:
 
 ```ts
-import { navigateTo } from '../../lib/navigation'
-import { getFirstVisibleRoute } from '../../routes/admin-routes'
+import { legacyNavigate } from 'legacy navigation helper'
+import { getFirstVisibleRoute } from 'legacy flat route registry'
 ```
 
 Use:
@@ -686,7 +686,7 @@ const firstRoute = getFirstAccessibleRoute(session.user.permissions)
 await navigate({ to: firstRoute?.path ?? '/403' })
 ```
 
-Use the installed TanStack Router navigation return type correctly; if navigation is synchronous in this version, do not await it.
+Use the installed router navigation return type correctly; if navigation is synchronous in this version, do not await it.
 
 - [ ] **Step 4: Run login tests**
 
@@ -729,12 +729,12 @@ Expected: commit succeeds.
 ### Task 1: Delete Old Routing Files And Fix Imports
 
 **Files:**
-- Delete: `apps/admin/src/lib/location-store.ts`
-- Delete: `apps/admin/src/lib/navigation.ts`
-- Delete: `apps/admin/src/lib/route-guard.ts`
-- Delete: `apps/admin/src/lib/route-guard.test.ts`
-- Delete: `apps/admin/src/routes/admin-routes.tsx`
-- Delete: `apps/admin/src/routes/admin-routes.test.tsx`
+- Delete: legacy location subscription helper
+- Delete: legacy imperative navigation helper
+- Delete: legacy route guard implementation
+- Delete: legacy route guard tests
+- Delete: legacy flat route registry
+- Delete: legacy flat route registry tests
 - Modify: any file still importing deleted modules.
 
 - [ ] **Step 1: Search old imports**
@@ -742,7 +742,7 @@ Expected: commit succeeds.
 Run:
 
 ```bash
-rg -n "location-store|navigateTo|route-guard|admin-routes" apps/admin/src
+rg -n "legacy-location-helper|legacy-navigation-helper|legacy-guard|legacy-registry" apps/admin/src
 ```
 
 Expected before cleanup: any remaining old imports are listed.
@@ -759,14 +759,14 @@ Use the new modules:
 - `apps/admin/src/routes/route-meta.ts`
 - `@tanstack/react-router`
 
-No app source file should import from `location-store`, `navigation`, `route-guard`, or `admin-routes`.
+No app source file should import from the legacy location, navigation, guard, or flat registry modules.
 
 - [ ] **Step 4: Verify no old imports remain**
 
 Run:
 
 ```bash
-rg -n "location-store|navigateTo|route-guard|admin-routes" apps/admin/src
+rg -n "legacy-location-helper|legacy-navigation-helper|legacy-guard|legacy-registry" apps/admin/src
 ```
 
 Expected: no output.
@@ -785,14 +785,14 @@ Frontend route/menu metadata:
 `apps/admin/src/routes/admin-route-registry.tsx` or the project-local equivalent
 ```
 
-Update the example text if it references the old `admin-routes.tsx` filename.
+Update the example text if it references the old legacy registry filename.
 
 - [ ] **Step 2: Run doc grep**
 
 Run:
 
 ```bash
-rg -n "admin-routes|route-guard|navigateTo|location-store" docs apps/admin/src
+rg -n "legacy-registry|legacy-guard|legacy-navigation-helper|legacy-location-helper" docs apps/admin/src
 ```
 
 Expected: no stale references except historical notes in the design/plan documents, if intentionally kept.

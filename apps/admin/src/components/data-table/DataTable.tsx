@@ -48,6 +48,10 @@ export function DataTable<TData>({
   retryLabel = 'Retry',
   toolbar,
 }: DataTableProps<TData>) {
+  // TanStack Table intentionally returns function-bearing table instances.
+  // React Compiler cannot memoize this hook safely, so keep the lint exception
+  // local to this integration point instead of disabling the rule globally.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns,

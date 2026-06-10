@@ -26,7 +26,7 @@ The provider will set `data-theme="light" | "dark"` and `style.colorScheme` on t
 
 Provider ordering:
 
-- Runtime: `QueryClientProvider > ThemeProvider > I18nProvider > AppContent + ThemedToaster`.
+- Runtime: `QueryClientProvider > ThemeProvider > I18nProvider > AdminRouterProvider + ThemedToaster`.
 - Tests that render `ThemeSwitcher`, `LoginView`, or `AdminShell` must wrap with both `ThemeProvider` and `I18nProvider`.
 - `ThemeSwitcher` reads translated labels through the existing i18n hook; `ThemeProvider` does not depend on i18n.
 

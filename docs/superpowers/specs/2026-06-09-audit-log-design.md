@@ -472,7 +472,7 @@ The page should be dense and operational:
 
 No create, edit, or delete controls should be shown.
 
-Add route/menu metadata in `apps/admin/src/routes/admin-routes.tsx`, using
+Add route/menu metadata in `apps/admin/src/routes/admin-route-registry.tsx`, using
 `audit_log.read` as `requiredPermissions`.
 
 Add user-facing copy to `apps/admin/src/i18n/messages.ts`. The page should be

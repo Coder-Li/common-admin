@@ -453,10 +453,10 @@ apps/admin/src/features/files/
 
 Add `/files` to:
 
-- `resolveRoute` protected paths.
-- `AdminShell` sidebar and mobile nav.
-- `AdminShell` page title resolution.
-- `AdminShell` route rendering.
+- the shared route/menu registry.
+- router guard coverage.
+- `AdminShell` sidebar and mobile nav through metadata.
+- `AdminShell` page title resolution through metadata.
 - i18n messages.
 
 The page follows the existing standard admin layout:

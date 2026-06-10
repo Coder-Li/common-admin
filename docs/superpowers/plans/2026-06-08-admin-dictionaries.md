@@ -69,9 +69,9 @@
 - Modify `apps/admin/src/features/users/users.columns.tsx`: render role labels from dictionary options.
 - Modify `apps/admin/src/features/users/UsersPage.test.tsx`: update mocks and add dictionary-backed role behavior tests.
 - Modify `apps/admin/src/i18n/messages.ts`: add dictionary management UI copy.
-- Modify `apps/admin/src/lib/route-guard.ts`: add `/dictionaries` to protected routes.
-- Modify `apps/admin/src/lib/route-guard.test.ts`: cover authenticated and anonymous `/dictionaries` routing.
-- Modify `apps/admin/src/lib/navigation.ts`, `apps/admin/src/layouts/AdminShell.tsx`, and/or `apps/admin/src/AppContent.tsx`: add the Dictionaries navigation route following the current routing pattern.
+- Modify `apps/admin/src/routes/admin-route-registry.tsx`: add `/dictionaries` route/menu metadata.
+- Modify `apps/admin/src/routes/router.test.tsx`: cover authenticated and anonymous `/dictionaries` routing.
+- Modify `apps/admin/src/layouts/AdminShell.tsx` only if the shared shell needs new rendering behavior.
 
 ## Chunk 1: Backend Data Model, DTOs, And Mappers
 
@@ -681,11 +681,9 @@ git commit -m "feat(admin): add dictionary option helpers"
 - Create: `apps/admin/src/features/dictionaries/DictionariesPage.tsx`
 - Create: `apps/admin/src/features/dictionaries/DictionariesPage.test.tsx`
 - Modify: `apps/admin/src/i18n/messages.ts`
-- Modify: `apps/admin/src/lib/route-guard.ts`
-- Modify: `apps/admin/src/lib/route-guard.test.ts`
-- Modify: `apps/admin/src/lib/navigation.ts`
+- Modify: `apps/admin/src/routes/admin-route-registry.tsx`
+- Modify: `apps/admin/src/routes/router.test.tsx`
 - Modify: `apps/admin/src/layouts/AdminShell.tsx`
-- Modify: `apps/admin/src/AppContent.tsx`
 
 - [ ] **Step 1: Write failing management page tests**
 
@@ -711,7 +709,7 @@ Mock `features/dictionaries/dictionaries.api.ts` and cover:
 Run:
 
 ```bash
-pnpm --filter admin test -- src/features/dictionaries/DictionariesPage.test.tsx src/lib/route-guard.test.ts
+pnpm --filter admin test -- src/features/dictionaries/DictionariesPage.test.tsx src/routes/router.test.tsx
 ```
 
 Expected: FAIL because the dictionaries feature does not exist.
@@ -776,9 +774,9 @@ Use existing `DataTable`, `DataTableToolbar`, and `useServerTableQuery`.
 
 - [ ] **Step 7: Add navigation and route rendering**
 
-Follow existing routing conventions in `AppContent`, `AdminShell`, `lib/navigation`, and `lib/route-guard`.
+Follow existing routing conventions in `AdminRouterProvider`, `AdminShell`, `@tanstack/react-router`, and `routes/admin-route-registry`.
 
-Add `/dictionaries` to `protectedPaths` in `apps/admin/src/lib/route-guard.ts` before wiring the nav item, otherwise authenticated users will be redirected back to `/dashboard`.
+Add `/dictionaries` route metadata in `apps/admin/src/routes/admin-route-registry.tsx` before wiring the nav item, otherwise authenticated users will not have a routable menu target.
 
 Add i18n keys for:
 
@@ -796,7 +794,7 @@ Add i18n keys for:
 Run:
 
 ```bash
-pnpm --filter admin test -- src/features/dictionaries/DictionariesPage.test.tsx src/lib/route-guard.test.ts
+pnpm --filter admin test -- src/features/dictionaries/DictionariesPage.test.tsx src/routes/router.test.tsx
 ```
 
 Expected: PASS.
@@ -804,7 +802,7 @@ Expected: PASS.
 - [ ] **Step 9: Commit Chunk 4**
 
 ```bash
-git add apps/admin/src/features/dictionaries apps/admin/src/i18n/messages.ts apps/admin/src/lib/navigation.ts apps/admin/src/lib/route-guard.ts apps/admin/src/lib/route-guard.test.ts apps/admin/src/layouts/AdminShell.tsx apps/admin/src/AppContent.tsx
+git add apps/admin/src/features/dictionaries apps/admin/src/i18n/messages.ts apps/admin/src/routes/admin-route-registry.tsx apps/admin/src/routes/router.test.tsx apps/admin/src/layouts/AdminShell.tsx
 git commit -m "feat(admin): add dictionary management page"
 ```
 
@@ -934,7 +932,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit Chunk 5**
 
 ```bash
-git add apps/admin/src/features/users apps/admin/src/lib/dictionaries apps/admin/src/features/dictionaries apps/api/src/dictionary apps/api/prisma apps/api/src/app.module.ts apps/api/src/auth/auth-flow.spec.ts apps/admin/src/i18n/messages.ts apps/admin/src/lib/navigation.ts apps/admin/src/lib/route-guard.ts apps/admin/src/lib/route-guard.test.ts apps/admin/src/layouts/AdminShell.tsx apps/admin/src/AppContent.tsx
+git add apps/admin/src/features/users apps/admin/src/lib/dictionaries apps/admin/src/features/dictionaries apps/api/src/dictionary apps/api/prisma apps/api/src/app.module.ts apps/api/src/auth/auth-flow.spec.ts apps/admin/src/i18n/messages.ts apps/admin/src/routes/admin-route-registry.tsx apps/admin/src/routes/router.test.tsx apps/admin/src/layouts/AdminShell.tsx
 git commit -m "feat: integrate dictionaries into admin"
 ```
 

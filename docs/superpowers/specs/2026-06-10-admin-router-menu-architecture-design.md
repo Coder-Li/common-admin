@@ -13,15 +13,14 @@ CRUD modules.
 
 ## Context
 
-The admin frontend already depends on TanStack Router, but the current routing
-layer is local code:
+The admin frontend already depends on TanStack Router, but before this
+migration the active routing layer was handwritten local code:
 
-- `apps/admin/src/lib/location-store.ts` subscribes to `popstate`.
-- `apps/admin/src/lib/navigation.ts` pushes or replaces browser history.
-- `apps/admin/src/lib/route-guard.ts` handles login, forbidden, not-found, and
-  permission redirects.
-- `apps/admin/src/routes/admin-routes.tsx` stores page path, label, icon,
-  permission, and component metadata.
+- A local location store subscribed to browser history changes.
+- A local navigation helper pushed or replaced browser history.
+- A local guard resolved login, forbidden, not-found, and permission redirects.
+- A flat route registry stored page path, label, icon, permission, and component
+  metadata.
 - `apps/admin/src/layouts/AdminShell.tsx` filters visible menu items from the
   same route metadata.
 
@@ -88,16 +87,18 @@ Responsibilities:
 - `route-meta.ts` owns metadata types and pure helper functions.
 - `router.tsx` creates the TanStack Router route tree and exports the router.
 
-The existing `apps/admin/src/routes/admin-routes.tsx` can be replaced or renamed
-as part of the migration. The final codebase should not have both old and new
-route registries.
+The existing flat route registry can be replaced or renamed as part of the
+migration. The final codebase should not have both old and new route
+registries.
 
 Remove the old handwritten routing files:
 
 ```text
-apps/admin/src/lib/location-store.ts
-apps/admin/src/lib/navigation.ts
-apps/admin/src/lib/route-guard.ts
+legacy app dispatcher
+legacy location subscription helper
+legacy imperative navigation helper
+legacy route guard and guard tests
+legacy flat route registry and registry tests
 ```
 
 Their tests should be replaced with registry, router guard, and shell behavior
@@ -426,11 +427,12 @@ Implementation should be done as one breaking migration:
 1. Add the new route metadata types and helper functions.
 2. Convert the current admin route list into grouped menu metadata.
 3. Build the TanStack Router route tree from the centralized metadata.
-4. Replace `AppContent` with `RouterProvider` plus auth bootstrap.
+4. Replace the legacy app dispatcher with `RouterProvider` plus auth bootstrap.
 5. Refactor `AdminShell` to use router matches, grouped menus, breadcrumbs, and
    `<Outlet />`.
-6. Replace `navigateTo` call sites with TanStack Router navigation or `Link`.
-7. Delete `location-store.ts`, `navigation.ts`, and `route-guard.ts`.
+6. Replace legacy imperative navigation call sites with TanStack Router
+   navigation or `Link`.
+7. Delete the legacy local routing helpers and flat route registry.
 8. Replace old route guard tests with registry, router guard, menu, breadcrumb,
    and shell tests.
 9. Update docs that mention frontend route/menu metadata if file names change.
@@ -494,10 +496,11 @@ The first version should support two levels only. Avoid recursive trees,
 collapsible persistence, and complex menu settings until there is a real
 product need.
 
-### Existing Tests Coupled To navigateTo
+### Existing Tests Coupled To Legacy Navigation
 
-Some tests currently mock `navigateTo`. Update them to assert router navigation
-or resulting screen state instead of preserving the old helper.
+Some tests currently mock the legacy navigation helper. Update them to assert
+router navigation or resulting screen state instead of preserving the old
+helper.
 
 ## Documentation Updates
 
