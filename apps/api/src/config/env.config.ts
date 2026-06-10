@@ -73,21 +73,44 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
 
   if (
     env.NODE_ENV === 'production' &&
+    config.AUTH_REFRESH_COOKIE_SECURE === undefined
+  ) {
+    throw new Error(
+      'AUTH_REFRESH_COOKIE_SECURE must be explicitly configured in production',
+    );
+  }
+
+  if (
+    env.AUTH_REFRESH_COOKIE_SAME_SITE === 'none' &&
+    !env.AUTH_REFRESH_COOKIE_SECURE
+  ) {
+    throw new Error(
+      'AUTH_REFRESH_COOKIE_SECURE must be true when AUTH_REFRESH_COOKIE_SAME_SITE is none',
+    );
+  }
+
+  const allowedOrigins = env.ALLOWED_ORIGINS.split(',').map((origin) =>
+    origin.trim(),
+  );
+
+  if (
+    env.NODE_ENV === 'production' &&
+    !env.AUTH_REFRESH_COOKIE_SECURE &&
+    allowedOrigins.some((origin) => !origin.startsWith('http://'))
+  ) {
+    throw new Error(
+      'AUTH_REFRESH_COOKIE_SECURE=false is only allowed with HTTP origins',
+    );
+  }
+
+  if (
+    env.NODE_ENV === 'production' &&
     env.JWT_ACCESS_TOKEN_SECRET === 'local-access-secret-change-me'
   ) {
     throw new Error('JWT_ACCESS_TOKEN_SECRET must be configured in production');
   }
 
-  if (env.NODE_ENV === 'production' && !env.AUTH_REFRESH_COOKIE_SECURE) {
-    throw new Error('AUTH_REFRESH_COOKIE_SECURE must be true in production');
-  }
-
-  if (
-    env.NODE_ENV === 'production' &&
-    env.ALLOWED_ORIGINS.split(',')
-      .map((origin) => origin.trim())
-      .includes('*')
-  ) {
+  if (env.NODE_ENV === 'production' && allowedOrigins.includes('*')) {
     throw new Error('ALLOWED_ORIGINS cannot include wildcard in production');
   }
 
