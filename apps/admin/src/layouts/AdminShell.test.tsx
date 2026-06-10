@@ -36,6 +36,7 @@ const user: UserProfile = {
 
 vi.mock('../app/api-client', () => ({
   api: {
+    changePassword: vi.fn(async () => undefined),
     me: vi.fn(async () => user),
     logout: vi.fn(async () => undefined),
   },
@@ -109,6 +110,8 @@ describe('AdminShell i18n', () => {
     window.scrollTo = vi.fn()
     window.localStorage.clear()
     mockBrowserLanguages(['en-US'])
+    vi.mocked(api.changePassword).mockReset()
+    vi.mocked(api.changePassword).mockResolvedValue(undefined)
     vi.mocked(api.logout).mockReset()
     vi.mocked(api.logout).mockResolvedValue(undefined)
     vi.mocked(clearQueryCache).mockReset()
@@ -254,6 +257,36 @@ describe('AdminShell i18n', () => {
     })
     expect(router.state.location.pathname).toBe('/login')
     expect(api.logout).toHaveBeenCalledOnce()
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(clearQueryCache).toHaveBeenCalledOnce()
+  })
+
+  it('changes password, clears local state, and navigates to login', async () => {
+    const testUser = userEvent.setup()
+    vi.mocked(api.changePassword).mockResolvedValueOnce(undefined)
+
+    const { router } = renderAdminShell()
+
+    await testUser.click(
+      await screen.findByRole('button', { name: /change password/i }),
+    )
+    await testUser.type(screen.getByLabelText('Current password'), 'OldPass123!')
+    await testUser.type(screen.getByLabelText('New password'), 'NewPass123!')
+    await testUser.click(
+      screen.getByRole('button', { name: /^change password$/i }),
+    )
+
+    await waitFor(() => {
+      expect(api.changePassword).toHaveBeenCalledWith({
+        currentPassword: 'OldPass123!',
+        newPassword: 'NewPass123!',
+      })
+    })
+    await waitFor(() => {
+      expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
+    })
+    expect(router.state.location.pathname).toBe('/login')
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(clearQueryCache).toHaveBeenCalledOnce()

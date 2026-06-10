@@ -165,10 +165,11 @@ export class RoleService {
 
     if (
       existing.isDefault &&
-      dto.status === RoleStatus.DISABLED &&
+      existing.status === RoleStatus.ACTIVE &&
+      (dto.status === RoleStatus.DISABLED || dto.isDefault === false) &&
       !(await this.hasAnotherActiveDefault(id))
     ) {
-      throw new ForbiddenException('Cannot disable the only default role');
+      throw new ForbiddenException('Cannot remove the only default role');
     }
 
     try {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createMemoryHistory } from '@tanstack/react-router'
 import {
   cleanup,
   render,
@@ -11,8 +12,13 @@ import {
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { api } from '../../app/api-client'
+import { clearQueryCache } from '../../app/query-client'
 import { I18nProvider } from '../../i18n/I18nProvider'
+import { AdminRouterProvider } from '../../routes/router'
+import { createAdminRouter } from '../../routes/router-factory'
 import { useAuthStore } from '../../stores/auth-store'
+import { ThemeProvider } from '../../theme/ThemeProvider'
 import type {
   CreateUserRequest,
   UpdateUserRequest,
@@ -27,6 +33,7 @@ const usersApiMock = vi.hoisted(() => ({
   deleteUser: vi.fn(),
   listUsers: vi.fn(),
   replaceUserRoles: vi.fn(),
+  resetUserPassword: vi.fn(),
   updateUser: vi.fn(),
 }))
 
@@ -39,6 +46,18 @@ const rolesApiMock = vi.hoisted(() => ({
 vi.mock('./users.api', () => usersApiMock)
 
 vi.mock('../roles/roles.api', () => rolesApiMock)
+
+vi.mock('../../app/api-client', () => ({
+  api: {
+    me: vi.fn(),
+    logout: vi.fn(),
+    refresh: vi.fn(),
+  },
+}))
+
+vi.mock('../../app/query-client', () => ({
+  clearQueryCache: vi.fn(),
+}))
 
 vi.mock('sonner', () => ({
   toast: {
@@ -153,13 +172,91 @@ function renderUsersPage(
   )
 }
 
+function renderUsersRoute(
+  currentUser: UserRecord,
+  permissions = [
+    'user.read',
+    'user.create',
+    'user.update',
+    'user.delete',
+    'user.assign_roles',
+  ],
+) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+
+  useAuthStore.getState().setSession({
+    accessToken: 'access-token',
+    user: {
+      id: currentUser.id,
+      email: currentUser.email,
+      username: currentUser.username,
+      firstName: currentUser.firstName,
+      lastName: currentUser.lastName,
+      roles: [{ code: 'admin', name: 'Admin' }],
+      permissions,
+    },
+  })
+  vi.mocked(api.me).mockResolvedValue({
+    id: currentUser.id,
+    email: currentUser.email,
+    username: currentUser.username,
+    firstName: currentUser.firstName,
+    lastName: currentUser.lastName,
+    roles: [{ code: 'admin', name: 'Admin' }],
+    permissions,
+  })
+
+  const router = createAdminRouter({
+    history: createMemoryHistory({ initialEntries: ['/users'] }),
+  })
+
+  return {
+    router,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <I18nProvider>
+            <AdminRouterProvider router={router} />
+          </I18nProvider>
+        </ThemeProvider>
+      </QueryClientProvider>,
+    ),
+  }
+}
+
 describe('UsersPage', () => {
   beforeEach(() => {
+    window.scrollTo = vi.fn()
     window.localStorage.clear()
+    vi.mocked(api.me).mockReset()
+    vi.mocked(api.me).mockResolvedValue({
+      id: 'current-user',
+      email: 'admin@example.com',
+      username: 'admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      roles: [{ code: 'admin', name: 'Admin' }],
+      permissions: [
+        'user.create',
+        'user.update',
+        'user.delete',
+        'user.assign_roles',
+      ],
+    })
+    vi.mocked(api.logout).mockReset()
+    vi.mocked(api.logout).mockResolvedValue(undefined)
+    vi.mocked(api.refresh).mockReset()
+    vi.mocked(clearQueryCache).mockReset()
     usersApiMock.createUser.mockReset()
     usersApiMock.deleteUser.mockReset()
     usersApiMock.listUsers.mockReset()
     usersApiMock.replaceUserRoles.mockReset()
+    usersApiMock.resetUserPassword.mockReset()
     usersApiMock.updateUser.mockReset()
     rolesApiMock.rolesApi.list.mockReset()
     rolesApiMock.rolesApi.list.mockResolvedValue({
@@ -390,6 +487,125 @@ describe('UsersPage', () => {
       ])
     })
     await waitFor(() => expect(usersApiMock.listUsers).toHaveBeenCalledTimes(2))
+  })
+
+  it('replaces roles with the selected role codes when editing a user', async () => {
+    const user = userEvent.setup()
+    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
+    usersApiMock.updateUser.mockResolvedValue(alice)
+    usersApiMock.replaceUserRoles.mockResolvedValue({
+      ...alice,
+      roles: [{ code: 'standard', name: 'Team member' }],
+    })
+
+    renderUsersPage()
+    await screen.findByText('alice')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.deselectOptions(
+      within(screen.getByRole('dialog')).getByLabelText('Role'),
+      'admin',
+    )
+    await user.selectOptions(
+      within(screen.getByRole('dialog')).getByLabelText('Role'),
+      'standard',
+    )
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit' }),
+    )
+
+    await waitFor(() => {
+      expect(usersApiMock.replaceUserRoles).toHaveBeenCalledWith('user-1', [
+        'standard',
+      ])
+    })
+  })
+
+  it('replaces roles without updating profile fields when only role assignment is allowed', async () => {
+    const user = userEvent.setup()
+    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
+    usersApiMock.replaceUserRoles.mockResolvedValue({
+      ...alice,
+      roles: [{ code: 'standard', name: 'Team member' }],
+    })
+
+    renderUsersPage(['user.assign_roles'])
+    await screen.findByText('alice')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.deselectOptions(
+      within(screen.getByRole('dialog')).getByLabelText('Role'),
+      'admin',
+    )
+    await user.selectOptions(
+      within(screen.getByRole('dialog')).getByLabelText('Role'),
+      'standard',
+    )
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit' }),
+    )
+
+    await waitFor(() => {
+      expect(usersApiMock.replaceUserRoles).toHaveBeenCalledWith('user-1', [
+        'standard',
+      ])
+    })
+    expect(usersApiMock.updateUser).not.toHaveBeenCalled()
+  })
+
+  it('resets a user password and refetches users', async () => {
+    const user = userEvent.setup()
+    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
+    usersApiMock.resetUserPassword.mockResolvedValue(undefined)
+
+    renderUsersPage()
+    await screen.findByText('alice')
+
+    await user.click(screen.getByRole('button', { name: 'Reset password' }))
+    await user.type(screen.getByLabelText('New password'), 'NewPassword123!')
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Reset password',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(usersApiMock.resetUserPassword).toHaveBeenCalledWith('user-1', {
+        newPassword: 'NewPassword123!',
+      })
+    })
+    await waitFor(() => expect(usersApiMock.listUsers).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('clears the session when resetting the current user password', async () => {
+    const user = userEvent.setup()
+    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
+    usersApiMock.resetUserPassword.mockResolvedValue(undefined)
+
+    const { router } = renderUsersRoute(alice)
+    await screen.findByText('alice')
+
+    await user.click(screen.getByRole('button', { name: 'Reset password' }))
+    await user.type(screen.getByLabelText('New password'), 'NewPassword123!')
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Reset password',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(usersApiMock.resetUserPassword).toHaveBeenCalledWith('user-1', {
+        newPassword: 'NewPassword123!',
+      })
+    })
+    await waitFor(() => {
+      expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
+    })
+    expect(router.state.location.pathname).toBe('/login')
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(clearQueryCache).toHaveBeenCalledOnce()
   })
 
   it('hides create, edit, delete, and role assignment without permissions', async () => {

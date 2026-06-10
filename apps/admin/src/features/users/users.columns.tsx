@@ -9,13 +9,16 @@ export interface UserColumnLabels {
   createdAt: string
   actions: string
   edit: string
+  resetPassword: string
   delete: string
 }
 
 export interface UserRowActions {
   canDelete: boolean
+  canResetPassword: boolean
   canUpdate: boolean
   onEdit: (user: UserRecord) => void
+  onResetPassword: (user: UserRecord) => void
   onDelete: (user: UserRecord) => void
 }
 
@@ -87,6 +90,15 @@ export function createUserColumns(
               type="button"
             >
               {labels.edit}
+            </button>
+          ) : null}
+          {actions.canResetPassword ? (
+            <button
+              className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              onClick={() => actions.onResetPassword(row.original)}
+              type="button"
+            >
+              {labels.resetPassword}
             </button>
           ) : null}
           {actions.canDelete ? (

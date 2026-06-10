@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router'
-import { Circle, Lock, LogOut } from 'lucide-react'
+import { Circle, KeyRound, Lock, LogOut } from 'lucide-react'
+import { useState } from 'react'
+import type { FormEvent } from 'react'
+import { toast } from 'sonner'
 import { api } from '../app/api-client'
 import { clearQueryCache } from '../app/query-client'
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher'
@@ -30,6 +33,10 @@ export function AdminShell() {
   const permissions = useAuthStore((state) => state.permissions)
   const setUser = useAuthStore((state) => state.setUser)
   const reset = useAuthStore((state) => state.reset)
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   useQuery({
     queryKey: ['me', accessToken],
@@ -41,13 +48,37 @@ export function AdminShell() {
     },
   })
 
+  function leaveSession() {
+    reset()
+    clearQueryCache()
+    void navigate({ to: '/login' })
+  }
+
   async function signOut() {
     try {
       await api.logout()
     } finally {
-      reset()
-      clearQueryCache()
-      void navigate({ to: '/login' })
+      leaveSession()
+    }
+  }
+
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsChangingPassword(true)
+
+    try {
+      await api.changePassword({ currentPassword, newPassword })
+      toast.success(t('page.changePassword.success'))
+      setIsPasswordDialogOpen(false)
+      setCurrentPassword('')
+      setNewPassword('')
+      leaveSession()
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : t('page.changePassword.error'),
+      )
+    } finally {
+      setIsChangingPassword(false)
     }
   }
 
@@ -133,6 +164,15 @@ export function AdminShell() {
               tone="light"
             />
             <button
+              aria-label={`Open ${t('page.changePassword')} dialog`}
+              className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--color-border-strong)] px-3 text-sm text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+              onClick={() => setIsPasswordDialogOpen(true)}
+              type="button"
+            >
+              <KeyRound size={16} />
+              {t('page.changePassword')}
+            </button>
+            <button
               className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--color-border-strong)] px-3 text-sm text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
               onClick={() => {
                 void signOut().catch(() => undefined)
@@ -147,6 +187,76 @@ export function AdminShell() {
 
         <Outlet />
       </section>
+
+      {isPasswordDialogOpen ? (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-20 grid place-items-center bg-slate-950/40 p-4"
+          role="dialog"
+        >
+          <form
+            className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-5 shadow-xl"
+            onSubmit={(event) => {
+              void changePassword(event)
+            }}
+          >
+            <h3 className="text-base font-semibold text-slate-950">
+              {t('page.changePassword.title')}
+            </h3>
+            <div className="mt-4 grid gap-4">
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-slate-700">
+                  {t('page.changePassword.currentPassword')}
+                </span>
+                <input
+                  aria-label={t('page.changePassword.currentPassword')}
+                  className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  type="password"
+                  value={currentPassword}
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium text-slate-700">
+                  {t('page.changePassword.newPassword')}
+                </span>
+                <input
+                  aria-label={t('page.changePassword.newPassword')}
+                  className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  type="password"
+                  value={newPassword}
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={isChangingPassword}
+                onClick={() => {
+                  setIsPasswordDialogOpen(false)
+                  setCurrentPassword('')
+                  setNewPassword('')
+                }}
+                type="button"
+              >
+                {t('users.form.cancel')}
+              </button>
+              <button
+                className="inline-flex h-9 items-center justify-center rounded-md bg-cyan-500 px-4 text-sm font-medium text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={
+                  isChangingPassword ||
+                  currentPassword.length === 0 ||
+                  newPassword.length < 8
+                }
+                type="submit"
+              >
+                {t('page.changePassword')}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </main>
   )
 }

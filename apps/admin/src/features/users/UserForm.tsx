@@ -11,13 +11,17 @@ import type {
   UserRoleSummary,
 } from './users.types'
 
+export type UserFormSubmitValue =
+  | CreateUserRequest
+  | (UpdateUserRequest & { roleCodes?: string[] })
+
 interface UserFormProps {
   mode: 'create' | 'edit'
   initialValue?: UserRecord
   isSubmitting: boolean
   canAssignRoles: boolean
   roleOptions: UserRoleSummary[]
-  onSubmit: (value: CreateUserRequest | UpdateUserRequest) => void
+  onSubmit: (value: UserFormSubmitValue) => void
   onCancel: () => void
 }
 
@@ -95,7 +99,10 @@ export function UserForm({
       return
     }
 
-    onSubmit(updateValue)
+    onSubmit({
+      ...updateValue,
+      roleCodes: canAssignRoles ? value.roleCodes : undefined,
+    })
   }
 
   return (

@@ -196,6 +196,40 @@ describe('RoleService', () => {
     });
   });
 
+  it('rejects clearing the only active default role', async () => {
+    const { prisma, service } = createService();
+    prisma.role.findUnique.mockResolvedValue(role({ isDefault: true }));
+    prisma.role.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updateRole('role-1', { isDefault: false }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('allows clearing a disabled default role', async () => {
+    const { prisma, service, tx } = createService();
+    const disabledDefault = role({
+      isDefault: true,
+      status: 'DISABLED',
+    });
+    prisma.role.findUnique.mockResolvedValue(disabledDefault);
+    tx.role.findUnique.mockResolvedValue(disabledDefault);
+    tx.role.update.mockResolvedValue(
+      role({
+        isDefault: false,
+        status: 'DISABLED',
+      }),
+    );
+
+    await service.updateRole('role-1', { isDefault: false });
+
+    expect(tx.role.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isDefault: false }),
+      }),
+    );
+  });
+
   it('updateRole reads before, updates, and writes before and after audit in the same transaction', async () => {
     const { auditLogService, prisma, service, tx } = createService();
     const guardRole = role({ name: 'Operator' });

@@ -6,6 +6,7 @@ import type { OnChangeFn } from '@tanstack/react-table'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import { clearQueryCache } from '../../app/query-client'
 import { DataTable } from '../../components/data-table/DataTable'
 import { DataTableToolbar } from '../../components/data-table/DataTableToolbar'
 import type {
@@ -23,15 +24,18 @@ import {
   deleteUser,
   listUsers,
   replaceUserRoles,
+  resetUserPassword,
   updateUser,
 } from './users.api'
 import { createUserColumns } from './users.columns'
 import type {
   CreateUserRequest,
+  ResetUserPasswordRequest,
   UpdateUserRequest,
   UserListQuery,
   UserRecord,
 } from './users.types'
+import type { UserFormSubmitValue } from './UserForm'
 
 type FormState =
   | { mode: 'create'; user?: undefined }
@@ -58,6 +62,8 @@ export function UsersPage() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
   const permissions = useAuthStore((state) => state.permissions)
+  const currentUserId = useAuthStore((state) => state.user?.id)
+  const resetAuth = useAuthStore((state) => state.reset)
   const [search, setSearch] = useState('')
   const [roleCode, setRoleCode] = useState<string | typeof allRoleFilter>(
     allRoleFilter,
@@ -69,11 +75,15 @@ export function UsersPage() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [formState, setFormState] = useState<FormState>(null)
   const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null)
+  const [resetPasswordTarget, setResetPasswordTarget] =
+    useState<UserRecord | null>(null)
+  const [newPassword, setNewPassword] = useState('')
 
   const canCreate = can(permissions, 'user.create')
   const canUpdate = can(permissions, 'user.update')
   const canDelete = can(permissions, 'user.delete')
   const canAssignRoles = can(permissions, 'user.assign_roles')
+  const canResetPassword = canUpdate
 
   const rolesQuery = useQuery({
     queryKey: ['roles', 'list', 'users-filter'],
@@ -120,10 +130,15 @@ export function UsersPage() {
       roleCodes: string[]
       value: UpdateUserRequest
     }) => {
-      const updatedUser = await updateUser(payload.id, payload.value)
+      let updatedUser: UserRecord | undefined
+      if (canUpdate) {
+        updatedUser = await updateUser(payload.id, payload.value)
+      }
+
       if (canAssignRoles) {
         return replaceUserRoles(payload.id, payload.roleCodes)
       }
+
       return updatedUser
     },
     onError: (error) => {
@@ -148,6 +163,26 @@ export function UsersPage() {
     },
   })
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: (payload: { id: string } & ResetUserPasswordRequest) =>
+      resetUserPassword(payload.id, { newPassword: payload.newPassword }),
+    onError: (error) => {
+      toast.error(mutationErrorMessage(error) ?? t('users.resetPassword.error'))
+    },
+    onSuccess: async (_data, variables) => {
+      toast.success(t('users.resetPassword.success'))
+      setResetPasswordTarget(null)
+      setNewPassword('')
+      if (variables.id === currentUserId) {
+        resetAuth()
+        clearQueryCache()
+        return
+      }
+
+      await invalidateUsers()
+    },
+  })
+
   const columns = useMemo(
     () =>
       createUserColumns(
@@ -158,17 +193,23 @@ export function UsersPage() {
           edit: t('users.action.edit'),
           email: t('users.column.email'),
           fullName: t('users.column.fullName'),
+          resetPassword: t('users.action.resetPassword'),
           role: t('users.column.role'),
           username: t('users.column.username'),
         },
         {
           canDelete,
+          canResetPassword,
           canUpdate: canUpdate || canAssignRoles,
           onDelete: setDeleteTarget,
           onEdit: (user) => setFormState({ mode: 'edit', user }),
+          onResetPassword: (user) => {
+            setNewPassword('')
+            setResetPasswordTarget(user)
+          },
         },
       ),
-    [canAssignRoles, canDelete, canUpdate, t],
+    [canAssignRoles, canDelete, canResetPassword, canUpdate, t],
   )
 
   const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {
@@ -203,20 +244,35 @@ export function UsersPage() {
     }))
   }
 
-  function handleSubmit(value: CreateUserRequest | UpdateUserRequest) {
+  function handleSubmit(value: UserFormSubmitValue) {
     if (formState?.mode === 'edit') {
+      const { roleCodes, ...updateValue } = value as UpdateUserRequest & {
+        roleCodes?: string[]
+      }
+
       updateMutation.mutate({
         id: formState.user.id,
         roleCodes:
-          'roleCodes' in value && Array.isArray(value.roleCodes)
-            ? value.roleCodes
+          Array.isArray(roleCodes)
+            ? roleCodes
             : formState.user.roles.map((role) => role.code),
-        value: value as UpdateUserRequest,
+        value: updateValue,
       })
       return
     }
 
     createMutation.mutate(value as CreateUserRequest)
+  }
+
+  function handleResetPassword() {
+    if (!resetPasswordTarget) {
+      return
+    }
+
+    resetPasswordMutation.mutate({
+      id: resetPasswordTarget.id,
+      newPassword,
+    })
   }
 
   const listError =
@@ -349,6 +405,58 @@ export function UsersPage() {
                 type="button"
               >
                 {t('users.delete.confirmTitle')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {resetPasswordTarget ? (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-20 grid place-items-center bg-slate-950/40 p-4"
+          role="dialog"
+        >
+          <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
+            <h3 className="text-base font-semibold text-slate-950">
+              {t('users.resetPassword.title')}
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              {resetPasswordTarget.email}
+            </p>
+            <label className="mt-4 grid gap-1.5 text-sm">
+              <span className="font-medium text-slate-700">
+                {t('users.resetPassword.newPassword')}
+              </span>
+              <input
+                aria-label={t('users.resetPassword.newPassword')}
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                onChange={(event) => setNewPassword(event.target.value)}
+                type="password"
+                value={newPassword}
+              />
+            </label>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                className="inline-flex h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                disabled={resetPasswordMutation.isPending}
+                onClick={() => {
+                  setResetPasswordTarget(null)
+                  setNewPassword('')
+                }}
+                type="button"
+              >
+                {t('users.form.cancel')}
+              </button>
+              <button
+                className="inline-flex h-9 items-center justify-center rounded-md bg-cyan-500 px-4 text-sm font-medium text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={
+                  resetPasswordMutation.isPending || newPassword.length < 8
+                }
+                onClick={handleResetPassword}
+                type="button"
+              >
+                {t('users.action.resetPassword')}
               </button>
             </div>
           </div>
