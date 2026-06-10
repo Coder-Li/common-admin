@@ -11,7 +11,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { AuthOriginGuard } from './auth-origin.guard';
@@ -38,6 +38,7 @@ export class AuthController {
 
   @IsPublic()
   @UseGuards(AuthOriginGuard)
+  @ApiOperation({ operationId: 'login' })
   @Post('login')
   @ApiOkResponse({ type: AuthResponseDto })
   async login(
@@ -57,6 +58,7 @@ export class AuthController {
 
   @IsPublic()
   @UseGuards(AuthOriginGuard)
+  @ApiOperation({ operationId: 'refreshSession' })
   @Post('refresh')
   @ApiOkResponse({ type: AuthResponseDto })
   async refresh(
@@ -84,6 +86,7 @@ export class AuthController {
 
   @IsPublic()
   @UseGuards(AuthOriginGuard)
+  @ApiOperation({ operationId: 'logout' })
   @Post('logout')
   async logout(
     @Req() request: Request,
@@ -117,6 +120,7 @@ export class AuthController {
   }
 
   @UseGuards(AuthOriginGuard)
+  @ApiOperation({ operationId: 'changePassword' })
   @Post('change-password')
   @HttpCode(HttpStatus.NO_CONTENT)
   async changePassword(

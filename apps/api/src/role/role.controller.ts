@@ -19,6 +19,7 @@ import {
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import {
@@ -45,6 +46,7 @@ export class RoleController {
 
   @ApiOkResponse({ type: RoleListResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
+  @ApiOperation({ operationId: 'listRoles' })
   @Permissions('role.read')
   @Get()
   listRoles(@Query() query: RoleListQueryDto): Promise<RoleListResponseDto> {
@@ -53,6 +55,7 @@ export class RoleController {
 
   @ApiCreatedResponse({ type: RoleResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
+  @ApiOperation({ operationId: 'createRole' })
   @Permissions('role.create')
   @Post()
   createRole(
@@ -70,6 +73,7 @@ export class RoleController {
   @ApiOkResponse({ type: RoleResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Role not found' })
+  @ApiOperation({ operationId: 'getRole' })
   @Permissions('role.read')
   @Get(':id')
   getRole(@Param('id') id: string): Promise<RoleResponseDto> {
@@ -79,6 +83,7 @@ export class RoleController {
   @ApiOkResponse({ type: RoleResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Role not found' })
+  @ApiOperation({ operationId: 'updateRole' })
   @Permissions('role.update')
   @Patch(':id')
   updateRole(
@@ -98,6 +103,7 @@ export class RoleController {
   @ApiNoContentResponse({ description: 'Role deleted' })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Role not found' })
+  @ApiOperation({ operationId: 'deleteRole' })
   @Permissions('role.delete')
   @HttpCode(204)
   @Delete(':id')
@@ -116,6 +122,7 @@ export class RoleController {
   @ApiOkResponse({ type: RoleResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Role not found' })
+  @ApiOperation({ operationId: 'replaceRolePermissions' })
   @Permissions('role.assign_permissions')
   @Put(':id/permissions')
   replaceRolePermissions(

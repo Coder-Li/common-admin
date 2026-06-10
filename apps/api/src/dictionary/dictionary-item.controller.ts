@@ -19,6 +19,7 @@ import {
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import {
@@ -47,6 +48,7 @@ export class DictionaryItemController {
 
   @ApiOkResponse({ type: DictionaryItemListResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
+  @ApiOperation({ operationId: 'listDictionaryItems' })
   @Permissions('dictionary.read')
   @Get()
   listItems(
@@ -58,6 +60,7 @@ export class DictionaryItemController {
   @ApiOkResponse({ type: DictionaryItemResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Dictionary item not found' })
+  @ApiOperation({ operationId: 'getDictionaryItem' })
   @Permissions('dictionary.read')
   @Get(':id')
   getItem(@Param('id') id: string): Promise<DictionaryItemResponseDto> {
@@ -68,6 +71,7 @@ export class DictionaryItemController {
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiConflictResponse({ description: 'Dictionary item already exists' })
   @ApiNotFoundResponse({ description: 'Dictionary type not found' })
+  @ApiOperation({ operationId: 'createDictionaryItem' })
   @Permissions('dictionary.create')
   @Post()
   createItem(
@@ -86,6 +90,7 @@ export class DictionaryItemController {
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiConflictResponse({ description: 'System dictionary item constraint' })
   @ApiNotFoundResponse({ description: 'Dictionary item not found' })
+  @ApiOperation({ operationId: 'updateDictionaryItem' })
   @Permissions('dictionary.update')
   @Patch(':id')
   updateItem(
@@ -108,6 +113,7 @@ export class DictionaryItemController {
     description: 'System dictionary item cannot be deleted',
   })
   @ApiNotFoundResponse({ description: 'Dictionary item not found' })
+  @ApiOperation({ operationId: 'deleteDictionaryItem' })
   @Permissions('dictionary.delete')
   @HttpCode(204)
   @Delete(':id')

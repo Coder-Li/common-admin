@@ -4,6 +4,7 @@ import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { Permissions } from '../auth/permissions.decorator';
@@ -22,6 +23,7 @@ export class AuditLogController {
 
   @ApiOkResponse({ type: AuditLogListResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
+  @ApiOperation({ operationId: 'listAuditLogs' })
   @Permissions('audit_log.read')
   @Get()
   listAuditLogs(
@@ -33,6 +35,7 @@ export class AuditLogController {
   @ApiOkResponse({ type: AuditLogResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Audit log not found' })
+  @ApiOperation({ operationId: 'getAuditLog' })
   @Permissions('audit_log.read')
   @Get(':id')
   getAuditLog(@Param('id') id: string): Promise<AuditLogResponseDto> {

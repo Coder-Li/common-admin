@@ -9,6 +9,7 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { DictionaryOptionsService } from './dictionary-options.service';
@@ -29,6 +30,7 @@ export class DictionaryOptionsController {
 
   @ApiOkResponse({ type: DictionaryOptionsMapResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid dictionary type query' })
+  @ApiOperation({ operationId: 'getDictionaryOptionsMap' })
   @Get('options')
   getOptionsMap(
     @Query() query: DictionaryOptionsQueryDto,
@@ -38,6 +40,7 @@ export class DictionaryOptionsController {
 
   @ApiOkResponse({ type: DictionaryOptionsResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid dictionary type code' })
+  @ApiOperation({ operationId: 'getDictionaryOptions' })
   @Get(':typeCode/options')
   getOptions(
     @Param('typeCode') typeCode: string,

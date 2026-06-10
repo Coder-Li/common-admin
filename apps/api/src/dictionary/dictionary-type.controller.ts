@@ -19,6 +19,7 @@ import {
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import {
@@ -47,6 +48,7 @@ export class DictionaryTypeController {
 
   @ApiOkResponse({ type: DictionaryTypeListResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
+  @ApiOperation({ operationId: 'listDictionaryTypes' })
   @Permissions('dictionary.read')
   @Get()
   listTypes(
@@ -58,6 +60,7 @@ export class DictionaryTypeController {
   @ApiOkResponse({ type: DictionaryTypeResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Dictionary type not found' })
+  @ApiOperation({ operationId: 'getDictionaryType' })
   @Permissions('dictionary.read')
   @Get(':id')
   getType(@Param('id') id: string): Promise<DictionaryTypeResponseDto> {
@@ -67,6 +70,7 @@ export class DictionaryTypeController {
   @ApiCreatedResponse({ type: DictionaryTypeResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiConflictResponse({ description: 'Dictionary type already exists' })
+  @ApiOperation({ operationId: 'createDictionaryType' })
   @Permissions('dictionary.create')
   @Post()
   createType(
@@ -84,6 +88,7 @@ export class DictionaryTypeController {
   @ApiOkResponse({ type: DictionaryTypeResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Dictionary type not found' })
+  @ApiOperation({ operationId: 'updateDictionaryType' })
   @Permissions('dictionary.update')
   @Patch(':id')
   updateType(
@@ -104,6 +109,7 @@ export class DictionaryTypeController {
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'Dictionary type not found' })
   @ApiConflictResponse({ description: 'Dictionary type cannot be deleted' })
+  @ApiOperation({ operationId: 'deleteDictionaryType' })
   @Permissions('dictionary.delete')
   @HttpCode(204)
   @Delete(':id')

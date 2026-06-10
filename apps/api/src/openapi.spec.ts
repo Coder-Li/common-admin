@@ -1,20 +1,77 @@
 import { SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
+import { Test } from '@nestjs/testing';
+import { AppModule } from './app.module';
 import { assertPrefixFreeOpenApiPaths, createOpenApiDocument } from './openapi';
 
-jest.mock('@nestjs/swagger', () => {
-  const actual =
-    jest.requireActual<typeof import('@nestjs/swagger')>('@nestjs/swagger');
+const expectedOperationIds = [
+  'checkHealth',
+  'login',
+  'refreshSession',
+  'logout',
+  'changePassword',
+  'getCurrentUser',
+  'listUsers',
+  'getUser',
+  'createUser',
+  'updateUser',
+  'deleteUser',
+  'replaceUserRoles',
+  'resetUserPassword',
+  'listRoles',
+  'getRole',
+  'createRole',
+  'updateRole',
+  'deleteRole',
+  'replaceRolePermissions',
+  'listPermissions',
+  'listPermissionModules',
+  'getDictionaryOptionsMap',
+  'getDictionaryOptions',
+  'listDictionaryTypes',
+  'getDictionaryType',
+  'createDictionaryType',
+  'updateDictionaryType',
+  'deleteDictionaryType',
+  'listDictionaryItems',
+  'getDictionaryItem',
+  'createDictionaryItem',
+  'updateDictionaryItem',
+  'deleteDictionaryItem',
+  'listFiles',
+  'getFile',
+  'uploadFile',
+  'updateFile',
+  'deleteFile',
+  'downloadFile',
+  'listAuditLogs',
+  'getAuditLog',
+] as const;
 
-  return {
-    ...actual,
-    SwaggerModule: {
-      ...actual.SwaggerModule,
-      createDocument: jest.fn(),
-    },
-  };
-});
+type SwaggerOperationLike = {
+  operationId: string;
+};
 
-const mockedSwaggerModule = jest.mocked(SwaggerModule);
+function hasOperationId(value: unknown): value is SwaggerOperationLike {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'operationId' in value &&
+    typeof (value as { operationId?: unknown }).operationId === 'string'
+  );
+}
+
+function collectOperationIds(document: OpenAPIObject): string[] {
+  const paths = document.paths as Record<
+    string,
+    Record<string, unknown> | undefined
+  >;
+
+  return Object.values(paths).flatMap((pathItem) =>
+    Object.values(pathItem ?? {}).flatMap((operation) =>
+      hasOperationId(operation) ? [operation.operationId] : [],
+    ),
+  );
+}
 
 describe('openapi helpers', () => {
   it('exports a document factory', () => {
@@ -31,16 +88,16 @@ describe('openapi helpers', () => {
       },
       paths: {},
     };
-    mockedSwaggerModule.createDocument.mockReturnValue(document);
+    const createDocumentSpy = jest
+      .spyOn(SwaggerModule, 'createDocument')
+      .mockReturnValue(document);
 
     expect(createOpenApiDocument(app)).toBe(document);
-    expect(mockedSwaggerModule.createDocument).toHaveBeenCalledWith(
-      app,
-      expect.any(Object),
-      { ignoreGlobalPrefix: true },
-    );
+    expect(createDocumentSpy).toHaveBeenCalledWith(app, expect.any(Object), {
+      ignoreGlobalPrefix: true,
+    });
 
-    const [, swaggerConfig] = mockedSwaggerModule.createDocument.mock.calls[0];
+    const [, swaggerConfig] = createDocumentSpy.mock.calls[0];
     expect(swaggerConfig.info).toEqual(
       expect.objectContaining({
         title: 'Common Admin API',
@@ -48,11 +105,43 @@ describe('openapi helpers', () => {
         version: '0.1.0',
       }),
     );
+
+    createDocumentSpy.mockRestore();
   });
 
   it('rejects generated paths that include the runtime API prefix', () => {
     expect(() =>
       assertPrefixFreeOpenApiPaths({ paths: { '/api/users': {} } }),
     ).toThrow('/api/users');
+  });
+});
+
+describe('OpenAPI operation ids', () => {
+  it('defines each generated endpoint operation id exactly once', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+    const app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api');
+
+    try {
+      await app.init();
+      const document = createOpenApiDocument(app);
+      const operationIds = collectOperationIds(document);
+      const operationIdCounts = operationIds.reduce<Record<string, number>>(
+        (counts, operationId) => ({
+          ...counts,
+          [operationId]: (counts[operationId] ?? 0) + 1,
+        }),
+        {},
+      );
+
+      expect(operationIds).toHaveLength(expectedOperationIds.length);
+      for (const operationId of expectedOperationIds) {
+        expect(operationIdCounts[operationId]).toBe(1);
+      }
+    } finally {
+      await app.close();
+    }
   });
 });

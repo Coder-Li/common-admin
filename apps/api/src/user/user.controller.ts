@@ -19,6 +19,7 @@ import {
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import {
@@ -46,6 +47,7 @@ export class UserController {
 
   @ApiOkResponse({ type: UserResponseDto })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiOperation({ operationId: 'getCurrentUser' })
   @Get('me')
   getMe(@CurrentUser() user: JwtUserPayload): Promise<UserProfile> {
     return this.userService.findProfileById(user.sub);
@@ -53,6 +55,7 @@ export class UserController {
 
   @ApiOkResponse({ type: UserListResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
+  @ApiOperation({ operationId: 'listUsers' })
   @Permissions('user.read')
   @Get()
   listUsers(@Query() query: UserListQueryDto): Promise<UserListResponseDto> {
@@ -62,6 +65,7 @@ export class UserController {
   @ApiOkResponse({ type: UserResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiOperation({ operationId: 'getUser' })
   @Permissions('user.read')
   @Get(':id')
   getUser(@Param('id') id: string): Promise<UserResponseDto> {
@@ -70,6 +74,7 @@ export class UserController {
 
   @ApiCreatedResponse({ type: UserResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
+  @ApiOperation({ operationId: 'createUser' })
   @Permissions('user.create')
   @Post()
   createUser(
@@ -87,6 +92,7 @@ export class UserController {
   @ApiOkResponse({ type: UserResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiOperation({ operationId: 'updateUser' })
   @Permissions('user.update')
   @Patch(':id')
   updateUser(
@@ -106,6 +112,7 @@ export class UserController {
   @ApiOkResponse({ type: UserResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiOperation({ operationId: 'resetUserPassword' })
   @Permissions('user.update')
   @Post(':id/reset-password')
   resetPassword(
@@ -125,6 +132,7 @@ export class UserController {
   @ApiOkResponse({ type: UserResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiOperation({ operationId: 'replaceUserRoles' })
   @Permissions('user.assign_roles')
   @Put(':id/roles')
   replaceRoles(
@@ -145,6 +153,7 @@ export class UserController {
   @ApiNoContentResponse({ description: 'User deleted' })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'User not found' })
+  @ApiOperation({ operationId: 'deleteUser' })
   @Permissions('user.delete')
   @HttpCode(204)
   @Delete(':id')

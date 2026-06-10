@@ -24,6 +24,7 @@ import {
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
@@ -51,6 +52,7 @@ export class FileController {
 
   @ApiOkResponse({ type: FileListResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
+  @ApiOperation({ operationId: 'listFiles' })
   @Permissions('file.read')
   @Get()
   listFiles(@Query() query: FileListQueryDto): Promise<FileListResponseDto> {
@@ -61,6 +63,7 @@ export class FileController {
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: UploadFileMetadataDto })
+  @ApiOperation({ operationId: 'uploadFile' })
   @Permissions('file.upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -87,6 +90,7 @@ export class FileController {
   @ApiOkResponse({ description: 'File download stream' })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'File not found' })
+  @ApiOperation({ operationId: 'downloadFile' })
   @Permissions('file.download')
   @Get(':id/download')
   async downloadFile(
@@ -106,6 +110,7 @@ export class FileController {
   @ApiOkResponse({ type: FileResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'File not found' })
+  @ApiOperation({ operationId: 'getFile' })
   @Permissions('file.read')
   @Get(':id')
   getFile(@Param('id') id: string): Promise<FileResponseDto> {
@@ -115,6 +120,7 @@ export class FileController {
   @ApiOkResponse({ type: FileResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'File not found' })
+  @ApiOperation({ operationId: 'updateFile' })
   @Permissions('file.update')
   @Patch(':id')
   updateFile(
@@ -134,6 +140,7 @@ export class FileController {
   @ApiNoContentResponse({ description: 'File deleted' })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'File not found' })
+  @ApiOperation({ operationId: 'deleteFile' })
   @Permissions('file.delete')
   @HttpCode(204)
   @Delete(':id')

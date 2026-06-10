@@ -1,5 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Permissions } from '../auth/permissions.decorator';
 import {
   PermissionModuleResponseDto,
@@ -14,6 +19,7 @@ export class PermissionController {
   constructor(private readonly permissionService: PermissionService) {}
 
   @ApiOkResponse({ type: [PermissionResponseDto] })
+  @ApiOperation({ operationId: 'listPermissions' })
   @Permissions('permission.read')
   @Get()
   listPermissions(): Promise<PermissionResponseDto[]> {
@@ -21,6 +27,7 @@ export class PermissionController {
   }
 
   @ApiOkResponse({ type: [PermissionModuleResponseDto] })
+  @ApiOperation({ operationId: 'listPermissionModules' })
   @Permissions('permission.read')
   @Get('modules')
   listPermissionModules(): Promise<PermissionModuleResponseDto[]> {
