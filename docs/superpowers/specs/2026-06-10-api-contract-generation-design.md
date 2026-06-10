@@ -132,6 +132,17 @@ export function createOpenApiDocument(app: INestApplication) {
 should use the same helper to write JSON. This prevents runtime Swagger UI and
 generated OpenAPI JSON from diverging.
 
+Use one explicit prefix policy:
+
+- Runtime API routes keep the existing global prefix: `/api`.
+- Generated OpenAPI paths must not include the global prefix.
+- Frontend Axios keeps `VITE_API_BASE_URL ?? '/api'`.
+
+With this policy, Orval generates paths such as `/users`, and the browser calls
+`/api/users`. The generation script or a small contract check should fail if any
+generated path starts with `/api/`, because that would create `/api/api/...`
+requests when combined with the frontend base URL.
+
 Add an API package script:
 
 ```json
@@ -144,49 +155,85 @@ The script should not require `pnpm dev:api` to be running. It should create
 the Nest application in-process, generate the document, write the JSON file,
 and close the app.
 
-## Operation Naming
+Generation must not connect to external services. Do not call `listen()`. Avoid
+`app.init()` unless implementation proves it is required for correct Swagger
+metadata and does not open Prisma or Redis connections. If `app.init()` becomes
+necessary, add a generation-mode guard or module override so OpenAPI generation
+still works without Postgres or Redis running.
 
-Generated hook names must be stable. The first version should use one of these
-approaches:
+The script may rely on the existing local defaults from `validateEnv`, but it
+should set `NODE_ENV=test` or another explicit generation-safe environment to
+avoid production-only env requirements. The shared app setup used by both
+runtime and generation should include validation pipes, CORS-relevant metadata
+only if needed by Swagger, global prefix setup, and Swagger document creation.
+The OpenAPI helper should use the Swagger option or equivalent post-processing
+needed to keep paths prefix-free.
 
-- Add stable `@ApiOperation({ operationId })` values to controllers.
-- Or configure a Swagger `operationIdFactory` that derives stable names from
-  controller and method names.
-
-Use clear operation ids:
+Add a contract assertion during generation:
 
 ```text
-login
-refreshSession
-logout
-changePassword
-getCurrentUser
-listUsers
-getUser
-createUser
-updateUser
-deleteUser
-replaceUserRoles
-resetUserPassword
-listRoles
-createRole
-updateRole
-deleteRole
-replaceRolePermissions
-listPermissionModules
-listDictionaryTypes
-createDictionaryType
-updateDictionaryType
-deleteDictionaryType
-listFiles
-uploadFile
-downloadFile
-listAuditLogs
-getAuditLog
+No OpenAPI path may start with /api/
 ```
 
-Do not allow generated names to depend on accidental controller method
-renames. Page imports should remain stable across small backend refactors.
+That assertion protects the chosen division of responsibility: OpenAPI paths
+are resource-relative, and the frontend base URL owns the deployment prefix.
+
+## Operation Naming
+
+Generated hook names must be stable. Use explicit
+`@ApiOperation({ operationId })` values for every generated endpoint. Do not
+use a controller/method-name `operationIdFactory` for this migration, because
+that would make generated imports depend on accidental backend method renames.
+
+Initial operation ids:
+
+| Method | Path | Operation ID |
+| --- | --- | --- |
+| `GET` | `/health` | `checkHealth` |
+| `POST` | `/auth/login` | `login` |
+| `POST` | `/auth/refresh` | `refreshSession` |
+| `POST` | `/auth/logout` | `logout` |
+| `POST` | `/auth/change-password` | `changePassword` |
+| `GET` | `/users/me` | `getCurrentUser` |
+| `GET` | `/users` | `listUsers` |
+| `GET` | `/users/{id}` | `getUser` |
+| `POST` | `/users` | `createUser` |
+| `PATCH` | `/users/{id}` | `updateUser` |
+| `DELETE` | `/users/{id}` | `deleteUser` |
+| `PUT` | `/users/{id}/roles` | `replaceUserRoles` |
+| `POST` | `/users/{id}/reset-password` | `resetUserPassword` |
+| `GET` | `/roles` | `listRoles` |
+| `GET` | `/roles/{id}` | `getRole` |
+| `POST` | `/roles` | `createRole` |
+| `PATCH` | `/roles/{id}` | `updateRole` |
+| `DELETE` | `/roles/{id}` | `deleteRole` |
+| `PUT` | `/roles/{id}/permissions` | `replaceRolePermissions` |
+| `GET` | `/permissions` | `listPermissions` |
+| `GET` | `/permissions/modules` | `listPermissionModules` |
+| `GET` | `/dictionaries/options` | `getDictionaryOptionsMap` |
+| `GET` | `/dictionaries/{typeCode}/options` | `getDictionaryOptions` |
+| `GET` | `/dictionary-types` | `listDictionaryTypes` |
+| `GET` | `/dictionary-types/{id}` | `getDictionaryType` |
+| `POST` | `/dictionary-types` | `createDictionaryType` |
+| `PATCH` | `/dictionary-types/{id}` | `updateDictionaryType` |
+| `DELETE` | `/dictionary-types/{id}` | `deleteDictionaryType` |
+| `GET` | `/dictionary-items` | `listDictionaryItems` |
+| `GET` | `/dictionary-items/{id}` | `getDictionaryItem` |
+| `POST` | `/dictionary-items` | `createDictionaryItem` |
+| `PATCH` | `/dictionary-items/{id}` | `updateDictionaryItem` |
+| `DELETE` | `/dictionary-items/{id}` | `deleteDictionaryItem` |
+| `GET` | `/files` | `listFiles` |
+| `GET` | `/files/{id}` | `getFile` |
+| `POST` | `/files` | `uploadFile` |
+| `PATCH` | `/files/{id}` | `updateFile` |
+| `DELETE` | `/files/{id}` | `deleteFile` |
+| `GET` | `/files/{id}/download` | `downloadFile` |
+| `GET` | `/audit-logs` | `listAuditLogs` |
+| `GET` | `/audit-logs/{id}` | `getAuditLog` |
+
+If a new controller endpoint should not be consumed by the admin app, still
+give it an explicit operation id and exclude it through the Orval config. Do
+not leave operation ids implicit.
 
 ## Orval Generation
 
@@ -216,6 +263,7 @@ The Orval config should:
 - Clean generated output before each run.
 - Split output by tag or operation group so the generated tree stays readable.
 - Export generated schemas and hooks from a stable index.
+- Generate or expose query key helpers and use them for invalidation.
 
 The exact generated file layout can follow Orval defaults, but the whole output
 must stay under:
@@ -258,6 +306,18 @@ Responsibilities:
 - Preserve support for `FormData` uploads.
 - Preserve support for blob downloads.
 
+The mutator should call a shared refresh coordinator instead of owning a private
+refresh promise. That coordinator should be used by:
+
+- the mutator when an ordinary request returns 401;
+- startup/session checks that explicitly refresh the current session;
+- any generated or hand-authored call path that needs `/auth/refresh`.
+
+This matters because refresh tokens are rotated through cookies. Two independent
+refresh calls can race and invalidate each other. `/auth/refresh` should still
+skip automatic refresh/replay loops, but it must participate in the same shared
+coordinator when the application intentionally refreshes a session.
+
 The mutator should initially rethrow Axios errors. After the later unified
 exception design lands, this file can normalize backend errors into a project
 shape such as:
@@ -275,6 +335,30 @@ interface ApiError {
 Generated hooks should know how to call the API. The mutator should know how a
 Common Admin request is safely sent.
 
+## File Endpoints
+
+File endpoints need explicit OpenAPI metadata and Orval overrides because they
+are the least likely to generate correct types from decorators alone.
+
+Upload rules:
+
+- `uploadFile` must declare `multipart/form-data`.
+- The request body must include a binary `file` field and the metadata fields
+  accepted by the backend.
+- The generated call should accept `FormData` or a typed payload that the
+  mutator converts to `FormData`; choose one convention during implementation
+  and document it.
+
+Download rules:
+
+- `downloadFile` must declare a binary response schema, such as
+  `type: string`, `format: binary`, with an appropriate content type.
+- The Orval config should override `downloadFile` to pass
+  `responseType: 'blob'`.
+- A thin feature-local facade is allowed if the generated download hook is
+  awkward for browser file-save behavior, but the facade should still call the
+  generated operation or mutator path.
+
 ## Frontend Usage Rules
 
 Pages may import generated hooks directly. This is the default path for new
@@ -289,6 +373,12 @@ value, such as:
 - Managing complex query invalidation.
 - Coordinating multi-step mutations.
 - Handling an endpoint that needs special file/blob behavior.
+
+All cache invalidation should use Orval generated query key helpers, or a small
+project-owned adapter that wraps those helpers. Do not introduce new handwritten
+query key strings during migration. If a feature-local facade coordinates
+multiple mutations, it should invalidate through generated keys rather than
+recreating endpoint names by hand.
 
 Feature-local `.types.ts` files should no longer duplicate backend DTOs. They
 may either:
@@ -319,8 +409,8 @@ remain application concerns.
 Rules:
 
 - Login should store the generated login response in the auth store.
-- Refresh should be called by the mutator and by any explicit startup/session
-  check that needs it.
+- Refresh should be called through the shared refresh coordinator by both the
+  mutator and any explicit startup/session check that needs it.
 - Logout should clear session state and query cache after the backend logout
   completes or if the user must be forced anonymous.
 - `/auth/login`, `/auth/refresh`, and `/auth/logout` should not trigger
@@ -350,6 +440,7 @@ Migrate in phases.
 - Move token injection, refresh, 401 replay, session reset, and cache clearing
   behavior into the mutator.
 - Add focused mutator tests.
+- Add focused refresh coordinator tests.
 - Confirm generated hooks use the mutator.
 
 ### Phase 3: Page Migration
@@ -397,7 +488,7 @@ Backend:
 - Add a focused test or script verification that OpenAPI JSON generation
   succeeds.
 - Add targeted checks for special endpoints if needed, especially multipart
-  upload, blob download, and stable operation ids.
+  upload, blob download, prefix-free paths, and stable operation ids.
 
 Frontend:
 
@@ -408,6 +499,8 @@ Frontend:
   - refresh failure cleanup
   - concurrent 401 responses sharing one refresh call
   - login/refresh/logout skip rules
+- Add tests for the shared refresh coordinator covering startup refresh racing
+  with 401-triggered refresh.
 - Update page tests to mock generated hooks or the request layer instead of the
   old `api-client`.
 - Keep page tests focused on UI behavior, not generated client mechanics.
@@ -437,11 +530,13 @@ Update README or a pattern guide with the standard new API workflow:
 ```text
 1. Add or update backend DTOs and controller Swagger metadata.
 2. Add stable operation ids.
-3. Run pnpm api:generate.
-4. Use generated React Query hooks in the admin page.
-5. Add a feature-local facade only for real page-level composition.
-6. Run pnpm api:check.
-7. Run pnpm lint && pnpm test && pnpm build.
+3. Confirm generated paths stay prefix-free.
+4. Run pnpm api:generate.
+5. Use generated React Query hooks in the admin page.
+6. Use generated query key helpers for invalidation.
+7. Add a feature-local facade only for real page-level composition.
+8. Run pnpm api:check.
+9. Run pnpm lint && pnpm test && pnpm build.
 ```
 
 Also document these rules:
@@ -450,6 +545,7 @@ Also document these rules:
 - Do not hand edit `apps/api/openapi.json`.
 - New simple modules should not create `xxx.api.ts`.
 - API DTO types should come from generated schemas.
+- Query invalidation should use generated query key helpers.
 - UI-only state can stay in feature-local types.
 
 ## Risks And Mitigations
@@ -471,7 +567,7 @@ If operation ids are accidental, generated hook imports will churn.
 
 Mitigation:
 
-- Use explicit operation ids or a stable operation id factory.
+- Use explicit operation ids for every generated endpoint.
 - Treat operation id changes as breaking frontend changes.
 
 ### Auth Refresh Complexity
@@ -482,8 +578,20 @@ cookie refresh, token replay, and session cleanup.
 Mitigation:
 
 - Require all generated calls to use the custom mutator.
+- Route all intentional refresh calls through one shared refresh coordinator.
 - Test the mutator independently.
 - Keep auth skip rules explicit.
+
+### Prefix Drift
+
+OpenAPI generation and frontend base URL configuration can accidentally split
+prefix ownership and produce `/api/api/...` requests.
+
+Mitigation:
+
+- Keep OpenAPI paths prefix-free.
+- Keep the frontend base URL responsible for `/api`.
+- Assert during generation that no OpenAPI path starts with `/api/`.
 
 ### File Endpoint Edge Cases
 
@@ -493,6 +601,8 @@ configuration.
 Mitigation:
 
 - Validate these endpoints during Phase 3.
+- Add explicit multipart and binary response metadata before generation.
+- Override `downloadFile` to request blobs.
 - Allow a thin local facade for blob download if generated hooks are awkward.
 
 ### Test Migration Cost
@@ -511,9 +621,13 @@ Mitigation:
 The design is complete when:
 
 - OpenAPI JSON can be generated without running a dev server.
+- Generated OpenAPI paths are prefix-free while the frontend base URL remains
+  `/api` by default.
 - Orval generates React Query hooks into `apps/admin/src/generated/api/`.
 - Generated requests use the project mutator.
+- All refresh paths use one shared refresh coordinator.
 - At least one CRUD module uses generated hooks directly.
+- Invalidation uses generated query key helpers or the project adapter.
 - The old handwritten API client is removed after migration.
 - `pnpm api:check` fails when OpenAPI or generated frontend output is stale.
 - Documentation tells template users how to add a new API-backed module.
