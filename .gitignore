@@ -32,6 +32,7 @@ prisma/dev.db-journal
 
 # Local runtime data
 .cache/
+.worktrees/
 .tmp/
 tmp/
 temp/
