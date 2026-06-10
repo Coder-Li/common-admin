@@ -52,6 +52,69 @@ admin@example.com
 Admin123!
 ```
 
+## Docker Compose 部署
+
+本地开发流程仍然使用 `pnpm dev`。Docker Compose 用作部署运行入口，默认只暴露 Nginx 端口，API、Postgres 和 Redis 只在 Compose 网络内访问。
+
+部署数据库密码应使用 URL-safe 字符，避免 `@`、`:`、`/`、`#`、`?` 等字符，除非后续调整 Compose 中的数据库 URL 构造方式。
+
+### 首次部署
+
+```bash
+cp .env.deploy.example .env.deploy
+# 修改 .env.deploy 中的密码、JWT secret、域名和端口配置
+
+docker compose --env-file .env.deploy up -d postgres redis
+pnpm deploy:init
+docker compose --env-file .env.deploy up -d --build
+```
+
+访问：
+
+```text
+Admin:   http://localhost:8080/
+Health:  http://localhost:8080/api/health
+Swagger: http://localhost:8080/api/docs
+```
+
+如果修改 `ADMIN_HTTP_PORT`，访问端口也随之变化。
+
+默认管理员账号：
+
+```text
+admin@example.com
+Admin123!
+```
+
+### 后续升级数据库
+
+如果新版本包含 Prisma migration，先构建新镜像，再执行迁移，最后启动或重建服务：
+
+```bash
+docker compose --env-file .env.deploy build api admin
+pnpm deploy:migrate
+docker compose --env-file .env.deploy up -d
+```
+
+`deploy:init` 会执行 seed，并会把默认管理员密码重置为 `Admin123!`。它只应该用于首次空库初始化；后续升级使用 `deploy:migrate`。
+
+### HTTP 与 HTTPS
+
+默认 Compose 部署支持 HTTP，所以 `.env.deploy.example` 使用：
+
+```text
+AUTH_REFRESH_COOKIE_SECURE=false
+AUTH_REFRESH_COOKIE_SAME_SITE=lax
+```
+
+如果你在 HTTPS 后面部署，建议改为：
+
+```text
+AUTH_REFRESH_COOKIE_SECURE=true
+```
+
+如果未来前端和 API 分不同站点部署，再根据实际域名调整 `AUTH_REFRESH_COOKIE_SAME_SITE` 和 `AUTH_REFRESH_COOKIE_DOMAIN`；`AUTH_REFRESH_COOKIE_SAME_SITE=none` 必须同时使用 `AUTH_REFRESH_COOKIE_SECURE=true`。
+
 ## 常用命令
 
 ```bash

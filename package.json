@@ -10,6 +10,8 @@
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test",
     "lint": "pnpm -r --if-present lint",
-    "format": "pnpm -r --if-present format"
+    "format": "pnpm -r --if-present format",
+    "deploy:init": "docker compose --env-file .env.deploy build api && docker compose --env-file .env.deploy run --rm api pnpm --filter api deploy:init",
+    "deploy:migrate": "docker compose --env-file .env.deploy build api && docker compose --env-file .env.deploy run --rm api pnpm --filter api deploy:migrate"
   }
 }

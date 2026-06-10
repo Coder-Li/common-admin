@@ -6,6 +6,7 @@ describe('validateEnv', () => {
       validateEnv({
         NODE_ENV: 'production',
         JWT_ACCESS_TOKEN_SECRET: 'local-access-secret-change-me',
+        AUTH_REFRESH_COOKIE_SECURE: 'true',
       }),
     ).toThrow('JWT_ACCESS_TOKEN_SECRET must be configured in production');
   });
@@ -37,7 +38,18 @@ describe('validateEnv', () => {
     });
   });
 
-  it('rejects sameSite none without secure cookies in production', () => {
+  it('allows sameSite none with secure cookies in production', () => {
+    expect(
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_ACCESS_TOKEN_SECRET: 'production-secret-change-me',
+        AUTH_REFRESH_COOKIE_SAME_SITE: 'none',
+        AUTH_REFRESH_COOKIE_SECURE: 'true',
+      }).AUTH_REFRESH_COOKIE_SAME_SITE,
+    ).toBe('none');
+  });
+
+  it('rejects sameSite none without secure cookies', () => {
     expect(() =>
       validateEnv({
         NODE_ENV: 'production',
@@ -45,17 +57,45 @@ describe('validateEnv', () => {
         AUTH_REFRESH_COOKIE_SAME_SITE: 'none',
         AUTH_REFRESH_COOKIE_SECURE: 'false',
       }),
-    ).toThrow('AUTH_REFRESH_COOKIE_SECURE must be true');
+    ).toThrow(
+      'AUTH_REFRESH_COOKIE_SECURE must be true when AUTH_REFRESH_COOKIE_SAME_SITE is none',
+    );
   });
 
-  it('rejects insecure refresh cookies in production', () => {
+  it('allows insecure refresh cookies in production when explicitly configured for HTTP deployments', () => {
+    expect(
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_ACCESS_TOKEN_SECRET: 'production-secret-change-me',
+        AUTH_REFRESH_COOKIE_SECURE: 'false',
+        ALLOWED_ORIGINS: 'http://localhost:8080',
+      }).AUTH_REFRESH_COOKIE_SECURE,
+    ).toBe(false);
+  });
+
+  it('requires refresh cookie secure mode to be explicit in production', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_ACCESS_TOKEN_SECRET: 'production-secret-change-me',
+        ALLOWED_ORIGINS: 'http://localhost:8080',
+      }),
+    ).toThrow(
+      'AUTH_REFRESH_COOKIE_SECURE must be explicitly configured in production',
+    );
+  });
+
+  it('rejects insecure refresh cookies in production for non-HTTP origins', () => {
     expect(() =>
       validateEnv({
         NODE_ENV: 'production',
         JWT_ACCESS_TOKEN_SECRET: 'production-secret-change-me',
         AUTH_REFRESH_COOKIE_SECURE: 'false',
+        ALLOWED_ORIGINS: 'https://admin.example.com',
       }),
-    ).toThrow('AUTH_REFRESH_COOKIE_SECURE must be true in production');
+    ).toThrow(
+      'AUTH_REFRESH_COOKIE_SECURE=false is only allowed with HTTP origins',
+    );
   });
 
   it('rejects wildcard allowed origins in production', () => {
