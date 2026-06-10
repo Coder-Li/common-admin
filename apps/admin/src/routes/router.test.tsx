@@ -7,6 +7,7 @@ import '@testing-library/jest-dom/vitest'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../app/api-client'
+import { apiRefreshCoordinator } from '../app/api-mutator'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { useAuthStore } from '../stores/auth-store'
 import { ThemeProvider } from '../theme/ThemeProvider'
@@ -19,6 +20,13 @@ vi.mock('../app/api-client', () => ({
     login: vi.fn(),
     logout: vi.fn(),
     me: vi.fn(),
+    refresh: vi.fn(),
+  },
+}))
+
+vi.mock('../app/api-mutator', () => ({
+  apiMutator: vi.fn(),
+  apiRefreshCoordinator: {
     refresh: vi.fn(),
   },
 }))
@@ -112,6 +120,7 @@ describe('admin router guards', () => {
     vi.mocked(api.logout).mockReset()
     vi.mocked(api.me).mockReset()
     vi.mocked(api.refresh).mockReset()
+    vi.mocked(apiRefreshCoordinator.refresh).mockReset()
     vi.mocked(api.me).mockResolvedValue(session.user)
     useAuthStore.getState().reset()
   })
@@ -123,7 +132,9 @@ describe('admin router guards', () => {
   })
 
   it('renders loading for / while auth is checking', async () => {
-    vi.mocked(api.refresh).mockReturnValue(new Promise(() => undefined))
+    vi.mocked(apiRefreshCoordinator.refresh).mockReturnValue(
+      new Promise(() => undefined),
+    )
 
     renderRouter({ path: '/', status: 'checking' })
 
@@ -131,7 +142,9 @@ describe('admin router guards', () => {
   })
 
   it('renders loading for /login while auth is checking', async () => {
-    vi.mocked(api.refresh).mockReturnValue(new Promise(() => undefined))
+    vi.mocked(apiRefreshCoordinator.refresh).mockReturnValue(
+      new Promise(() => undefined),
+    )
 
     renderRouter({ path: '/login', status: 'checking' })
 
@@ -222,6 +235,7 @@ describe('admin router startup refresh', () => {
     vi.mocked(api.logout).mockReset()
     vi.mocked(api.me).mockReset()
     vi.mocked(api.refresh).mockReset()
+    vi.mocked(apiRefreshCoordinator.refresh).mockReset()
     vi.mocked(api.me).mockResolvedValue(session.user)
     useAuthStore.getState().reset()
   })
@@ -233,17 +247,22 @@ describe('admin router startup refresh', () => {
   })
 
   it('runs refresh while auth is checking', async () => {
-    vi.mocked(api.refresh).mockReturnValue(new Promise(() => undefined))
+    vi.mocked(apiRefreshCoordinator.refresh).mockReturnValue(
+      new Promise(() => undefined),
+    )
 
     renderRouter({ path: '/dashboard', status: 'checking' })
 
     await waitFor(() => {
-      expect(api.refresh).toHaveBeenCalledTimes(1)
+      expect(apiRefreshCoordinator.refresh).toHaveBeenCalledTimes(1)
     })
   })
 
   it('stores a successful refresh session and reaches the protected route', async () => {
-    vi.mocked(api.refresh).mockResolvedValue(session)
+    vi.mocked(apiRefreshCoordinator.refresh).mockImplementation(async () => {
+      useAuthStore.getState().setSession(session)
+      return session
+    })
 
     renderRouter({ path: '/dashboard', status: 'checking' })
 
@@ -253,7 +272,10 @@ describe('admin router startup refresh', () => {
   })
 
   it('marks anonymous after a failed refresh and reaches /login', async () => {
-    vi.mocked(api.refresh).mockRejectedValue(new Error('expired'))
+    vi.mocked(apiRefreshCoordinator.refresh).mockImplementation(async () => {
+      useAuthStore.getState().setAnonymous()
+      throw new Error('expired')
+    })
     const router = renderRouter({ path: '/dashboard', status: 'checking' })
 
     expect(await screen.findByText('Sign in to continue')).toBeInTheDocument()

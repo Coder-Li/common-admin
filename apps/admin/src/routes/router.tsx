@@ -1,6 +1,6 @@
 import { RouterProvider } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef } from 'react'
-import { api } from '../app/api-client'
+import { apiRefreshCoordinator } from '../app/api-mutator'
 import { useAuthStore } from '../stores/auth-store'
 import {
   createAdminRouter,
@@ -15,7 +15,6 @@ export function AdminRouterProvider({
 }) {
   const status = useAuthStore((state) => state.status)
   const permissions = useAuthStore((state) => state.permissions)
-  const setSession = useAuthStore((state) => state.setSession)
   const setAnonymous = useAuthStore((state) => state.setAnonymous)
   const refreshStartedRef = useRef(false)
   const activeRouter = useMemo(() => router ?? createAdminRouter(), [router])
@@ -36,11 +35,8 @@ export function AdminRouterProvider({
     }
 
     refreshStartedRef.current = true
-    void api
-      .refresh()
-      .then((session) => setSession(session))
-      .catch(() => setAnonymous())
-  }, [status, setSession, setAnonymous])
+    void apiRefreshCoordinator.refresh().catch(() => setAnonymous())
+  }, [status, setAnonymous])
 
   useEffect(() => {
     void activeRouter.invalidate()
