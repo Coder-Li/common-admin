@@ -19,8 +19,18 @@ import { AdminRouterProvider } from '../../routes/router'
 import { createAdminRouter } from '../../routes/router-factory'
 import { useAuthStore } from '../../stores/auth-store'
 import { ThemeProvider } from '../../theme/ThemeProvider'
+import {
+  createUser,
+  deleteUser,
+  getListUsersQueryKey,
+  listUsers,
+  replaceUserRoles,
+  resetUserPassword,
+  updateUser,
+} from '../../generated/api/endpoints/users/users'
 import type {
   CreateUserRequest,
+  ListUsersParams,
   UpdateUserRequest,
   UserListQuery,
   UserListResponse,
@@ -28,22 +38,23 @@ import type {
 } from './users.types'
 import { UsersPage } from './UsersPage'
 
-const usersApiMock = vi.hoisted(() => ({
-  createUser: vi.fn(),
-  deleteUser: vi.fn(),
-  listUsers: vi.fn(),
-  replaceUserRoles: vi.fn(),
-  resetUserPassword: vi.fn(),
-  updateUser: vi.fn(),
-}))
-
 const rolesApiMock = vi.hoisted(() => ({
   rolesApi: {
     list: vi.fn(),
   },
 }))
 
-vi.mock('./users.api', () => usersApiMock)
+vi.mock('../../generated/api/endpoints/users/users', () => ({
+  createUser: vi.fn(),
+  deleteUser: vi.fn(),
+  getListUsersQueryKey: vi.fn((params?: ListUsersParams) =>
+    params ? ['/users', params] : ['/users'],
+  ),
+  listUsers: vi.fn(),
+  replaceUserRoles: vi.fn(),
+  resetUserPassword: vi.fn(),
+  updateUser: vi.fn(),
+}))
 
 vi.mock('../roles/roles.api', () => rolesApiMock)
 
@@ -252,12 +263,16 @@ describe('UsersPage', () => {
     vi.mocked(api.logout).mockResolvedValue(undefined)
     vi.mocked(api.refresh).mockReset()
     vi.mocked(clearQueryCache).mockReset()
-    usersApiMock.createUser.mockReset()
-    usersApiMock.deleteUser.mockReset()
-    usersApiMock.listUsers.mockReset()
-    usersApiMock.replaceUserRoles.mockReset()
-    usersApiMock.resetUserPassword.mockReset()
-    usersApiMock.updateUser.mockReset()
+    vi.mocked(createUser).mockReset()
+    vi.mocked(deleteUser).mockReset()
+    vi.mocked(getListUsersQueryKey).mockClear()
+    vi.mocked(getListUsersQueryKey).mockImplementation(
+      (params?: ListUsersParams) => (params ? ['/users', params] : ['/users']),
+    )
+    vi.mocked(listUsers).mockReset()
+    vi.mocked(replaceUserRoles).mockReset()
+    vi.mocked(resetUserPassword).mockReset()
+    vi.mocked(updateUser).mockReset()
     rolesApiMock.rolesApi.list.mockReset()
     rolesApiMock.rolesApi.list.mockResolvedValue({
       items: roleOptions,
@@ -273,7 +288,7 @@ describe('UsersPage', () => {
   })
 
   it('renders the loading state while users are loading', () => {
-    usersApiMock.listUsers.mockReturnValue(deferred<UserListResponse>().promise)
+    vi.mocked(listUsers).mockReturnValue(deferred<UserListResponse>().promise)
 
     renderUsersPage()
 
@@ -281,7 +296,7 @@ describe('UsersPage', () => {
   })
 
   it('renders an empty state when no users match the query', async () => {
-    usersApiMock.listUsers.mockResolvedValue(listResponse([]))
+    vi.mocked(listUsers).mockResolvedValue(listResponse([]))
 
     renderUsersPage()
 
@@ -289,7 +304,7 @@ describe('UsersPage', () => {
   })
 
   it('renders returned data rows', async () => {
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice, bruno]))
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice, bruno]))
 
     renderUsersPage()
 
@@ -299,7 +314,7 @@ describe('UsersPage', () => {
   })
 
   it('renders table role labels from role records', async () => {
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice, bruno]))
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice, bruno]))
 
     renderUsersPage()
 
@@ -308,7 +323,7 @@ describe('UsersPage', () => {
   })
 
   it('renders role records in the role filter while keeping all roles', async () => {
-    usersApiMock.listUsers.mockResolvedValue(listResponse([]))
+    vi.mocked(listUsers).mockResolvedValue(listResponse([]))
 
     renderUsersPage()
     await screen.findByText('No users found')
@@ -328,7 +343,7 @@ describe('UsersPage', () => {
 
   it('renders role records in the role select', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([]))
+    vi.mocked(listUsers).mockResolvedValue(listResponse([]))
 
     renderUsersPage()
     await screen.findByText('No users found')
@@ -349,8 +364,8 @@ describe('UsersPage', () => {
 
   it('keeps user creation usable with selected role codes', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([]))
-    usersApiMock.createUser.mockResolvedValue(alice)
+    vi.mocked(listUsers).mockResolvedValue(listResponse([]))
+    vi.mocked(createUser).mockResolvedValue(alice)
 
     renderUsersPage()
     await screen.findByText('No users found')
@@ -366,7 +381,7 @@ describe('UsersPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Create user' }))
 
     await waitFor(() => {
-      expect(usersApiMock.createUser).toHaveBeenCalledWith(
+      expect(createUser).toHaveBeenCalledWith(
         expect.objectContaining<CreateUserRequest>({
           email: 'alice@example.com',
           firstName: 'Alice',
@@ -381,7 +396,7 @@ describe('UsersPage', () => {
 
   it('queries the list again when the role filter changes', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
 
     renderUsersPage()
     await screen.findByText('alice')
@@ -389,7 +404,7 @@ describe('UsersPage', () => {
     await user.selectOptions(screen.getByLabelText('Filter by role'), 'admin')
 
     await waitFor(() => {
-      expect(usersApiMock.listUsers).toHaveBeenLastCalledWith(
+      expect(listUsers).toHaveBeenLastCalledWith(
         expect.objectContaining<UserListQuery>({
           page: 1,
           pageSize: 20,
@@ -401,23 +416,23 @@ describe('UsersPage', () => {
 
   it('does not send a sort query for synthetic full name column clicks', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
 
     renderUsersPage()
     await screen.findByText('alice')
 
     await user.click(screen.getByText('Full name'))
 
-    expect(usersApiMock.listUsers).toHaveBeenCalledTimes(1)
-    expect(usersApiMock.listUsers).toHaveBeenLastCalledWith(
+    expect(listUsers).toHaveBeenCalledTimes(1)
+    expect(listUsers).toHaveBeenLastCalledWith(
       expect.not.objectContaining({ sort: 'fullName:asc' }),
     )
   })
 
   it('refetches the users list and closes the form after create succeeds', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([]))
-    usersApiMock.createUser.mockResolvedValue(alice)
+    vi.mocked(listUsers).mockResolvedValue(listResponse([]))
+    vi.mocked(createUser).mockResolvedValue(alice)
 
     renderUsersPage()
     await screen.findByText('No users found')
@@ -433,7 +448,7 @@ describe('UsersPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Create user' }))
 
     await waitFor(() => {
-      expect(usersApiMock.createUser).toHaveBeenCalledWith(
+      expect(createUser).toHaveBeenCalledWith(
         expect.objectContaining<CreateUserRequest>({
           email: 'alice@example.com',
           firstName: 'Alice',
@@ -444,18 +459,18 @@ describe('UsersPage', () => {
         }),
       )
     })
-    await waitFor(() => expect(usersApiMock.listUsers).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(listUsers).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('refetches the users list after update succeeds', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
-    usersApiMock.updateUser.mockResolvedValue({
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+    vi.mocked(updateUser).mockResolvedValue({
       ...alice,
       firstName: 'Alicia',
     })
-    usersApiMock.replaceUserRoles.mockResolvedValue({
+    vi.mocked(replaceUserRoles).mockResolvedValue({
       ...alice,
       firstName: 'Alicia',
     })
@@ -471,7 +486,7 @@ describe('UsersPage', () => {
     )
 
     await waitFor(() => {
-      expect(usersApiMock.updateUser).toHaveBeenCalledWith(
+      expect(updateUser).toHaveBeenCalledWith(
         'user-1',
         expect.objectContaining<UpdateUserRequest>({
           email: 'alice@example.com',
@@ -482,18 +497,18 @@ describe('UsersPage', () => {
       )
     })
     await waitFor(() => {
-      expect(usersApiMock.replaceUserRoles).toHaveBeenCalledWith('user-1', [
-        'admin',
-      ])
+      expect(replaceUserRoles).toHaveBeenCalledWith('user-1', {
+        roleCodes: ['admin'],
+      })
     })
-    await waitFor(() => expect(usersApiMock.listUsers).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(listUsers).toHaveBeenCalledTimes(2))
   })
 
   it('replaces roles with the selected role codes when editing a user', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
-    usersApiMock.updateUser.mockResolvedValue(alice)
-    usersApiMock.replaceUserRoles.mockResolvedValue({
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+    vi.mocked(updateUser).mockResolvedValue(alice)
+    vi.mocked(replaceUserRoles).mockResolvedValue({
       ...alice,
       roles: [{ code: 'standard', name: 'Team member' }],
     })
@@ -515,16 +530,16 @@ describe('UsersPage', () => {
     )
 
     await waitFor(() => {
-      expect(usersApiMock.replaceUserRoles).toHaveBeenCalledWith('user-1', [
-        'standard',
-      ])
+      expect(replaceUserRoles).toHaveBeenCalledWith('user-1', {
+        roleCodes: ['standard'],
+      })
     })
   })
 
   it('replaces roles without updating profile fields when only role assignment is allowed', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
-    usersApiMock.replaceUserRoles.mockResolvedValue({
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+    vi.mocked(replaceUserRoles).mockResolvedValue({
       ...alice,
       roles: [{ code: 'standard', name: 'Team member' }],
     })
@@ -546,17 +561,17 @@ describe('UsersPage', () => {
     )
 
     await waitFor(() => {
-      expect(usersApiMock.replaceUserRoles).toHaveBeenCalledWith('user-1', [
-        'standard',
-      ])
+      expect(replaceUserRoles).toHaveBeenCalledWith('user-1', {
+        roleCodes: ['standard'],
+      })
     })
-    expect(usersApiMock.updateUser).not.toHaveBeenCalled()
+    expect(updateUser).not.toHaveBeenCalled()
   })
 
   it('resets a user password and refetches users', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
-    usersApiMock.resetUserPassword.mockResolvedValue(undefined)
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+    vi.mocked(resetUserPassword).mockResolvedValue(alice)
 
     renderUsersPage()
     await screen.findByText('alice')
@@ -570,18 +585,18 @@ describe('UsersPage', () => {
     )
 
     await waitFor(() => {
-      expect(usersApiMock.resetUserPassword).toHaveBeenCalledWith('user-1', {
+      expect(resetUserPassword).toHaveBeenCalledWith('user-1', {
         newPassword: 'NewPassword123!',
       })
     })
-    await waitFor(() => expect(usersApiMock.listUsers).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(listUsers).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('clears the session when resetting the current user password', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
-    usersApiMock.resetUserPassword.mockResolvedValue(undefined)
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+    vi.mocked(resetUserPassword).mockResolvedValue(alice)
 
     const { router } = renderUsersRoute(alice)
     await screen.findByText('alice')
@@ -595,7 +610,7 @@ describe('UsersPage', () => {
     )
 
     await waitFor(() => {
-      expect(usersApiMock.resetUserPassword).toHaveBeenCalledWith('user-1', {
+      expect(resetUserPassword).toHaveBeenCalledWith('user-1', {
         newPassword: 'NewPassword123!',
       })
     })
@@ -609,7 +624,7 @@ describe('UsersPage', () => {
   })
 
   it('hides create, edit, delete, and role assignment without permissions', async () => {
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
 
     renderUsersPage([])
     await screen.findByText('alice')
@@ -625,8 +640,8 @@ describe('UsersPage', () => {
 
   it('confirms delete, calls delete, and refetches users', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers.mockResolvedValue(listResponse([alice]))
-    usersApiMock.deleteUser.mockResolvedValue(undefined)
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+    vi.mocked(deleteUser).mockResolvedValue(undefined)
 
     renderUsersPage()
     await screen.findByText('alice')
@@ -635,14 +650,14 @@ describe('UsersPage', () => {
     await user.click(screen.getByRole('button', { name: 'Delete user' }))
 
     await waitFor(() => {
-      expect(usersApiMock.deleteUser).toHaveBeenCalledWith('user-1')
+      expect(deleteUser).toHaveBeenCalledWith('user-1')
     })
-    await waitFor(() => expect(usersApiMock.listUsers).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(listUsers).toHaveBeenCalledTimes(2))
   })
 
   it('renders an error state with retry', async () => {
     const user = userEvent.setup()
-    usersApiMock.listUsers
+    vi.mocked(listUsers)
       .mockRejectedValueOnce(new Error('Users are unavailable'))
       .mockResolvedValueOnce(listResponse([alice]))
 
@@ -652,6 +667,6 @@ describe('UsersPage', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(await screen.findByText('alice')).toBeInTheDocument()
-    expect(usersApiMock.listUsers).toHaveBeenCalledTimes(2)
+    expect(listUsers).toHaveBeenCalledTimes(2)
   })
 })

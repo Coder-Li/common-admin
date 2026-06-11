@@ -22,11 +22,13 @@ import { UserForm } from './UserForm'
 import {
   createUser,
   deleteUser,
+  getListUsersQueryKey,
   listUsers,
   replaceUserRoles,
   resetUserPassword,
   updateUser,
-} from './users.api'
+} from '../../generated/api/endpoints/users/users'
+import type { ListUsersParams } from '../../generated/api/schemas'
 import { createUserColumns } from './users.columns'
 import type {
   CreateUserRequest,
@@ -105,12 +107,15 @@ export function UsersPage() {
       search,
       sort: toSortParam(sorting),
     },
-    queryFn: listUsers,
+    queryFn: (query) => listUsers(query as unknown as ListUsersParams),
   })
 
-  const invalidateUsers = () => queryClient.invalidateQueries({
-    queryKey: ['users', 'list'],
-  })
+  const invalidateUsers = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: ['users', 'list'] }),
+    ])
+  }
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateUserRequest) => createUser(payload),
@@ -136,7 +141,7 @@ export function UsersPage() {
       }
 
       if (canAssignRoles) {
-        return replaceUserRoles(payload.id, payload.roleCodes)
+        return replaceUserRoles(payload.id, { roleCodes: payload.roleCodes })
       }
 
       return updatedUser

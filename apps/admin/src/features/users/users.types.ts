@@ -1,50 +1,25 @@
-export interface UserRoleSummary {
-  code: string
-  name: string
-}
+import type {
+  CreateUserDto,
+  ListUsersParams as GeneratedListUsersParams,
+  ReplaceUserRolesDto,
+  ResetUserPasswordDto,
+  UpdateUserDto,
+  UserListResponseDto,
+  UserResponseDto,
+  UserRoleResponseDto,
+} from '../../generated/api/schemas'
 
-export interface UserListQuery {
+export type UserRoleSummary = UserRoleResponseDto
+export type UserRecord = UserResponseDto
+export type UserListResponse = UserListResponseDto
+export type CreateUserRequest = CreateUserDto
+export type UpdateUserRequest = UpdateUserDto
+export type ResetUserPasswordRequest = ResetUserPasswordDto
+export type ReplaceUserRolesRequest = ReplaceUserRolesDto
+export type ListUsersParams = GeneratedListUsersParams
+
+export interface UserListQuery
+  extends Omit<GeneratedListUsersParams, 'page' | 'pageSize'> {
   page: number
   pageSize: number
-  search?: string
-  sort?: string
-  roleCode?: string
-}
-
-export interface UserRecord {
-  id: string
-  email: string
-  username: string
-  firstName: string
-  lastName: string
-  roles: UserRoleSummary[]
-  createdAt: string
-  updatedAt: string
-}
-
-export interface UserListResponse {
-  items: UserRecord[]
-  total: number
-  page: number
-  pageSize: number
-}
-
-export interface CreateUserRequest {
-  email: string
-  username: string
-  firstName: string
-  lastName: string
-  password: string
-  roleCodes?: string[]
-}
-
-export interface UpdateUserRequest {
-  email?: string
-  username?: string
-  firstName?: string
-  lastName?: string
-}
-
-export interface ResetUserPasswordRequest {
-  newPassword: string
 }
