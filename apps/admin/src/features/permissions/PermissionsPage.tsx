@@ -8,8 +8,8 @@ import type {
   SortingState,
 } from '../../components/data-table/DataTable'
 import {
-  getListPermissionModulesQueryKey,
-  listPermissionModules,
+  getListPermissionsQueryKey,
+  listPermissions,
 } from '../../generated/api/endpoints/permissions/permissions'
 import { useI18n } from '../../i18n/useI18n'
 import type { PermissionRecord } from '../roles/roles.types'
@@ -50,15 +50,11 @@ export function PermissionsPage() {
   const [sorting, setSorting] = useState<SortingState>([])
 
   const permissionsQuery = useQuery({
-    queryKey: getListPermissionModulesQueryKey(),
-    queryFn: () => listPermissionModules(),
+    queryKey: getListPermissionsQueryKey(),
+    queryFn: () => listPermissions(),
   })
 
-  const permissions = useMemo(
-    () =>
-      (permissionsQuery.data ?? []).flatMap((module) => module.permissions),
-    [permissionsQuery.data],
-  )
+  const permissions = permissionsQuery.data ?? []
 
   const filteredPermissions = useMemo(() => {
     const nextPermissions = permissions.filter((permission) =>

@@ -1,49 +1,45 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
-import { listPermissionModules } from '../../generated/api/endpoints/permissions/permissions'
+import { listPermissions } from '../../generated/api/endpoints/permissions/permissions'
 import { PermissionsPage } from './PermissionsPage'
-import type { PermissionModule } from '../roles/roles.types'
+import type { PermissionRecord } from '../roles/roles.types'
 
 vi.mock('../../generated/api/endpoints/permissions/permissions', () => ({
-  getListPermissionModulesQueryKey: vi.fn(() => ['/permissions/modules']),
-  listPermissionModules: vi.fn(),
+  getListPermissionsQueryKey: vi.fn(() => ['/permissions']),
+  listPermissions: vi.fn(),
 }))
 
-const modules: PermissionModule[] = [
+const permissions: PermissionRecord[] = [
   {
+    id: 'permission-1',
+    code: 'user.read',
     module: 'user',
-    permissions: [
-      {
-        id: 'permission-1',
-        code: 'user.read',
-        module: 'user',
-        action: 'read',
-        name: 'View users',
-        description: null,
-        status: 'ACTIVE',
-        sortOrder: 100,
-      },
-    ],
+    action: 'read',
+    name: 'View users',
+    description: null,
+    status: 'ACTIVE',
+    sortOrder: 100,
   },
   {
+    id: 'permission-2',
+    code: 'role.assign_permissions',
     module: 'role',
-    permissions: [
-      {
-        id: 'permission-2',
-        code: 'role.assign_permissions',
-        module: 'role',
-        action: 'assign_permissions',
-        name: 'Assign role permissions',
-        description: null,
-        status: 'DISABLED',
-        sortOrder: 240,
-      },
-    ],
+    action: 'assign_permissions',
+    name: 'Assign role permissions',
+    description: null,
+    status: 'DISABLED',
+    sortOrder: 240,
   },
 ]
 
@@ -65,7 +61,7 @@ function renderPermissionsPage() {
 
 describe('PermissionsPage', () => {
   beforeEach(() => {
-    vi.mocked(listPermissionModules).mockResolvedValue(modules)
+    vi.mocked(listPermissions).mockResolvedValue(permissions)
   })
 
   afterEach(() => {
@@ -73,13 +69,13 @@ describe('PermissionsPage', () => {
     vi.clearAllMocks()
   })
 
-  it('lists permission modules as table rows', async () => {
+  it('lists permissions as table rows', async () => {
     renderPermissionsPage()
 
+    await waitFor(() => expect(listPermissions).toHaveBeenCalledTimes(1))
     const userPermissionRow = (await screen.findByText('user.read')).closest(
       'tr',
     )
-    expect(listPermissionModules).toHaveBeenCalledTimes(1)
     expect(userPermissionRow).not.toBeNull()
     expect(
       within(userPermissionRow as HTMLTableRowElement).getByText('View users'),
