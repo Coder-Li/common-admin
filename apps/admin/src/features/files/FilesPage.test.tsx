@@ -13,6 +13,14 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
 import { useAuthStore } from '../../stores/auth-store'
+import {
+  deleteFile,
+  downloadFile,
+  getFile,
+  listFiles,
+  updateFile,
+  uploadFile,
+} from '../../generated/api/endpoints/files/files'
 import type {
   FileListQuery,
   FileListResponse,
@@ -21,15 +29,14 @@ import type {
 } from './files.types'
 import { FilesPage } from './FilesPage'
 
-const filesApiMock = vi.hoisted(() => ({
+vi.mock('../../generated/api/endpoints/files/files', () => ({
   deleteFile: vi.fn(),
   downloadFile: vi.fn(),
+  getFile: vi.fn(),
   listFiles: vi.fn(),
   updateFile: vi.fn(),
   uploadFile: vi.fn(),
 }))
-
-vi.mock('./files.api', () => filesApiMock)
 
 vi.mock('sonner', () => ({
   toast: {
@@ -113,11 +120,13 @@ function renderFilesPage(
 
 describe('FilesPage', () => {
   beforeEach(() => {
-    filesApiMock.deleteFile.mockReset()
-    filesApiMock.downloadFile.mockReset()
-    filesApiMock.listFiles.mockReset()
-    filesApiMock.updateFile.mockReset()
-    filesApiMock.uploadFile.mockReset()
+    vi.mocked(deleteFile).mockReset()
+    vi.mocked(downloadFile).mockReset()
+    vi.mocked(getFile).mockReset()
+    vi.mocked(listFiles).mockReset()
+    vi.mocked(updateFile).mockReset()
+    vi.mocked(uploadFile).mockReset()
+    vi.mocked(getFile).mockResolvedValue(report)
     URL.createObjectURL = vi.fn(() => 'blob:download-url')
     URL.revokeObjectURL = vi.fn()
   })
@@ -128,7 +137,7 @@ describe('FilesPage', () => {
   })
 
   it('renders the loading state while files are loading', () => {
-    filesApiMock.listFiles.mockReturnValue(deferred<FileListResponse>().promise)
+    vi.mocked(listFiles).mockReturnValue(deferred<FileListResponse>().promise)
 
     renderFilesPage()
 
@@ -136,7 +145,7 @@ describe('FilesPage', () => {
   })
 
   it('renders an empty state when no files match the query', async () => {
-    filesApiMock.listFiles.mockResolvedValue(listResponse([]))
+    vi.mocked(listFiles).mockResolvedValue(listResponse([]))
 
     renderFilesPage()
 
@@ -145,7 +154,7 @@ describe('FilesPage', () => {
 
   it('renders an error state with retry', async () => {
     const user = userEvent.setup()
-    filesApiMock.listFiles
+    vi.mocked(listFiles)
       .mockRejectedValueOnce(new Error('Files are unavailable'))
       .mockResolvedValueOnce(listResponse([report]))
 
@@ -155,11 +164,11 @@ describe('FilesPage', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(await screen.findByText('Report')).toBeInTheDocument()
-    expect(filesApiMock.listFiles).toHaveBeenCalledTimes(2)
+    expect(listFiles).toHaveBeenCalledTimes(2)
   })
 
   it('renders returned file records', async () => {
-    filesApiMock.listFiles.mockResolvedValue(listResponse([report]))
+    vi.mocked(listFiles).mockResolvedValue(listResponse([report]))
 
     renderFilesPage()
 
@@ -171,7 +180,7 @@ describe('FilesPage', () => {
 
   it('queries the list again when search changes', async () => {
     const user = userEvent.setup()
-    filesApiMock.listFiles.mockResolvedValue(listResponse([report]))
+    vi.mocked(listFiles).mockResolvedValue(listResponse([report]))
 
     renderFilesPage()
     await screen.findByText('Report')
@@ -179,7 +188,7 @@ describe('FilesPage', () => {
     await user.type(screen.getByLabelText('Search files'), 'report')
 
     await waitFor(() => {
-      expect(filesApiMock.listFiles).toHaveBeenLastCalledWith(
+      expect(listFiles).toHaveBeenLastCalledWith(
         expect.objectContaining<FileListQuery>({
           page: 1,
           pageSize: 20,
@@ -191,8 +200,8 @@ describe('FilesPage', () => {
 
   it('invalidates the file list and closes the upload dialog after upload succeeds', async () => {
     const user = userEvent.setup()
-    filesApiMock.listFiles.mockResolvedValue(listResponse([]))
-    filesApiMock.uploadFile.mockResolvedValue(report)
+    vi.mocked(listFiles).mockResolvedValue(listResponse([]))
+    vi.mocked(uploadFile).mockResolvedValue(report)
 
     renderFilesPage()
     await screen.findByText('No files found')
@@ -208,16 +217,16 @@ describe('FilesPage', () => {
     )
 
     await waitFor(() => {
-      expect(filesApiMock.uploadFile).toHaveBeenCalledWith(expect.any(FormData))
+      expect(uploadFile).toHaveBeenCalledWith(expect.any(FormData))
     })
-    await waitFor(() => expect(filesApiMock.listFiles).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(listFiles).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('invalidates the file list after edit succeeds', async () => {
     const user = userEvent.setup()
-    filesApiMock.listFiles.mockResolvedValue(listResponse([report]))
-    filesApiMock.updateFile.mockResolvedValue({
+    vi.mocked(listFiles).mockResolvedValue(listResponse([report]))
+    vi.mocked(updateFile).mockResolvedValue({
       ...report,
       displayName: 'Updated report',
     })
@@ -226,6 +235,9 @@ describe('FilesPage', () => {
     await screen.findByText('Report')
 
     await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await waitFor(() => {
+      expect(getFile).toHaveBeenCalledWith('file-1')
+    })
     await user.clear(screen.getByLabelText('Display name'))
     await user.type(screen.getByLabelText('Display name'), 'Updated report')
     await user.click(
@@ -233,20 +245,20 @@ describe('FilesPage', () => {
     )
 
     await waitFor(() => {
-      expect(filesApiMock.updateFile).toHaveBeenCalledWith(
+      expect(updateFile).toHaveBeenCalledWith(
         'file-1',
         expect.objectContaining<UpdateFileRequest>({
           displayName: 'Updated report',
         }),
       )
     })
-    await waitFor(() => expect(filesApiMock.listFiles).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(listFiles).toHaveBeenCalledTimes(2))
   })
 
   it('invalidates the file list after delete succeeds', async () => {
     const user = userEvent.setup()
-    filesApiMock.listFiles.mockResolvedValue(listResponse([report]))
-    filesApiMock.deleteFile.mockResolvedValue(undefined)
+    vi.mocked(listFiles).mockResolvedValue(listResponse([report]))
+    vi.mocked(deleteFile).mockResolvedValue(undefined)
 
     renderFilesPage()
     await screen.findByText('Report')
@@ -255,15 +267,15 @@ describe('FilesPage', () => {
     await user.click(screen.getByRole('button', { name: 'Delete file' }))
 
     await waitFor(() => {
-      expect(filesApiMock.deleteFile).toHaveBeenCalledWith('file-1')
+      expect(deleteFile).toHaveBeenCalledWith('file-1')
     })
-    await waitFor(() => expect(filesApiMock.listFiles).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(listFiles).toHaveBeenCalledTimes(2))
   })
 
   it('downloads files with an object URL and temporary anchor', async () => {
     const user = userEvent.setup()
-    filesApiMock.listFiles.mockResolvedValue(listResponse([report]))
-    filesApiMock.downloadFile.mockResolvedValue(
+    vi.mocked(listFiles).mockResolvedValue(listResponse([report]))
+    vi.mocked(downloadFile).mockResolvedValue(
       new Blob(['hello'], { type: 'application/pdf' }),
     )
     const click = vi.fn()
@@ -282,7 +294,7 @@ describe('FilesPage', () => {
     await user.click(screen.getByRole('button', { name: 'Download' }))
 
     await waitFor(() => {
-      expect(filesApiMock.downloadFile).toHaveBeenCalledWith('file-1')
+      expect(downloadFile).toHaveBeenCalledWith('file-1')
     })
     expect(URL.createObjectURL).toHaveBeenCalledOnce()
     expect(click).toHaveBeenCalledOnce()
@@ -290,7 +302,7 @@ describe('FilesPage', () => {
   })
 
   it('hides upload, download, edit, and delete without file permissions', async () => {
-    filesApiMock.listFiles.mockResolvedValue(listResponse([report]))
+    vi.mocked(listFiles).mockResolvedValue(listResponse([report]))
 
     renderFilesPage([])
     await screen.findByText('Report')

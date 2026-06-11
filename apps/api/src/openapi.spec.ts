@@ -1,3 +1,4 @@
+import type { INestApplication } from '@nestjs/common';
 import { SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { AppModule } from './app.module';
@@ -52,6 +53,18 @@ type SwaggerOperationLike = {
   operationId: string;
 };
 
+type OpenApiPathOperation = {
+  requestBody?: {
+    content?: Record<string, { schema?: unknown }>;
+  };
+  responses?: Record<
+    string,
+    {
+      content?: Record<string, { schema?: unknown }>;
+    }
+  >;
+};
+
 function hasOperationId(value: unknown): value is SwaggerOperationLike {
   return (
     typeof value === 'object' &&
@@ -72,6 +85,38 @@ function collectOperationIds(document: OpenAPIObject): string[] {
       hasOperationId(operation) ? [operation.operationId] : [],
     ),
   );
+}
+
+async function createTestOpenApiDocument(): Promise<{
+  app: INestApplication;
+  document: OpenAPIObject;
+}> {
+  const moduleRef = await Test.createTestingModule({
+    imports: [AppModule],
+  })
+    .overrideProvider(PrismaService)
+    .useValue({
+      $connect: jest.fn(),
+      $disconnect: jest.fn(),
+    })
+    .compile();
+  const app = moduleRef.createNestApplication();
+  app.setGlobalPrefix('api');
+  await app.init();
+
+  return { app, document: createOpenApiDocument(app) };
+}
+
+function getOperation(
+  document: OpenAPIObject,
+  path: string,
+  method: string,
+): OpenApiPathOperation {
+  const pathItem = (document.paths as Record<string, Record<string, unknown>>)[
+    path
+  ];
+
+  return pathItem?.[method] as OpenApiPathOperation;
 }
 
 describe('openapi helpers', () => {
@@ -239,6 +284,89 @@ describe('OpenAPI operation ids', () => {
       ).toEqual(
         expect.objectContaining({
           type: 'object',
+          nullable: true,
+        }),
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('documents file uploads as multipart form data with a binary file', async () => {
+    const { app, document } = await createTestOpenApiDocument();
+
+    try {
+      const operation = getOperation(document, '/files', 'post');
+      const multipartContent =
+        operation.requestBody?.content?.['multipart/form-data'];
+
+      expect(multipartContent).toBeDefined();
+      expect(multipartContent?.schema).toEqual(
+        expect.objectContaining({
+          properties: expect.objectContaining({
+            file: expect.objectContaining({
+              type: 'string',
+              format: 'binary',
+            }),
+          }),
+        }),
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('documents file downloads as binary content', async () => {
+    const { app, document } = await createTestOpenApiDocument();
+
+    try {
+      const operation = getOperation(document, '/files/{id}/download', 'get');
+      const okResponse = operation.responses?.['200'];
+      const binaryContent = okResponse?.content?.['application/octet-stream'];
+
+      expect(binaryContent).toBeDefined();
+      expect(binaryContent?.schema).toEqual({
+        type: 'string',
+        format: 'binary',
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('documents nullable file string fields as strings', async () => {
+    const { app, document } = await createTestOpenApiDocument();
+
+    try {
+      expect(
+        document.components?.schemas?.UpdateFileDto?.properties?.description,
+      ).toEqual(
+        expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
+      );
+      expect(
+        document.components?.schemas?.FileResponseDto?.properties?.description,
+      ).toEqual(
+        expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
+      );
+      expect(
+        document.components?.schemas?.FileResponseDto?.properties?.extension,
+      ).toEqual(
+        expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
+      );
+      expect(
+        document.components?.schemas?.FileResponseDto?.properties?.uploadedById,
+      ).toEqual(
+        expect.objectContaining({
+          type: 'string',
           nullable: true,
         }),
       );

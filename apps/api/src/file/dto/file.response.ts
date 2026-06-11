@@ -15,7 +15,7 @@ export class FileResponseDto {
   @ApiProperty()
   mimeType!: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   extension!: string | null;
 
   @ApiProperty({ type: String })
@@ -27,13 +27,13 @@ export class FileResponseDto {
   @ApiProperty({ enum: FileVisibility })
   visibility!: FileVisibility;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   description!: string | null;
 
   @ApiPropertyOptional({ type: Object, nullable: true })
   metadata!: Record<string, unknown> | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   uploadedById!: string | null;
 
   @ApiProperty()

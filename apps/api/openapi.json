@@ -1771,7 +1771,30 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/UploadFileMetadataDto"
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "maxLength": 255
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 500
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "nullable": true,
+                    "additionalProperties": true
+                  }
+                }
               }
             }
           }
@@ -1817,7 +1840,15 @@
         ],
         "responses": {
           "200": {
-            "description": "File download stream"
+            "description": "File download stream",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
           },
           "403": {
             "description": "Permission required"
@@ -3032,7 +3063,7 @@
             "type": "string"
           },
           "extension": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "size": {
@@ -3051,7 +3082,7 @@
             ]
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "metadata": {
@@ -3059,7 +3090,7 @@
             "nullable": true
           },
           "uploadedById": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "createdAt": {
@@ -3107,23 +3138,6 @@
           "pageSize"
         ]
       },
-      "UploadFileMetadataDto": {
-        "type": "object",
-        "properties": {
-          "displayName": {
-            "type": "string",
-            "maxLength": 255
-          },
-          "description": {
-            "type": "object",
-            "maxLength": 500
-          },
-          "metadata": {
-            "type": "object",
-            "nullable": true
-          }
-        }
-      },
       "UpdateFileDto": {
         "type": "object",
         "properties": {
@@ -3132,7 +3146,7 @@
             "maxLength": 255
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "maxLength": 500,
             "nullable": true
           },

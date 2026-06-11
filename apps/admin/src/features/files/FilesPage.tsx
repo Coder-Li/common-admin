@@ -13,15 +13,17 @@ import { useI18n } from '../../i18n/useI18n'
 import { useServerTableQuery } from '../../lib/crud/useServerTableQuery'
 import { can } from '../../lib/permissions'
 import { useAuthStore } from '../../stores/auth-store'
-import { FileForm } from './FileForm'
-import { FileUploadDialog } from './FileUploadDialog'
 import {
   deleteFile,
   downloadFile,
+  getFile,
   listFiles,
   updateFile,
   uploadFile,
-} from './files.api'
+} from '../../generated/api/endpoints/files/files'
+import type { ListFilesParams } from '../../generated/api/schemas'
+import { FileForm } from './FileForm'
+import { FileUploadDialog } from './FileUploadDialog'
 import { createFileColumns } from './files.columns'
 import type { FileListQuery, FileRecord, UpdateFileRequest } from './files.types'
 
@@ -79,7 +81,7 @@ export function FilesPage() {
       search,
       sort: toSortParam(sorting),
     },
-    queryFn: (query) => listFiles(query),
+    queryFn: (query) => listFiles(query as unknown as ListFilesParams),
   })
 
   const invalidateFiles = () =>
@@ -109,6 +111,16 @@ export function FilesPage() {
       toast.success(t('files.success.update'))
       setEditTarget(null)
       await invalidateFiles()
+    },
+  })
+
+  const editMutation = useMutation({
+    mutationFn: (id: string) => getFile(id),
+    onError: (error) => {
+      toast.error(mutationErrorMessage(error) ?? t('files.error.load'))
+    },
+    onSuccess: (file) => {
+      setEditTarget(file)
     },
   })
 
@@ -159,10 +171,10 @@ export function FilesPage() {
           canUpdate,
           onDelete: setDeleteTarget,
           onDownload: (file) => downloadMutation.mutate(file),
-          onEdit: setEditTarget,
+          onEdit: (file) => editMutation.mutate(file.id),
         },
       ),
-    [canDelete, canDownload, canUpdate, downloadMutation, t],
+    [canDelete, canDownload, canUpdate, downloadMutation, editMutation, t],
   )
 
   const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {

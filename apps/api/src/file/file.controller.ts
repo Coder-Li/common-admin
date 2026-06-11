@@ -62,7 +62,32 @@ export class FileController {
   @ApiCreatedResponse({ type: FileResponseDto })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiConsumes('multipart/form-data')
-  @ApiBody({ type: UploadFileMetadataDto })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+        displayName: {
+          type: 'string',
+          maxLength: 255,
+        },
+        description: {
+          type: 'string',
+          nullable: true,
+          maxLength: 500,
+        },
+        metadata: {
+          type: 'object',
+          nullable: true,
+          additionalProperties: true,
+        },
+      },
+    },
+  })
   @ApiOperation({ operationId: 'uploadFile' })
   @Permissions('file.upload')
   @UseInterceptors(
@@ -87,7 +112,17 @@ export class FileController {
     );
   }
 
-  @ApiOkResponse({ description: 'File download stream' })
+  @ApiOkResponse({
+    description: 'File download stream',
+    content: {
+      'application/octet-stream': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
   @ApiForbiddenResponse({ description: 'Permission required' })
   @ApiNotFoundResponse({ description: 'File not found' })
   @ApiOperation({ operationId: 'downloadFile' })

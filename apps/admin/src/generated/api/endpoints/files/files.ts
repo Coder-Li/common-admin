@@ -26,7 +26,6 @@ import type {
   FileResponseDto,
   ListFilesParams,
   UpdateFileDto,
-  UploadFileMetadataDto,
 } from "../../schemas";
 
 import { apiMutator } from "../../../../app/api-mutator";
@@ -168,27 +167,10 @@ export function useListFiles<
 }
 
 export const uploadFile = (
-  uploadFileMetadataDto: UploadFileMetadataDto,
+  formData: FormData,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal,
 ) => {
-  const formData = new FormData();
-  if (uploadFileMetadataDto.displayName !== undefined) {
-    formData.append(`displayName`, uploadFileMetadataDto.displayName);
-  }
-  if (uploadFileMetadataDto.description !== undefined) {
-    formData.append(
-      `description`,
-      JSON.stringify(uploadFileMetadataDto.description),
-    );
-  }
-  if (
-    uploadFileMetadataDto.metadata !== undefined &&
-    uploadFileMetadataDto.metadata !== null
-  ) {
-    formData.append(`metadata`, JSON.stringify(uploadFileMetadataDto.metadata));
-  }
-
   return apiMutator<FileResponseDto>(
     {
       url: `/files`,
@@ -208,14 +190,14 @@ export const getUploadFileMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof uploadFile>>,
     TError,
-    { data: UploadFileMetadataDto },
+    { data: FormData },
     TContext
   >;
   request?: SecondParameter<typeof apiMutator>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof uploadFile>>,
   TError,
-  { data: UploadFileMetadataDto },
+  { data: FormData },
   TContext
 > => {
   const mutationKey = ["uploadFile"];
@@ -229,7 +211,7 @@ export const getUploadFileMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof uploadFile>>,
-    { data: UploadFileMetadataDto }
+    { data: FormData }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -242,7 +224,7 @@ export const getUploadFileMutationOptions = <
 export type UploadFileMutationResult = NonNullable<
   Awaited<ReturnType<typeof uploadFile>>
 >;
-export type UploadFileMutationBody = UploadFileMetadataDto;
+export type UploadFileMutationBody = FormData;
 export type UploadFileMutationError = void;
 
 export const useUploadFile = <TError = void, TContext = unknown>(
@@ -250,7 +232,7 @@ export const useUploadFile = <TError = void, TContext = unknown>(
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof uploadFile>>,
       TError,
-      { data: UploadFileMetadataDto },
+      { data: FormData },
       TContext
     >;
     request?: SecondParameter<typeof apiMutator>;
@@ -259,7 +241,7 @@ export const useUploadFile = <TError = void, TContext = unknown>(
 ): UseMutationResult<
   Awaited<ReturnType<typeof uploadFile>>,
   TError,
-  { data: UploadFileMetadataDto },
+  { data: FormData },
   TContext
 > => {
   return useMutation(getUploadFileMutationOptions(options), queryClient);
@@ -269,8 +251,13 @@ export const downloadFile = (
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal,
 ) => {
-  return apiMutator<void>(
-    { url: `/files/${id}/download`, method: "GET", signal },
+  return apiMutator<Blob>(
+    {
+      url: `/files/${id}/download`,
+      method: "GET",
+      responseType: "blob",
+      signal,
+    },
     { responseType: "blob", ...options },
   );
 };

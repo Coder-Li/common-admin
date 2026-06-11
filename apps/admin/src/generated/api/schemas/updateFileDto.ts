@@ -5,7 +5,6 @@
  * API for the common admin starter template
  * OpenAPI spec version: 0.1.0
  */
-import type { UpdateFileDtoDescription } from "./updateFileDtoDescription";
 import type { UpdateFileDtoMetadata } from "./updateFileDtoMetadata";
 
 export interface UpdateFileDto {
@@ -15,7 +14,7 @@ export interface UpdateFileDto {
    * @maxLength 500
    * @nullable
    */
-  description?: UpdateFileDtoDescription;
+  description?: string | null;
   /** @nullable */
   metadata?: UpdateFileDtoMetadata;
 }

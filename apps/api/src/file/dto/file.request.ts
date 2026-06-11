@@ -65,7 +65,7 @@ export class UploadFileMetadataDto {
   @MaxLength(255)
   displayName?: string;
 
-  @ApiPropertyOptional({ maxLength: 500 })
+  @ApiPropertyOptional({ type: String, maxLength: 500, nullable: true })
   @IsOptional()
   @Transform(({ value }) => transformOptionalNullableTrimmedString(value))
   @ValidateIf((_, value) => value !== null && value !== undefined)
@@ -101,7 +101,7 @@ export class UpdateFileDto {
   @MaxLength(255)
   displayName?: string;
 
-  @ApiPropertyOptional({ maxLength: 500, nullable: true })
+  @ApiPropertyOptional({ type: String, maxLength: 500, nullable: true })
   @IsOptional()
   @Transform(({ value }) => transformOptionalNullableTrimmedString(value))
   @ValidateIf((_, value) => value !== null && value !== undefined)

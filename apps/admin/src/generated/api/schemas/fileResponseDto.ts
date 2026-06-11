@@ -5,11 +5,8 @@
  * API for the common admin starter template
  * OpenAPI spec version: 0.1.0
  */
-import type { FileResponseDtoDescription } from "./fileResponseDtoDescription";
-import type { FileResponseDtoExtension } from "./fileResponseDtoExtension";
 import type { FileResponseDtoMetadata } from "./fileResponseDtoMetadata";
 import type { FileResponseDtoStorageDriver } from "./fileResponseDtoStorageDriver";
-import type { FileResponseDtoUploadedById } from "./fileResponseDtoUploadedById";
 import type { FileResponseDtoVisibility } from "./fileResponseDtoVisibility";
 
 export interface FileResponseDto {
@@ -18,16 +15,16 @@ export interface FileResponseDto {
   displayName: string;
   mimeType: string;
   /** @nullable */
-  extension?: FileResponseDtoExtension;
+  extension?: string | null;
   size: string;
   storageDriver: FileResponseDtoStorageDriver;
   visibility: FileResponseDtoVisibility;
   /** @nullable */
-  description?: FileResponseDtoDescription;
+  description?: string | null;
   /** @nullable */
   metadata?: FileResponseDtoMetadata;
   /** @nullable */
-  uploadedById?: FileResponseDtoUploadedById;
+  uploadedById?: string | null;
   createdAt: string;
   updatedAt: string;
 }
