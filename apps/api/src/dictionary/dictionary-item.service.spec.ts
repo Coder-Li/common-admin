@@ -720,6 +720,38 @@ describe('DictionaryItemService', () => {
       });
     });
 
+    it('clears nullable item metadata with Prisma database null', async () => {
+      const { prisma, service, tx } = createService();
+      const existingItem = makeItem({
+        metadata: { tone: 'neutral' },
+        description: 'Neutral item',
+      });
+      const updatedItem = makeItem({
+        badgeVariant: null,
+        metadata: null,
+        description: null,
+      });
+      prisma.dictionaryItem.findUnique.mockResolvedValue(existingItem);
+      tx.dictionaryItem.findUnique.mockResolvedValue(existingItem);
+      tx.dictionaryItem.update.mockResolvedValue(updatedItem);
+
+      await service.updateItem('item-1', {
+        badgeVariant: null,
+        metadata: null,
+        description: null,
+      });
+
+      expect(tx.dictionaryItem.update).toHaveBeenCalledWith({
+        where: { id: 'item-1' },
+        data: {
+          badgeVariant: null,
+          metadata: Prisma.DbNull,
+          description: null,
+        },
+        include: { type: true },
+      });
+    });
+
     it('clears previous defaults, updates, and audits in the same transaction when updating to default', async () => {
       const { auditLogService, prisma, service, tx } = createService();
       const existingItem = makeItem({ isDefault: false, label: 'Preflight' });

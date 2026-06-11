@@ -177,7 +177,12 @@ export class DictionaryItemService {
         ? { badgeVariant: dto.badgeVariant }
         : {}),
       ...(dto.metadata !== undefined
-        ? { metadata: dto.metadata as Prisma.InputJsonValue }
+        ? {
+            metadata:
+              dto.metadata === null
+                ? Prisma.DbNull
+                : (dto.metadata as Prisma.InputJsonValue),
+          }
         : {}),
       ...(dto.description !== undefined
         ? { description: dto.description }

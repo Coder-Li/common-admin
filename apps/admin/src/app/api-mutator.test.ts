@@ -213,4 +213,26 @@ describe('api mutator', () => {
       }),
     )
   })
+
+  it('serializes array query params as comma-separated values', async () => {
+    await loadMutator()
+
+    const createConfig = axiosCreate.mock.calls[0]?.[0] as
+      | AxiosRequestConfig
+      | undefined
+    const paramsSerializer = createConfig?.paramsSerializer
+
+    expect(paramsSerializer).toEqual(
+      expect.objectContaining({
+        serialize: expect.any(Function),
+      }),
+    )
+    expect(
+      (paramsSerializer as { serialize: (params: unknown) => string }).serialize({
+        page: 1,
+        types: ['common_status', 'user_role'],
+        ignored: undefined,
+      }),
+    ).toBe('page=1&types=common_status%2Cuser_role')
+  })
 })

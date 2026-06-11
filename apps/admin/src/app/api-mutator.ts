@@ -11,8 +11,26 @@ const skipRefreshPaths = new Set([
   '/auth/logout',
 ])
 
+function serializeParams(params: Record<string, unknown>) {
+  const searchParams = new URLSearchParams()
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null) {
+      continue
+    }
+
+    searchParams.append(
+      key,
+      Array.isArray(value) ? value.map(String).join(',') : String(value),
+    )
+  }
+
+  return searchParams.toString()
+}
+
 const apiClient = axios.create({
   baseURL: apiBaseURL,
+  paramsSerializer: { serialize: serializeParams },
   withCredentials: true,
 })
 
