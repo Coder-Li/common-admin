@@ -6,8 +6,9 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../app/api-client'
 import { clearQueryCache } from '../app/query-client'
+import { changePassword, logout } from '../generated/api/endpoints/auth/auth'
+import { getCurrentUser } from '../generated/api/endpoints/users/users'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { LOCALE_STORAGE_KEY } from '../i18n/locale-storage'
 import { AdminRouterProvider } from '../routes/router'
@@ -34,12 +35,31 @@ const user: UserProfile = {
   ],
 }
 
-vi.mock('../app/api-client', () => ({
-  api: {
-    changePassword: vi.fn(async () => undefined),
-    me: vi.fn(async () => user),
-    logout: vi.fn(async () => undefined),
-  },
+function currentUserResponse(
+  permissions = user.permissions,
+) {
+  return {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    roles: user.roles,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    permissions,
+  } as Awaited<ReturnType<typeof getCurrentUser>> & {
+    permissions: string[]
+  }
+}
+
+vi.mock('../generated/api/endpoints/auth/auth', () => ({
+  changePassword: vi.fn(async () => undefined),
+  logout: vi.fn(async () => undefined),
+}))
+
+vi.mock('../generated/api/endpoints/users/users', () => ({
+  getCurrentUser: vi.fn(async () => currentUserResponse()),
 }))
 
 vi.mock('../app/query-client', () => ({
@@ -79,7 +99,7 @@ function renderAdminShell(
     accessToken: 'access-token',
     user: { ...user, permissions },
   })
-  vi.mocked(api.me).mockResolvedValue({ ...user, permissions })
+  vi.mocked(getCurrentUser).mockResolvedValue(currentUserResponse(permissions))
   const router = createAdminRouter({
     history: createMemoryHistory({ initialEntries: [path] }),
   })
@@ -110,10 +130,12 @@ describe('AdminShell i18n', () => {
     window.scrollTo = vi.fn()
     window.localStorage.clear()
     mockBrowserLanguages(['en-US'])
-    vi.mocked(api.changePassword).mockReset()
-    vi.mocked(api.changePassword).mockResolvedValue(undefined)
-    vi.mocked(api.logout).mockReset()
-    vi.mocked(api.logout).mockResolvedValue(undefined)
+    vi.mocked(changePassword).mockReset()
+    vi.mocked(changePassword).mockResolvedValue(undefined)
+    vi.mocked(logout).mockReset()
+    vi.mocked(logout).mockResolvedValue(undefined)
+    vi.mocked(getCurrentUser).mockReset()
+    vi.mocked(getCurrentUser).mockResolvedValue(currentUserResponse())
     vi.mocked(clearQueryCache).mockReset()
   })
 
@@ -213,6 +235,24 @@ describe('AdminShell i18n', () => {
     expect(screen.getByTestId('mobile-nav-roles')).toHaveTextContent('Roles')
   })
 
+  it('ignores malformed current-user responses without replacing the session user', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValueOnce('<!DOCTYPE html>' as never)
+
+    renderAdminShell('/users', ['user.read'])
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Users' }),
+    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(getCurrentUser).toHaveBeenCalled()
+    })
+    expect(useAuthStore.getState().user).toMatchObject({
+      id: 'user-1',
+      email: 'admin@example.com',
+    })
+    expect(useAuthStore.getState().permissions).toEqual(['user.read'])
+  })
+
   it('does not render links to unauthorized routes', async () => {
     renderAdminShell('/dashboard', ['dashboard.view', 'file.read'])
 
@@ -224,7 +264,7 @@ describe('AdminShell i18n', () => {
 
   it('logs out through the API before clearing local state and navigating to login', async () => {
     const testUser = userEvent.setup()
-    vi.mocked(api.logout).mockResolvedValueOnce(undefined)
+    vi.mocked(logout).mockResolvedValueOnce(undefined)
 
     const { router } = renderAdminShell()
 
@@ -236,7 +276,7 @@ describe('AdminShell i18n', () => {
       expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
     })
     expect(router.state.location.pathname).toBe('/login')
-    expect(api.logout).toHaveBeenCalledOnce()
+    expect(logout).toHaveBeenCalledOnce()
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(clearQueryCache).toHaveBeenCalledOnce()
@@ -244,7 +284,7 @@ describe('AdminShell i18n', () => {
 
   it('still clears local state and navigates to login when logout API rejects', async () => {
     const testUser = userEvent.setup()
-    vi.mocked(api.logout).mockRejectedValueOnce(new Error('logout failed'))
+    vi.mocked(logout).mockRejectedValueOnce(new Error('logout failed'))
 
     const { router } = renderAdminShell()
 
@@ -256,7 +296,7 @@ describe('AdminShell i18n', () => {
       expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
     })
     expect(router.state.location.pathname).toBe('/login')
-    expect(api.logout).toHaveBeenCalledOnce()
+    expect(logout).toHaveBeenCalledOnce()
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(clearQueryCache).toHaveBeenCalledOnce()
@@ -264,7 +304,7 @@ describe('AdminShell i18n', () => {
 
   it('changes password, clears local state, and navigates to login', async () => {
     const testUser = userEvent.setup()
-    vi.mocked(api.changePassword).mockResolvedValueOnce(undefined)
+    vi.mocked(changePassword).mockResolvedValueOnce(undefined)
 
     const { router } = renderAdminShell()
 
@@ -278,7 +318,7 @@ describe('AdminShell i18n', () => {
     )
 
     await waitFor(() => {
-      expect(api.changePassword).toHaveBeenCalledWith({
+      expect(changePassword).toHaveBeenCalledWith({
         currentPassword: 'OldPass123!',
         newPassword: 'NewPass123!',
       })

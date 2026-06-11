@@ -20,15 +20,16 @@ import { LOCALE_STORAGE_KEY } from '../../i18n/locale-storage'
 import { useAuthStore } from '../../stores/auth-store'
 import type { AuthSession } from '../../types/auth'
 import { ThemeProvider } from '../../theme/ThemeProvider'
-import { api } from '../../app/api-client'
+import { login } from '../../generated/api/endpoints/auth/auth'
+import { getCurrentUser } from '../../generated/api/endpoints/users/users'
 import { LoginView } from './LoginView'
 
-vi.mock('../../app/api-client', () => ({
-  api: {
-    login: vi.fn(),
-    me: vi.fn(),
-    refresh: vi.fn(),
-  },
+vi.mock('../../generated/api/endpoints/auth/auth', () => ({
+  login: vi.fn(),
+}))
+
+vi.mock('../../generated/api/endpoints/users/users', () => ({
+  getCurrentUser: vi.fn(),
 }))
 
 vi.mock('../../app/query-client', () => ({
@@ -120,6 +121,17 @@ const usersOnlySession: AuthSession = {
   },
 }
 
+const usersOnlyCurrentUser = {
+  id: usersOnlySession.user.id,
+  email: usersOnlySession.user.email,
+  username: usersOnlySession.user.username,
+  firstName: usersOnlySession.user.firstName,
+  lastName: usersOnlySession.user.lastName,
+  roles: usersOnlySession.user.roles,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+}
+
 describe('LoginView i18n', () => {
   afterEach(() => {
     cleanup()
@@ -132,8 +144,8 @@ describe('LoginView i18n', () => {
     window.localStorage.clear()
     window.history.replaceState({}, '', '/login')
     mockBrowserLanguages(['fr-FR', 'en-US'])
-    vi.mocked(api.login).mockReset()
-    vi.mocked(api.me).mockReset()
+    vi.mocked(login).mockReset()
+    vi.mocked(getCurrentUser).mockReset()
     vi.mocked(toast.error).mockReset()
     vi.mocked(toast.success).mockReset()
     useAuthStore.getState().reset()
@@ -172,8 +184,8 @@ describe('LoginView i18n', () => {
 
   it('redirects to the first visible route after login', async () => {
     const user = userEvent.setup()
-    vi.mocked(api.login).mockResolvedValue(usersOnlySession)
-    vi.mocked(api.me).mockResolvedValue(usersOnlySession.user)
+    vi.mocked(login).mockResolvedValue(usersOnlySession)
+    vi.mocked(getCurrentUser).mockResolvedValue(usersOnlyCurrentUser)
     const { router } = renderLoginRouter()
 
     await user.click(await screen.findByRole('button', { name: /sign in/i }))
@@ -188,15 +200,18 @@ describe('LoginView i18n', () => {
 
   it('does not report invalid credentials when navigation fails after login succeeds', async () => {
     const user = userEvent.setup()
-    vi.mocked(api.login).mockResolvedValue(usersOnlySession)
-    vi.mocked(api.me).mockResolvedValue(usersOnlySession.user)
+    vi.mocked(login).mockResolvedValue(usersOnlySession)
+    vi.mocked(getCurrentUser).mockResolvedValue(usersOnlyCurrentUser)
     const { router } = renderLoginRouter()
     vi.spyOn(router, 'navigate').mockRejectedValueOnce(new Error('navigation failed'))
 
     await user.click(await screen.findByRole('button', { name: /sign in/i }))
 
     await waitFor(() => {
-      expect(api.login).toHaveBeenCalledOnce()
+      expect(login).toHaveBeenCalledWith({
+        usernameOrEmail: 'admin@example.com',
+        password: 'Admin123!',
+      })
     })
     expect(toast.error).not.toHaveBeenCalledWith('Invalid credentials')
   })

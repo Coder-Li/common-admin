@@ -1,21 +1,11 @@
+import type {
+  AuthResponseDto,
+  UserProfileDto,
+  UserRoleSummaryDto,
+} from '../generated/api/schemas'
+
 export type AuthStatus = 'checking' | 'authenticated' | 'anonymous'
 
-export interface UserRoleSummary {
-  code: string
-  name: string
-}
-
-export interface UserProfile {
-  id: string
-  email: string
-  username: string
-  firstName: string
-  lastName: string
-  roles: UserRoleSummary[]
-  permissions: string[]
-}
-
-export interface AuthSession {
-  accessToken: string
-  user: UserProfile
-}
+export type UserRoleSummary = UserRoleSummaryDto
+export type UserProfile = UserProfileDto
+export type AuthSession = AuthResponseDto

@@ -4,8 +4,12 @@ import { Circle, KeyRound, Lock, LogOut } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { toast } from 'sonner'
-import { api } from '../app/api-client'
 import { clearQueryCache } from '../app/query-client'
+import {
+  changePassword as changePasswordRequest,
+  logout,
+} from '../generated/api/endpoints/auth/auth'
+import { getCurrentUser } from '../generated/api/endpoints/users/users'
 import { LanguageSwitcher } from '../i18n/LanguageSwitcher'
 import { useI18n } from '../i18n/useI18n'
 import {
@@ -15,6 +19,7 @@ import {
 } from '../routes/admin-route-registry'
 import { useAuthStore } from '../stores/auth-store'
 import { ThemeSwitcher } from '../theme/ThemeSwitcher'
+import type { UserProfile } from '../types/auth'
 
 function navItemClass(isActive: boolean) {
   return [
@@ -25,12 +30,22 @@ function navItemClass(isActive: boolean) {
   ].join(' ')
 }
 
+function isCurrentUserProfile(value: unknown): value is UserProfile {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      'id' in value &&
+      typeof value.id === 'string',
+  )
+}
+
 export function AdminShell() {
   const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
   const accessToken = useAuthStore((state) => state.accessToken)
   const permissions = useAuthStore((state) => state.permissions)
+  const roles = useAuthStore((state) => state.roles)
   const setUser = useAuthStore((state) => state.setUser)
   const reset = useAuthStore((state) => state.reset)
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
@@ -42,7 +57,21 @@ export function AdminShell() {
     queryKey: ['me', accessToken],
     enabled: Boolean(accessToken),
     queryFn: async () => {
-      const profile = await api.me()
+      const requestAccessToken = accessToken
+      const currentUser = await getCurrentUser()
+
+      if (
+        useAuthStore.getState().accessToken !== requestAccessToken ||
+        !isCurrentUserProfile(currentUser)
+      ) {
+        return currentUser
+      }
+
+      const profile = {
+        ...currentUser,
+        roles: currentUser.roles ?? roles,
+        permissions,
+      } as UserProfile
       setUser(profile)
       return profile
     },
@@ -56,7 +85,7 @@ export function AdminShell() {
 
   async function signOut() {
     try {
-      await api.logout()
+      await logout()
     } finally {
       leaveSession()
     }
@@ -67,7 +96,7 @@ export function AdminShell() {
     setIsChangingPassword(true)
 
     try {
-      await api.changePassword({ currentPassword, newPassword })
+      await changePasswordRequest({ currentPassword, newPassword })
       toast.success(t('page.changePassword.success'))
       setIsPasswordDialogOpen(false)
       setCurrentPassword('')

@@ -3,8 +3,8 @@ import type { FormEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { LogIn, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
-import { api } from '../../app/api-client'
 import { clearQueryCache } from '../../app/query-client'
+import { login } from '../../generated/api/endpoints/auth/auth'
 import { LanguageSwitcher } from '../../i18n/LanguageSwitcher'
 import { useI18n } from '../../i18n/useI18n'
 import { getFirstAccessibleRoute } from '../../routes/admin-route-registry'
@@ -17,7 +17,6 @@ export function LoginView() {
   const [usernameOrEmail, setUsernameOrEmail] = useState('admin@example.com')
   const [password, setPassword] = useState('Admin123!')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const setSession = useAuthStore((state) => state.setSession)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -25,7 +24,7 @@ export function LoginView() {
 
     let session
     try {
-      session = await api.login({ usernameOrEmail, password })
+      session = await login({ usernameOrEmail, password })
     } catch {
       toast.error(t('auth.invalidCredentials'))
       setIsSubmitting(false)
@@ -34,7 +33,7 @@ export function LoginView() {
 
     try {
       clearQueryCache()
-      setSession(session)
+      useAuthStore.getState().setSession(session)
       const firstRoute = getFirstAccessibleRoute(session.user.permissions)
       await navigate({ to: firstRoute?.path ?? '/403' })
       toast.success(t('auth.welcomeBack', { firstName: session.user.firstName }))
