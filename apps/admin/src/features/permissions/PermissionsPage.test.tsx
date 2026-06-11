@@ -5,14 +5,13 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
+import { listPermissionModules } from '../../generated/api/endpoints/permissions/permissions'
 import { PermissionsPage } from './PermissionsPage'
-import { permissionsApi } from './permissions.api'
 import type { PermissionModule } from '../roles/roles.types'
 
-vi.mock('./permissions.api', () => ({
-  permissionsApi: {
-    listModules: vi.fn(),
-  },
+vi.mock('../../generated/api/endpoints/permissions/permissions', () => ({
+  getListPermissionModulesQueryKey: vi.fn(() => ['/permissions/modules']),
+  listPermissionModules: vi.fn(),
 }))
 
 const modules: PermissionModule[] = [
@@ -25,7 +24,7 @@ const modules: PermissionModule[] = [
         module: 'user',
         action: 'read',
         name: 'View users',
-        description: 'Allows reading users',
+        description: null,
         status: 'ACTIVE',
         sortOrder: 100,
       },
@@ -66,7 +65,7 @@ function renderPermissionsPage() {
 
 describe('PermissionsPage', () => {
   beforeEach(() => {
-    vi.mocked(permissionsApi.listModules).mockResolvedValue(modules)
+    vi.mocked(listPermissionModules).mockResolvedValue(modules)
   })
 
   afterEach(() => {
@@ -80,6 +79,7 @@ describe('PermissionsPage', () => {
     const userPermissionRow = (await screen.findByText('user.read')).closest(
       'tr',
     )
+    expect(listPermissionModules).toHaveBeenCalledTimes(1)
     expect(userPermissionRow).not.toBeNull()
     expect(
       within(userPermissionRow as HTMLTableRowElement).getByText('View users'),

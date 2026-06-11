@@ -9,13 +9,29 @@ import type {
   PaginationState,
   SortingState,
 } from '../../components/data-table/DataTable'
+import {
+  getListPermissionModulesQueryKey,
+  listPermissionModules,
+} from '../../generated/api/endpoints/permissions/permissions'
+import {
+  createRole,
+  deleteRole,
+  getListRolesQueryKey,
+  listRoles,
+  replaceRolePermissions,
+  updateRole,
+} from '../../generated/api/endpoints/roles/roles'
+import type {
+  CreateRoleDto,
+  ListRolesParams,
+  UpdateRoleDto,
+} from '../../generated/api/schemas'
 import { useI18n } from '../../i18n/useI18n'
 import { can } from '../../lib/permissions'
 import { useAuthStore } from '../../stores/auth-store'
 import { RoleForm } from './RoleForm'
 import { RolePermissionPanel } from './RolePermissionPanel'
 import { createRoleColumns } from './roles.columns'
-import { rolesApi } from './roles.api'
 import { rolePermissions } from './roles.permissions'
 import type {
   CreateRoleRequest,
@@ -40,6 +56,19 @@ function toSortParam(sorting: SortingState) {
   }
 
   return `${firstSort.id}:${firstSort.desc ? 'desc' : 'asc'}`
+}
+
+function toListRolesParams(params: {
+  page: number
+  pageSize: number
+  search?: string
+  sort?: string
+}): ListRolesParams {
+  return {
+    ...params,
+    page: params.page as unknown as ListRolesParams['page'],
+    pageSize: params.pageSize as unknown as ListRolesParams['pageSize'],
+  }
 }
 
 export function RolesPage() {
@@ -67,37 +96,34 @@ export function RolesPage() {
   )
   const canReadPermissions = can(permissions, rolePermissions.readPermissions)
 
-  const rolesQuery = useQuery({
-    queryKey: [
-      'roles',
-      'list',
-      {
-        pageIndex: pagination.pageIndex,
-        pageSize: pagination.pageSize,
-        search,
-        sort: toSortParam(sorting),
-      },
-    ],
-    queryFn: () =>
-      rolesApi.list({
+  const listParams = useMemo(
+    () =>
+      toListRolesParams({
         page: pagination.pageIndex + 1,
         pageSize: pagination.pageSize,
         search: search || undefined,
         sort: toSortParam(sorting),
       }),
+    [pagination.pageIndex, pagination.pageSize, search, sorting],
+  )
+
+  const rolesQuery = useQuery({
+    queryKey: getListRolesQueryKey(listParams),
+    queryFn: () => listRoles(listParams),
   })
 
   const modulesQuery = useQuery({
-    queryKey: ['permissions', 'modules'],
+    queryKey: getListPermissionModulesQueryKey(),
     enabled: canReadPermissions,
-    queryFn: () => rolesApi.listPermissionModules(),
+    queryFn: () => listPermissionModules(),
   })
 
   const invalidateRoles = () =>
-    queryClient.invalidateQueries({ queryKey: ['roles', 'list'] })
+    queryClient.invalidateQueries({ queryKey: getListRolesQueryKey() })
 
   const createMutation = useMutation({
-    mutationFn: (payload: CreateRoleRequest) => rolesApi.create(payload),
+    mutationFn: (payload: CreateRoleRequest) =>
+      createRole(payload as CreateRoleDto),
     onError: (error) => {
       toast.error(mutationErrorMessage(error) ?? t('roles.error.create'))
     },
@@ -110,7 +136,7 @@ export function RolesPage() {
 
   const updateMutation = useMutation({
     mutationFn: (payload: { id: string; value: UpdateRoleRequest }) =>
-      rolesApi.update(payload.id, payload.value),
+      updateRole(payload.id, payload.value as UpdateRoleDto),
     onError: (error) => {
       toast.error(mutationErrorMessage(error) ?? t('roles.error.update'))
     },
@@ -122,7 +148,7 @@ export function RolesPage() {
   })
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => rolesApi.remove(id),
+    mutationFn: (id: string) => deleteRole(id),
     onError: (error) => {
       toast.error(mutationErrorMessage(error) ?? t('roles.error.delete'))
     },
@@ -135,7 +161,9 @@ export function RolesPage() {
 
   const permissionsMutation = useMutation({
     mutationFn: (payload: { id: string; permissionCodes: string[] }) =>
-      rolesApi.replacePermissions(payload.id, payload.permissionCodes),
+      replaceRolePermissions(payload.id, {
+        permissionCodes: payload.permissionCodes,
+      }),
     onError: (error) => {
       toast.error(
         mutationErrorMessage(error) ?? t('roles.error.permissions'),

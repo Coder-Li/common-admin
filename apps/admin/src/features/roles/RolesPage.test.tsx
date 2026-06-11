@@ -7,19 +7,31 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
 import { useAuthStore } from '../../stores/auth-store'
+import { listPermissionModules } from '../../generated/api/endpoints/permissions/permissions'
+import {
+  createRole,
+  deleteRole,
+  listRoles,
+  replaceRolePermissions,
+  updateRole,
+} from '../../generated/api/endpoints/roles/roles'
 import { RolesPage } from './RolesPage'
-import { rolesApi } from './roles.api'
 import type { PermissionModule, RoleRecord } from './roles.types'
 
-vi.mock('./roles.api', () => ({
-  rolesApi: {
-    create: vi.fn(),
-    list: vi.fn(),
-    listPermissionModules: vi.fn(),
-    remove: vi.fn(),
-    replacePermissions: vi.fn(),
-    update: vi.fn(),
-  },
+vi.mock('../../generated/api/endpoints/permissions/permissions', () => ({
+  getListPermissionModulesQueryKey: vi.fn(() => ['/permissions/modules']),
+  listPermissionModules: vi.fn(),
+}))
+
+vi.mock('../../generated/api/endpoints/roles/roles', () => ({
+  createRole: vi.fn(),
+  deleteRole: vi.fn(),
+  getListRolesQueryKey: vi.fn((params?: unknown) =>
+    params ? ['/roles', params] : ['/roles'],
+  ),
+  listRoles: vi.fn(),
+  replaceRolePermissions: vi.fn(),
+  updateRole: vi.fn(),
 }))
 
 const roles: RoleRecord[] = [
@@ -27,7 +39,7 @@ const roles: RoleRecord[] = [
     id: 'role-1',
     code: 'admin',
     name: 'Admin',
-    description: 'Administrators',
+    description: null,
     status: 'ACTIVE',
     isSystem: true,
     isDefault: false,
@@ -121,17 +133,17 @@ function renderRolesPage(permissions = [
 
 describe('RolesPage', () => {
   beforeEach(() => {
-    vi.mocked(rolesApi.list).mockResolvedValue({
+    vi.mocked(listRoles).mockResolvedValue({
       items: roles,
       total: roles.length,
       page: 1,
       pageSize: 20,
     })
-    vi.mocked(rolesApi.listPermissionModules).mockResolvedValue(modules)
-    vi.mocked(rolesApi.create).mockResolvedValue(roles[1])
-    vi.mocked(rolesApi.update).mockResolvedValue(roles[1])
-    vi.mocked(rolesApi.remove).mockResolvedValue(undefined)
-    vi.mocked(rolesApi.replacePermissions).mockResolvedValue(roles[1])
+    vi.mocked(listPermissionModules).mockResolvedValue(modules)
+    vi.mocked(createRole).mockResolvedValue(roles[1])
+    vi.mocked(updateRole).mockResolvedValue(roles[1])
+    vi.mocked(deleteRole).mockResolvedValue(undefined)
+    vi.mocked(replaceRolePermissions).mockResolvedValue(roles[1])
   })
 
   afterEach(() => {
@@ -145,6 +157,13 @@ describe('RolesPage', () => {
 
     expect(await screen.findByText('Admin')).toBeInTheDocument()
     expect(screen.getByText('Operator')).toBeInTheDocument()
+    expect(listRoles).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 20,
+      search: undefined,
+      sort: undefined,
+    })
+    expect(listPermissionModules).toHaveBeenCalledTimes(1)
     expect(
       screen.queryByRole('heading', { name: 'Available permissions' }),
     ).not.toBeInTheDocument()
@@ -195,10 +214,9 @@ describe('RolesPage', () => {
     await user.click(screen.getByLabelText('View users'))
     await user.click(screen.getByRole('button', { name: 'Save permissions' }))
 
-    expect(rolesApi.replacePermissions).toHaveBeenCalledWith('role-2', [
-      'file.read',
-      'user.read',
-    ])
+    expect(replaceRolePermissions).toHaveBeenCalledWith('role-2', {
+      permissionCodes: ['file.read', 'user.read'],
+    })
   })
 
   it('hides assignment action without role.assign_permissions', async () => {

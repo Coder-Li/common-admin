@@ -22,6 +22,12 @@ interface RoleFormValues {
   isDefault: boolean
 }
 
+function descriptionToFormValue(
+  description: RoleRecord['description'] | undefined,
+) {
+  return typeof description === 'string' ? description : ''
+}
+
 export function RoleForm({
   mode,
   initialValue,
@@ -58,22 +64,23 @@ export function RoleForm({
     defaultValues: {
       code: initialValue?.code ?? '',
       name: initialValue?.name ?? '',
-      description: initialValue?.description ?? '',
+      description: descriptionToFormValue(initialValue?.description),
       status: initialValue?.status ?? 'ACTIVE',
       isDefault: initialValue?.isDefault ?? false,
     },
   })
 
   function submitForm(value: RoleFormValues) {
+    const description = value.description.trim()
     const payload = {
       name: value.name,
-      description: value.description.trim() ? value.description : null,
       isDefault: value.isDefault,
     }
 
     if (isCreate) {
       onSubmit({
         ...payload,
+        ...(description ? { description } : {}),
         code: value.code,
       })
       return
@@ -81,6 +88,7 @@ export function RoleForm({
 
     onSubmit({
       ...payload,
+      description: (description || null) as UpdateRoleRequest['description'],
       status: value.status,
     })
   }

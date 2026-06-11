@@ -16,9 +16,12 @@ import type {
 import { useI18n } from '../../i18n/useI18n'
 import { toApiListQuery } from '../../lib/crud/list-query'
 import { can } from '../../lib/permissions'
-import { rolesApi } from '../roles/roles.api'
 import { useAuthStore } from '../../stores/auth-store'
 import { UserForm } from './UserForm'
+import {
+  getListRolesQueryKey,
+  listRoles,
+} from '../../generated/api/endpoints/roles/roles'
 import {
   createUser,
   deleteUser,
@@ -28,7 +31,10 @@ import {
   resetUserPassword,
   updateUser,
 } from '../../generated/api/endpoints/users/users'
-import type { ListUsersParams } from '../../generated/api/schemas'
+import type {
+  ListRolesParams,
+  ListUsersParams,
+} from '../../generated/api/schemas'
 import { createUserColumns } from './users.columns'
 import type {
   CreateUserRequest,
@@ -87,14 +93,19 @@ export function UsersPage() {
   const canAssignRoles = can(permissions, 'user.assign_roles')
   const canResetPassword = canUpdate
 
-  const rolesQuery = useQuery({
-    queryKey: ['roles', 'list', 'users-filter'],
-    queryFn: () =>
-      rolesApi.list({
+  const rolesQueryParams = useMemo(
+    () =>
+      ({
         page: 1,
         pageSize: 100,
         status: 'ACTIVE',
-      }),
+      }) as unknown as ListRolesParams,
+    [],
+  )
+
+  const rolesQuery = useQuery({
+    queryKey: getListRolesQueryKey(rolesQueryParams),
+    queryFn: () => listRoles(rolesQueryParams),
   })
   const roleOptions = rolesQuery.data?.items ?? []
 

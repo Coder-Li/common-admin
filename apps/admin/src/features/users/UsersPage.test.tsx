@@ -19,6 +19,10 @@ import { createAdminRouter } from '../../routes/router-factory'
 import { useAuthStore } from '../../stores/auth-store'
 import { ThemeProvider } from '../../theme/ThemeProvider'
 import {
+  getListRolesQueryKey,
+  listRoles,
+} from '../../generated/api/endpoints/roles/roles'
+import {
   createUser,
   deleteUser,
   getListUsersQueryKey,
@@ -35,12 +39,14 @@ import type {
   UserListResponse,
   UserRecord,
 } from './users.types'
+import type { ListRolesParams } from '../../generated/api/schemas'
 import { UsersPage } from './UsersPage'
 
-const rolesApiMock = vi.hoisted(() => ({
-  rolesApi: {
-    list: vi.fn(),
-  },
+vi.mock('../../generated/api/endpoints/roles/roles', () => ({
+  getListRolesQueryKey: vi.fn((params?: ListRolesParams) =>
+    params ? ['/roles', params] : ['/roles'],
+  ),
+  listRoles: vi.fn(),
 }))
 
 vi.mock('../../generated/api/endpoints/users/users', () => ({
@@ -54,8 +60,6 @@ vi.mock('../../generated/api/endpoints/users/users', () => ({
   resetUserPassword: vi.fn(),
   updateUser: vi.fn(),
 }))
-
-vi.mock('../roles/roles.api', () => rolesApiMock)
 
 vi.mock('../../app/query-client', () => ({
   clearQueryCache: vi.fn(),
@@ -237,8 +241,12 @@ describe('UsersPage', () => {
     vi.mocked(replaceUserRoles).mockReset()
     vi.mocked(resetUserPassword).mockReset()
     vi.mocked(updateUser).mockReset()
-    rolesApiMock.rolesApi.list.mockReset()
-    rolesApiMock.rolesApi.list.mockResolvedValue({
+    vi.mocked(getListRolesQueryKey).mockClear()
+    vi.mocked(getListRolesQueryKey).mockImplementation(
+      (params?: ListRolesParams) => (params ? ['/roles', params] : ['/roles']),
+    )
+    vi.mocked(listRoles).mockReset()
+    vi.mocked(listRoles).mockResolvedValue({
       items: roleOptions,
       page: 1,
       pageSize: 100,

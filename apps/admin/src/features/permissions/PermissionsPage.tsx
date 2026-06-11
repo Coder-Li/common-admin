@@ -7,9 +7,12 @@ import type {
   PaginationState,
   SortingState,
 } from '../../components/data-table/DataTable'
+import {
+  getListPermissionModulesQueryKey,
+  listPermissionModules,
+} from '../../generated/api/endpoints/permissions/permissions'
 import { useI18n } from '../../i18n/useI18n'
 import type { PermissionRecord } from '../roles/roles.types'
-import { permissionsApi } from './permissions.api'
 import { createPermissionColumns } from './permissions.columns'
 
 function matchesPermission(permission: PermissionRecord, search: string) {
@@ -26,7 +29,7 @@ function matchesPermission(permission: PermissionRecord, search: string) {
     permission.action,
     permission.status,
     permission.description ?? '',
-  ].some((value) => value.toLowerCase().includes(keyword))
+  ].some((value) => String(value ?? '').toLowerCase().includes(keyword))
 }
 
 function compareValues(left: unknown, right: unknown) {
@@ -47,8 +50,8 @@ export function PermissionsPage() {
   const [sorting, setSorting] = useState<SortingState>([])
 
   const permissionsQuery = useQuery({
-    queryKey: ['permissions', 'modules'],
-    queryFn: () => permissionsApi.listModules(),
+    queryKey: getListPermissionModulesQueryKey(),
+    queryFn: () => listPermissionModules(),
   })
 
   const permissions = useMemo(

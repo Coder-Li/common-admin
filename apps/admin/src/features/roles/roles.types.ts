@@ -1,62 +1,39 @@
-import type { ListResponse } from '../../lib/api'
+import type {
+  CreateRoleDto,
+  ListRolesParams as GeneratedListRolesParams,
+  PermissionModuleResponseDto,
+  PermissionResponseDto,
+  RoleListResponseDto,
+  RolePermissionSummaryDto,
+  RoleResponseDto,
+  UpdateRoleDto,
+} from '../../generated/api/schemas'
 
-export type RoleStatus = 'ACTIVE' | 'DISABLED'
-export type PermissionStatus = 'ACTIVE' | 'DISABLED'
+export type RoleStatus = RoleResponseDto['status']
+export type PermissionStatus = PermissionResponseDto['status']
 
-export interface RoleListQuery {
+export type RolePermissionSummary = RolePermissionSummaryDto
+
+export type RoleRecord = RoleResponseDto
+
+export type RoleListResponse = RoleListResponseDto
+
+export type CreateRoleRequest = Omit<CreateRoleDto, 'description'> & {
+  description?: string | null
+}
+
+export type UpdateRoleRequest = Omit<UpdateRoleDto, 'description'> & {
+  description?: string | null
+}
+
+export type ListRolesParams = GeneratedListRolesParams
+
+export interface RoleListQuery
+  extends Omit<GeneratedListRolesParams, 'page' | 'pageSize'> {
   page: number
   pageSize: number
-  search?: string
-  sort?: string
-  status?: RoleStatus
 }
 
-export interface RolePermissionSummary {
-  code: string
-  name: string
-}
+export type PermissionRecord = PermissionResponseDto
 
-export interface RoleRecord {
-  id: string
-  code: string
-  name: string
-  description: string | null
-  status: RoleStatus
-  isSystem: boolean
-  isDefault: boolean
-  permissions: RolePermissionSummary[]
-  createdAt: string
-  updatedAt: string
-}
-
-export type RoleListResponse = ListResponse<RoleRecord>
-
-export interface CreateRoleRequest {
-  code: string
-  name: string
-  description?: string | null
-  isDefault?: boolean
-}
-
-export interface UpdateRoleRequest {
-  name?: string
-  description?: string | null
-  status?: RoleStatus
-  isDefault?: boolean
-}
-
-export interface PermissionRecord {
-  id: string
-  code: string
-  module: string
-  action: string
-  name: string
-  description: string | null
-  status: PermissionStatus
-  sortOrder: number
-}
-
-export interface PermissionModule {
-  module: string
-  permissions: PermissionRecord[]
-}
+export type PermissionModule = PermissionModuleResponseDto
