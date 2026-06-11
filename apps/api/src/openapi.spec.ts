@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
 import { AppModule } from './app.module';
+import { ErrorResponseDto } from './common/errors/error-response.dto';
 import { assertPrefixFreeOpenApiPaths, createOpenApiDocument } from './openapi';
 import { PrismaService } from './prisma/prisma.service';
 
@@ -160,21 +161,24 @@ describe('openapi helpers', () => {
       .spyOn(SwaggerModule, 'createDocument')
       .mockReturnValue(document);
 
-    expect(createOpenApiDocument(app)).toBe(document);
-    expect(createDocumentSpy).toHaveBeenCalledWith(app, expect.any(Object), {
-      ignoreGlobalPrefix: true,
-    });
+    try {
+      expect(createOpenApiDocument(app)).toBe(document);
+      expect(createDocumentSpy).toHaveBeenCalledWith(app, expect.any(Object), {
+        ignoreGlobalPrefix: true,
+        extraModels: [ErrorResponseDto],
+      });
 
-    const [, swaggerConfig] = createDocumentSpy.mock.calls[0];
-    expect(swaggerConfig.info).toEqual(
-      expect.objectContaining({
-        title: 'Common Admin API',
-        description: 'API for the common admin starter template',
-        version: '0.1.0',
-      }),
-    );
-
-    createDocumentSpy.mockRestore();
+      const [, swaggerConfig] = createDocumentSpy.mock.calls[0];
+      expect(swaggerConfig.info).toEqual(
+        expect.objectContaining({
+          title: 'Common Admin API',
+          description: 'API for the common admin starter template',
+          version: '0.1.0',
+        }),
+      );
+    } finally {
+      createDocumentSpy.mockRestore();
+    }
   });
 
   it('rejects generated paths that include the runtime API prefix', () => {
@@ -343,6 +347,23 @@ describe('OpenAPI operation ids', () => {
         type: 'string',
         format: 'binary',
       });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('documents the shared error response schema on auth login validation errors', async () => {
+    const { app, document } = await createTestOpenApiDocument();
+
+    try {
+      expect(document.components?.schemas?.ErrorResponseDto).toBeDefined();
+
+      const operation = getOperation(document, '/auth/login', 'post');
+      const badRequestResponse = operation.responses?.['400'];
+
+      expect(badRequestResponse?.content?.['application/json']?.schema).toEqual(
+        { $ref: '#/components/schemas/ErrorResponseDto' },
+      );
     } finally {
       await app.close();
     }

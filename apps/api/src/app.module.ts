@@ -6,6 +6,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './auth/permissions.guard';
+import { GlobalExceptionFilter } from './common/errors/exception-filter';
 import { validateEnv } from './config/env.config';
 import { DictionaryModule } from './dictionary/dictionary.module';
 import { FileModule } from './file/file.module';
@@ -40,6 +41,7 @@ import { UserModule } from './user/user.module';
     HealthModule,
   ],
   providers: [
+    GlobalExceptionFilter,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

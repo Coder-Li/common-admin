@@ -20,6 +20,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { SessionCookieService } from './session-cookie.service';
 import { IsPublic } from '../common/decorators/is-public.decorator';
+import { ApiCommonErrorResponses } from '../common/errors/error-response.decorator';
 import { AUTH_TOKEN_CONFIG } from '../config/auth.config';
 import type { AuthTokenConfig } from '../config/auth.config';
 import { CurrentUser } from '../user/current-user.decorator';
@@ -40,6 +41,7 @@ export class AuthController {
   @UseGuards(AuthOriginGuard)
   @ApiOperation({ operationId: 'login' })
   @Post('login')
+  @ApiCommonErrorResponses()
   @ApiOkResponse({ type: AuthResponseDto })
   async login(
     @Body() body: LoginDto,

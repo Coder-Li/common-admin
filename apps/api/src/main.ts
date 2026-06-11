@@ -5,6 +5,10 @@ import { SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { AppException } from './common/errors/app-exception';
+import { ERROR_CODES } from './common/errors/error-codes';
+import { GlobalExceptionFilter } from './common/errors/exception-filter';
+import { flattenValidationErrors } from './common/errors/validation-errors';
 import { createOpenApiDocument } from './openapi';
 
 async function bootstrap() {
@@ -17,11 +21,19 @@ async function bootstrap() {
 
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cookieParser());
+  app.useGlobalFilters(app.get(GlobalExceptionFilter));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: (errors) =>
+        new AppException({
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: 'Request validation failed',
+          statusCode: 400,
+          details: { fields: flattenValidationErrors(errors) },
+        }),
     }),
   );
   app.enableCors({

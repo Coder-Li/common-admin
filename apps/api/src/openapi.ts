@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ErrorResponseDto } from './common/errors/error-response.dto';
 
 export function createOpenApiDocument(app: INestApplication) {
   const swaggerConfig = new DocumentBuilder()
@@ -14,6 +15,7 @@ export function createOpenApiDocument(app: INestApplication) {
 
   const document = SwaggerModule.createDocument(app, swaggerConfig, {
     ignoreGlobalPrefix: true,
+    extraModels: [ErrorResponseDto],
   });
   assertPrefixFreeOpenApiPaths(document);
 
