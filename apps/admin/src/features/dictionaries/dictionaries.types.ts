@@ -1,106 +1,45 @@
-export type DictionaryStatus = 'ACTIVE' | 'DISABLED'
+import type {
+  CreateDictionaryItemDto,
+  CreateDictionaryTypeDto,
+  DictionaryItemListResponseDto,
+  DictionaryItemResponseDto,
+  DictionaryItemResponseDtoBadgeVariant,
+  DictionaryItemResponseDtoStatus,
+  DictionaryTypeListResponseDto,
+  DictionaryTypeResponseDto,
+  DictionaryTypeResponseDtoStatus,
+  ListDictionaryItemsParams,
+  ListDictionaryTypesParams,
+  UpdateDictionaryItemDto,
+  UpdateDictionaryTypeDto,
+} from '../../generated/api/schemas'
 
-export type DictionaryBadgeVariant =
-  | 'DEFAULT'
-  | 'SUCCESS'
-  | 'WARNING'
-  | 'DANGER'
-  | 'NEUTRAL'
+export type DictionaryStatus =
+  | DictionaryTypeResponseDtoStatus
+  | DictionaryItemResponseDtoStatus
 
-export interface DictionaryTypeListQuery {
-  page: number
-  pageSize: number
-  search?: string
-  sort?: string
-  status?: DictionaryStatus
-  isSystem?: boolean
-}
+export type DictionaryBadgeVariant = DictionaryItemResponseDtoBadgeVariant
 
-export interface DictionaryTypeRecord {
-  id: string
-  code: string
-  name: string
-  status: DictionaryStatus
-  isSystem: boolean
-  description?: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface DictionaryTypeListResponse {
-  items: DictionaryTypeRecord[]
-  total: number
+export type DictionaryTypeListQuery = Omit<
+  ListDictionaryTypesParams,
+  'page' | 'pageSize'
+> & {
   page: number
   pageSize: number
 }
+export type DictionaryTypeRecord = DictionaryTypeResponseDto
+export type DictionaryTypeListResponse = DictionaryTypeListResponseDto
+export type CreateDictionaryTypeRequest = CreateDictionaryTypeDto
+export type UpdateDictionaryTypeRequest = UpdateDictionaryTypeDto
 
-export interface CreateDictionaryTypeRequest {
-  code: string
-  name: string
-  status?: DictionaryStatus
-  description?: string
-}
-
-export interface UpdateDictionaryTypeRequest {
-  name?: string
-  status?: DictionaryStatus
-  description?: string | null
-}
-
-export interface DictionaryItemListQuery {
-  page: number
-  pageSize: number
-  search?: string
-  sort?: string
-  typeId?: string
-  typeCode?: string
-  status?: DictionaryStatus
-  isDefault?: boolean
-}
-
-export interface DictionaryItemRecord {
-  id: string
-  typeId: string
-  typeCode: string
-  typeName: string
-  value: string
-  label: string
-  sortOrder: number
-  status: DictionaryStatus
-  isSystem: boolean
-  isDefault: boolean
-  badgeVariant?: DictionaryBadgeVariant
-  metadata?: Record<string, unknown>
-  description?: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface DictionaryItemListResponse {
-  items: DictionaryItemRecord[]
-  total: number
+export type DictionaryItemListQuery = Omit<
+  ListDictionaryItemsParams,
+  'page' | 'pageSize'
+> & {
   page: number
   pageSize: number
 }
-
-export interface CreateDictionaryItemRequest {
-  typeId: string
-  value: string
-  label: string
-  sortOrder?: number
-  status?: DictionaryStatus
-  isDefault?: boolean
-  badgeVariant?: DictionaryBadgeVariant
-  metadata?: Record<string, unknown>
-  description?: string
-}
-
-export interface UpdateDictionaryItemRequest {
-  label?: string
-  sortOrder?: number
-  status?: DictionaryStatus
-  isDefault?: boolean
-  badgeVariant?: DictionaryBadgeVariant | null
-  metadata?: Record<string, unknown>
-  description?: string | null
-}
+export type DictionaryItemRecord = DictionaryItemResponseDto
+export type DictionaryItemListResponse = DictionaryItemListResponseDto
+export type CreateDictionaryItemRequest = CreateDictionaryItemDto
+export type UpdateDictionaryItemRequest = UpdateDictionaryItemDto

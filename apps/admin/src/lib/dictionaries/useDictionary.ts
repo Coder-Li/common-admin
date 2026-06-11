@@ -1,9 +1,11 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  getDictionariesOptions,
+  getDictionaryOptionsMap,
+  getGetDictionaryOptionsMapQueryKey,
+  getGetDictionaryOptionsQueryKey,
   getDictionaryOptions,
-} from './dictionaries.api'
+} from '../../generated/api/endpoints/dictionaries/dictionaries'
 import type { DictionaryOption } from './dictionaries.types'
 
 const dictionaryStaleTime = 5 * 60 * 1000
@@ -17,7 +19,7 @@ function normalizeTypeCodes(typeCodes: string[]) {
 export function useDictionary(typeCode: string) {
   const normalizedTypeCode = typeCode.trim()
   const query = useQuery({
-    queryKey: ['dictionaries', 'options', normalizedTypeCode],
+    queryKey: getGetDictionaryOptionsQueryKey(normalizedTypeCode),
     queryFn: () => getDictionaryOptions(normalizedTypeCode),
     enabled: Boolean(normalizedTypeCode),
     staleTime: dictionaryStaleTime,
@@ -35,8 +37,8 @@ export function useDictionaries(typeCodes: string[]) {
     [typeCodes],
   )
   const query = useQuery({
-    queryKey: ['dictionaries', 'options', normalizedTypeCodes],
-    queryFn: () => getDictionariesOptions(normalizedTypeCodes),
+    queryKey: getGetDictionaryOptionsMapQueryKey({ types: normalizedTypeCodes }),
+    queryFn: () => getDictionaryOptionsMap({ types: normalizedTypeCodes }),
     enabled: normalizedTypeCodes.length > 0,
     staleTime: dictionaryStaleTime,
   })

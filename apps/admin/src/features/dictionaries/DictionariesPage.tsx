@@ -10,7 +10,7 @@ import type {
   ReactNode,
 } from 'react'
 import type { OnChangeFn } from '@tanstack/react-table'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Check,
   MoreHorizontal,
@@ -25,22 +25,34 @@ import type {
   PaginationState,
   SortingState,
 } from '../../components/data-table/DataTable'
+import {
+  getGetDictionaryOptionsMapQueryKey,
+  getGetDictionaryOptionsQueryKey,
+} from '../../generated/api/endpoints/dictionaries/dictionaries'
+import {
+  createDictionaryItem,
+  deleteDictionaryItem,
+  getListDictionaryItemsQueryKey,
+  listDictionaryItems,
+  updateDictionaryItem,
+} from '../../generated/api/endpoints/dictionary-items/dictionary-items'
+import {
+  createDictionaryType,
+  deleteDictionaryType,
+  getListDictionaryTypesQueryKey,
+  listDictionaryTypes,
+  updateDictionaryType,
+} from '../../generated/api/endpoints/dictionary-types/dictionary-types'
+import type {
+  ListDictionaryItemsParams,
+  ListDictionaryTypesParams,
+} from '../../generated/api/schemas'
 import { useI18n } from '../../i18n/useI18n'
-import { useServerTableQuery } from '../../lib/crud/useServerTableQuery'
+import { toApiListQuery } from '../../lib/crud/list-query'
 import { can } from '../../lib/permissions'
 import { useAuthStore } from '../../stores/auth-store'
 import { DictionaryItemForm } from './DictionaryItemForm'
 import { DictionaryTypeForm } from './DictionaryTypeForm'
-import {
-  createDictionaryItem,
-  createDictionaryType,
-  deleteDictionaryItem,
-  deleteDictionaryType,
-  listDictionaryItems,
-  listDictionaryTypes,
-  updateDictionaryItem,
-  updateDictionaryType,
-} from './dictionaries.api'
 import { createDictionaryItemColumns } from './dictionary-item.columns'
 import type {
   CreateDictionaryItemRequest,
@@ -97,6 +109,26 @@ function emptyItemResponse(page: number, pageSize: number) {
   }
 }
 
+function toListDictionaryTypesParams(
+  query: DictionaryTypeListQuery,
+): ListDictionaryTypesParams {
+  return {
+    ...query,
+    page: query.page as unknown as ListDictionaryTypesParams['page'],
+    pageSize: query.pageSize as unknown as ListDictionaryTypesParams['pageSize'],
+  }
+}
+
+function toListDictionaryItemsParams(
+  query: DictionaryItemListQuery,
+): ListDictionaryItemsParams {
+  return {
+    ...query,
+    page: query.page as unknown as ListDictionaryItemsParams['page'],
+    pageSize: query.pageSize as unknown as ListDictionaryItemsParams['pageSize'],
+  }
+}
+
 export function DictionariesPage() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
@@ -122,51 +154,86 @@ export function DictionariesPage() {
   const canUpdate = can(permissions, 'dictionary.update')
   const canDelete = can(permissions, 'dictionary.delete')
 
-  const typeQuery = useServerTableQuery<
-    DictionaryTypeRecord,
-    object,
-    DictionaryTypeListQuery
-  >({
-    resource: 'dictionaryTypes',
-    state: {
-      filters: {},
-      pageIndex: typePagination.pageIndex,
-      pageSize: typePagination.pageSize,
-      search: typeSearch,
-      sort: 'updatedAt:desc',
-    },
-    queryFn: listDictionaryTypes,
+  const typeListParams = useMemo(
+    () =>
+      toListDictionaryTypesParams(
+        toApiListQuery<object, DictionaryTypeListQuery>({
+          filters: {},
+          pageIndex: typePagination.pageIndex,
+          pageSize: typePagination.pageSize,
+          search: typeSearch,
+          sort: 'updatedAt:desc',
+        }),
+      ),
+    [typePagination.pageIndex, typePagination.pageSize, typeSearch],
+  )
+
+  const typeQuery = useQuery({
+    queryKey: getListDictionaryTypesQueryKey(typeListParams),
+    queryFn: () => listDictionaryTypes(typeListParams),
   })
 
   const typeItems = typeQuery.data?.items ?? []
   const selectedType =
     typeItems.find((type) => type.id === selectedTypeId) ?? typeItems[0] ?? null
 
-  const itemQuery = useServerTableQuery<
-    DictionaryItemRecord,
-    { typeId?: string },
-    DictionaryItemListQuery
-  >({
-    resource: 'dictionaryItems',
-    state: {
-      filters: selectedType ? { typeId: selectedType.id } : {},
-      pageIndex: itemPagination.pageIndex,
-      pageSize: itemPagination.pageSize,
-      search: itemSearch,
-      sort: toSortParam(itemSorting),
-    },
-    queryFn: (query) =>
+  const itemListParams = useMemo(
+    () =>
       selectedType
-        ? listDictionaryItems(query)
-        : Promise.resolve(emptyItemResponse(query.page, query.pageSize)),
+        ? toListDictionaryItemsParams(
+            toApiListQuery<{ typeId?: string }, DictionaryItemListQuery>({
+              filters: { typeId: selectedType.id },
+              pageIndex: itemPagination.pageIndex,
+              pageSize: itemPagination.pageSize,
+              search: itemSearch,
+              sort: toSortParam(itemSorting),
+            }),
+          )
+        : null,
+    [
+      itemPagination.pageIndex,
+      itemPagination.pageSize,
+      itemSearch,
+      itemSorting,
+      selectedType,
+    ],
+  )
+
+  const itemQuery = useQuery({
+    queryKey: getListDictionaryItemsQueryKey(itemListParams ?? undefined),
+    queryFn: () =>
+      itemListParams
+        ? listDictionaryItems(itemListParams)
+        : Promise.resolve(
+            emptyItemResponse(
+              itemPagination.pageIndex + 1,
+              itemPagination.pageSize,
+            ),
+          ),
+    enabled: Boolean(itemListParams),
   })
 
   const invalidateTypes = () =>
-    queryClient.invalidateQueries({ queryKey: ['dictionaryTypes', 'list'] })
+    queryClient.invalidateQueries({ queryKey: getListDictionaryTypesQueryKey() })
   const invalidateItems = () =>
-    queryClient.invalidateQueries({ queryKey: ['dictionaryItems', 'list'] })
-  const invalidateOptions = () =>
-    queryClient.invalidateQueries({ queryKey: ['dictionaries', 'options'] })
+    queryClient.invalidateQueries({ queryKey: getListDictionaryItemsQueryKey() })
+  const invalidateOptions = (typeCode?: string) => {
+    const invalidations = [
+      queryClient.invalidateQueries({
+        queryKey: getGetDictionaryOptionsMapQueryKey(),
+      }),
+    ]
+
+    if (typeCode) {
+      invalidations.push(
+        queryClient.invalidateQueries({
+          queryKey: getGetDictionaryOptionsQueryKey(typeCode),
+        }),
+      )
+    }
+
+    return Promise.all(invalidations)
+  }
 
   const createTypeMutation = useMutation({
     mutationFn: (payload: CreateDictionaryTypeRequest) =>
@@ -188,10 +255,13 @@ export function DictionariesPage() {
       toast.error(mutationErrorMessage(error) ?? t('dictionaries.error.updateType'))
     },
     onSuccess: async () => {
+      const typeCode = typeFormState?.mode === 'edit'
+        ? typeFormState.type.code
+        : undefined
       toast.success(t('dictionaries.success.updateType'))
       setTypeFormState(null)
       await invalidateTypes()
-      await invalidateOptions()
+      await invalidateOptions(typeCode)
     },
   })
 
@@ -201,12 +271,15 @@ export function DictionariesPage() {
       toast.error(mutationErrorMessage(error) ?? t('dictionaries.delete.typeError'))
     },
     onSuccess: async () => {
+      const typeCode = deleteState?.kind === 'type'
+        ? deleteState.record.code
+        : undefined
       toast.success(t('dictionaries.delete.typeSuccess'))
       setDeleteState(null)
       setSelectedTypeId(null)
       await invalidateTypes()
       await invalidateItems()
-      await invalidateOptions()
+      await invalidateOptions(typeCode)
     },
   })
 
@@ -220,7 +293,7 @@ export function DictionariesPage() {
       toast.success(t('dictionaries.success.createItem'))
       setItemFormState(null)
       await invalidateItems()
-      await invalidateOptions()
+      await invalidateOptions(selectedType?.code)
     },
   })
 
@@ -231,10 +304,13 @@ export function DictionariesPage() {
       toast.error(mutationErrorMessage(error) ?? t('dictionaries.error.updateItem'))
     },
     onSuccess: async () => {
+      const typeCode = itemFormState?.mode === 'edit'
+        ? itemFormState.item.typeCode
+        : selectedType?.code
       toast.success(t('dictionaries.success.updateItem'))
       setItemFormState(null)
       await invalidateItems()
-      await invalidateOptions()
+      await invalidateOptions(typeCode)
     },
   })
 
@@ -244,10 +320,13 @@ export function DictionariesPage() {
       toast.error(mutationErrorMessage(error) ?? t('dictionaries.delete.itemError'))
     },
     onSuccess: async () => {
+      const typeCode = deleteState?.kind === 'item'
+        ? deleteState.record.typeCode
+        : selectedType?.code
       toast.success(t('dictionaries.delete.itemSuccess'))
       setDeleteState(null)
       await invalidateItems()
-      await invalidateOptions()
+      await invalidateOptions(typeCode)
     },
   })
 

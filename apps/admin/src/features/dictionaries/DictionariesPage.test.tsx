@@ -27,18 +27,41 @@ import type {
 } from './dictionaries.types'
 import { DictionariesPage } from './DictionariesPage'
 
-const dictionariesApiMock = vi.hoisted(() => ({
+const dictionaryItemsApiMock = vi.hoisted(() => ({
   createDictionaryItem: vi.fn(),
-  createDictionaryType: vi.fn(),
   deleteDictionaryItem: vi.fn(),
-  deleteDictionaryType: vi.fn(),
+  getListDictionaryItemsQueryKey: vi.fn((params?: unknown) => [
+    '/dictionary-items',
+    ...(params ? [params] : []),
+  ]),
   listDictionaryItems: vi.fn(),
-  listDictionaryTypes: vi.fn(),
   updateDictionaryItem: vi.fn(),
+}))
+
+const dictionaryTypesApiMock = vi.hoisted(() => ({
+  createDictionaryType: vi.fn(),
+  deleteDictionaryType: vi.fn(),
+  getListDictionaryTypesQueryKey: vi.fn((params?: unknown) => [
+    '/dictionary-types',
+    ...(params ? [params] : []),
+  ]),
+  listDictionaryTypes: vi.fn(),
   updateDictionaryType: vi.fn(),
 }))
 
-vi.mock('./dictionaries.api', () => dictionariesApiMock)
+const dictionariesApiMock = {
+  ...dictionaryItemsApiMock,
+  ...dictionaryTypesApiMock,
+}
+
+vi.mock(
+  '../../generated/api/endpoints/dictionary-items/dictionary-items',
+  () => dictionaryItemsApiMock,
+)
+vi.mock(
+  '../../generated/api/endpoints/dictionary-types/dictionary-types',
+  () => dictionaryTypesApiMock,
+)
 
 vi.mock('sonner', () => ({
   toast: {
@@ -173,6 +196,12 @@ describe('DictionariesPage', () => {
   beforeEach(() => {
     window.localStorage.clear()
     Object.values(dictionariesApiMock).forEach((mock) => mock.mockReset())
+    dictionaryItemsApiMock.getListDictionaryItemsQueryKey.mockImplementation(
+      (params?: unknown) => ['/dictionary-items', ...(params ? [params] : [])],
+    )
+    dictionaryTypesApiMock.getListDictionaryTypesQueryKey.mockImplementation(
+      (params?: unknown) => ['/dictionary-types', ...(params ? [params] : [])],
+    )
     dictionariesApiMock.listDictionaryItems.mockResolvedValue(itemListResponse([]))
   })
 
@@ -429,6 +458,75 @@ describe('DictionariesPage', () => {
       expect(dictionariesApiMock.listDictionaryTypes).toHaveBeenCalledTimes(2)
     })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('omits empty optional fields when updating a dictionary type', async () => {
+    const user = userEvent.setup()
+    dictionariesApiMock.listDictionaryTypes.mockResolvedValue(
+      typeListResponse([commonStatusType]),
+    )
+    dictionariesApiMock.updateDictionaryType.mockResolvedValue(commonStatusType)
+
+    renderDictionariesPage()
+    const typeButton = await screen.findByRole('button', {
+      name: 'Select common_status',
+    })
+
+    fireEvent.contextMenu(typeButton)
+    await user.click(screen.getByRole('menuitem', { name: 'Edit' }))
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Edit' })).getByRole('button', {
+        name: 'Edit',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(dictionariesApiMock.updateDictionaryType).toHaveBeenCalledWith(
+        'type-common-status',
+        expect.any(Object),
+      )
+    })
+    const payload = dictionariesApiMock.updateDictionaryType.mock.calls[0]?.[1]
+    expect(payload).not.toHaveProperty('description')
+  })
+
+  it('omits empty optional fields when updating a dictionary item', async () => {
+    const user = userEvent.setup()
+    const plainItem: DictionaryItemRecord = {
+      ...standardItem,
+      id: 'item-plain',
+      value: 'PLAIN',
+      label: 'Plain',
+      badgeVariant: undefined,
+      description: undefined,
+    }
+    dictionariesApiMock.listDictionaryTypes.mockResolvedValue(
+      typeListResponse([userRoleType]),
+    )
+    dictionariesApiMock.listDictionaryItems.mockResolvedValue(
+      itemListResponse([plainItem]),
+    )
+    dictionariesApiMock.updateDictionaryItem.mockResolvedValue(plainItem)
+
+    renderDictionariesPage()
+    const itemRow = (await screen.findByText('PLAIN')).closest('tr')
+
+    await user.click(within(itemRow!).getByRole('button', { name: 'Edit' }))
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Edit' })).getByRole('button', {
+        name: 'Edit',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(dictionariesApiMock.updateDictionaryItem).toHaveBeenCalledWith(
+        'item-plain',
+        expect.any(Object),
+      )
+    })
+    const payload = dictionariesApiMock.updateDictionaryItem.mock.calls[0]?.[1]
+    expect(payload).not.toHaveProperty('badgeVariant')
+    expect(payload).not.toHaveProperty('description')
   })
 
   it('shows confirmation before deleting a non-system item', async () => {

@@ -82,7 +82,7 @@ export function DictionaryTypeForm({
     const payload = {
       name: value.name,
       status: value.status,
-      ...(description ? { description } : isCreate ? {} : { description: null }),
+      ...(description ? { description } : {}),
     }
 
     if (isCreate) {

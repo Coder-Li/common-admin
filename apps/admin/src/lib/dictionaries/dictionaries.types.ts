@@ -1,23 +1,11 @@
-export type DictionaryBadgeVariant =
-  | 'DEFAULT'
-  | 'SUCCESS'
-  | 'WARNING'
-  | 'DANGER'
-  | 'NEUTRAL'
+import type {
+  DictionaryOptionDto,
+  DictionaryOptionDtoBadgeVariant,
+  DictionaryOptionsMapResponseDto,
+  DictionaryOptionsResponseDto,
+} from '../../generated/api/schemas'
 
-export interface DictionaryOption {
-  value: string
-  label: string
-  badgeVariant?: DictionaryBadgeVariant
-  isDefault: boolean
-  metadata?: Record<string, unknown>
-}
-
-export interface DictionaryOptionsResponse {
-  typeCode: string
-  items: DictionaryOption[]
-}
-
-export interface DictionaryOptionsMapResponse {
-  dictionaries: Record<string, DictionaryOption[]>
-}
+export type DictionaryBadgeVariant = DictionaryOptionDtoBadgeVariant
+export type DictionaryOption = DictionaryOptionDto
+export type DictionaryOptionsResponse = DictionaryOptionsResponseDto
+export type DictionaryOptionsMapResponse = DictionaryOptionsMapResponseDto

@@ -15,11 +15,21 @@ import {
 } from './useDictionary'
 
 const dictionariesApiMock = vi.hoisted(() => ({
+  getDictionaryOptionsMap: vi.fn(),
+  getGetDictionaryOptionsMapQueryKey: vi.fn((params?: { types: string[] }) => [
+    '/dictionaries/options',
+    ...(params ? [params] : []),
+  ]),
   getDictionaryOptions: vi.fn(),
-  getDictionariesOptions: vi.fn(),
+  getGetDictionaryOptionsQueryKey: vi.fn((typeCode: string) => [
+    `/dictionaries/${typeCode}/options`,
+  ]),
 }))
 
-vi.mock('./dictionaries.api', () => dictionariesApiMock)
+vi.mock(
+  '../../generated/api/endpoints/dictionaries/dictionaries',
+  () => dictionariesApiMock,
+)
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -53,8 +63,10 @@ function createQueryClient() {
 
 describe('dictionary hooks', () => {
   beforeEach(() => {
+    dictionariesApiMock.getDictionaryOptionsMap.mockReset()
+    dictionariesApiMock.getGetDictionaryOptionsMapQueryKey.mockClear()
     dictionariesApiMock.getDictionaryOptions.mockReset()
-    dictionariesApiMock.getDictionariesOptions.mockReset()
+    dictionariesApiMock.getGetDictionaryOptionsQueryKey.mockClear()
   })
 
   afterEach(() => {
@@ -110,7 +122,7 @@ describe('dictionary hooks', () => {
         ],
       },
     }
-    dictionariesApiMock.getDictionariesOptions.mockResolvedValue(response)
+    dictionariesApiMock.getDictionaryOptionsMap.mockResolvedValue(response)
     const queryClient = createQueryClient()
 
     const first = renderHook(
@@ -130,7 +142,10 @@ describe('dictionary hooks', () => {
     await waitFor(() => {
       expect(second.result.current.isSuccess).toBe(true)
     })
-    expect(dictionariesApiMock.getDictionariesOptions).toHaveBeenCalledOnce()
+    expect(dictionariesApiMock.getDictionaryOptionsMap).toHaveBeenCalledOnce()
+    expect(dictionariesApiMock.getDictionaryOptionsMap).toHaveBeenCalledWith({
+      types: ['common_status', 'user_role'],
+    })
     expect(second.result.current.dictionaries.user_role).toEqual([
       {
         value: 'ADMIN',
@@ -171,6 +186,6 @@ describe('dictionary hooks', () => {
     })
 
     expect(result.current.dictionaries).toEqual({})
-    expect(dictionariesApiMock.getDictionariesOptions).not.toHaveBeenCalled()
+    expect(dictionariesApiMock.getDictionaryOptionsMap).not.toHaveBeenCalled()
   })
 })
