@@ -10,8 +10,12 @@ import type {
 } from '../../components/data-table/DataTable'
 import { useI18n } from '../../i18n/useI18n'
 import { useServerTableQuery } from '../../lib/crud/useServerTableQuery'
+import {
+  getAuditLog,
+  listAuditLogs,
+} from '../../generated/api/endpoints/audit-logs/audit-logs'
+import type { ListAuditLogsParams } from '../../generated/api/schemas'
 import { AuditLogDetailsDialog } from './AuditLogDetailsDialog'
-import { getAuditLog, listAuditLogs } from './audit-logs.api'
 import { createAuditLogColumns } from './audit-logs.columns'
 import type {
   AuditLogListItem,
@@ -67,6 +71,14 @@ function mutationErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : undefined
 }
 
+function toListAuditLogsParams(query: AuditLogTableQuery): ListAuditLogsParams {
+  return {
+    ...query,
+    page: query.page as unknown as ListAuditLogsParams['page'],
+    pageSize: query.pageSize as unknown as ListAuditLogsParams['pageSize'],
+  } as unknown as ListAuditLogsParams
+}
+
 export function AuditLogsPage() {
   const { t } = useI18n()
   const [search, setSearch] = useState('')
@@ -91,7 +103,7 @@ export function AuditLogsPage() {
       search,
       sort: toSortParam(sorting),
     },
-    queryFn: (query) => listAuditLogs(query),
+    queryFn: (query) => listAuditLogs(toListAuditLogsParams(query)),
   })
 
   const detailsMutation = useMutation({
@@ -154,7 +166,7 @@ export function AuditLogsPage() {
     setFilters((currentFilters) => ({
       ...currentFilters,
       [key]: value || undefined,
-    }))
+    }) as AuditLogFilters)
     resetToFirstPage()
   }
 

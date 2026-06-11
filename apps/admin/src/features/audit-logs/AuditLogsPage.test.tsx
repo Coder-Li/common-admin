@@ -26,7 +26,10 @@ const auditLogsApiMock = vi.hoisted(() => ({
   listAuditLogs: vi.fn(),
 }))
 
-vi.mock('./audit-logs.api', () => auditLogsApiMock)
+vi.mock(
+  '../../generated/api/endpoints/audit-logs/audit-logs',
+  () => auditLogsApiMock,
+)
 
 vi.mock('sonner', () => ({
   toast: {
