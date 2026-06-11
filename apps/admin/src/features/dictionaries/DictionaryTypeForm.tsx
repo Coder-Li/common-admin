@@ -93,7 +93,10 @@ export function DictionaryTypeForm({
       return
     }
 
-    onSubmit(payload)
+    onSubmit({
+      ...payload,
+      description: description || null,
+    })
   }
 
   return (

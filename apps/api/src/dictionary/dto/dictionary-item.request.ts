@@ -144,19 +144,19 @@ export class UpdateDictionaryItemDto {
   @IsBoolean()
   isDefault?: boolean;
 
-  @ApiPropertyOptional({ enum: DictionaryBadgeVariant })
+  @ApiPropertyOptional({ enum: DictionaryBadgeVariant, nullable: true })
   @IsOptional()
   @IsEnum(DictionaryBadgeVariant)
-  badgeVariant?: DictionaryBadgeVariant;
+  badgeVariant?: DictionaryBadgeVariant | null;
 
-  @ApiPropertyOptional({ type: Object })
-  @ValidateIf((_, value) => value !== undefined)
+  @ApiPropertyOptional({ type: Object, nullable: true })
+  @ValidateIf((_, value) => value !== undefined && value !== null)
   @IsPlainRecord()
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> | null;
 
-  @ApiPropertyOptional({ maxLength: 500 })
+  @ApiPropertyOptional({ type: String, maxLength: 500, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  description?: string;
+  description?: string | null;
 }

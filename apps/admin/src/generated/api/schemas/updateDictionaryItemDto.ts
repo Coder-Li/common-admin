@@ -19,8 +19,13 @@ export interface UpdateDictionaryItemDto {
   sortOrder?: number;
   status?: UpdateDictionaryItemDtoStatus;
   isDefault?: boolean;
+  /** @nullable */
   badgeVariant?: UpdateDictionaryItemDtoBadgeVariant;
+  /** @nullable */
   metadata?: UpdateDictionaryItemDtoMetadata;
-  /** @maxLength 500 */
-  description?: string;
+  /**
+   * @maxLength 500
+   * @nullable
+   */
+  description?: string | null;
 }

@@ -14,6 +14,9 @@ export interface UpdateDictionaryTypeDto {
    */
   name?: string;
   status?: UpdateDictionaryTypeDtoStatus;
-  /** @maxLength 500 */
-  description?: string;
+  /**
+   * @maxLength 500
+   * @nullable
+   */
+  description?: string | null;
 }

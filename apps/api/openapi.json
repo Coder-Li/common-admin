@@ -2742,7 +2742,8 @@
           },
           "description": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 500,
+            "nullable": true
           }
         }
       },
@@ -2934,14 +2935,17 @@
               "WARNING",
               "DANGER",
               "NEUTRAL"
-            ]
+            ],
+            "nullable": true
           },
           "metadata": {
-            "type": "object"
+            "type": "object",
+            "nullable": true
           },
           "description": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 500,
+            "nullable": true
           }
         }
       },

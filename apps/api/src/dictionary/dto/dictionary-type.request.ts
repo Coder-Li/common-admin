@@ -90,9 +90,9 @@ export class UpdateDictionaryTypeDto {
   @IsEnum(DictionaryStatus)
   status?: DictionaryStatus;
 
-  @ApiPropertyOptional({ maxLength: 500 })
+  @ApiPropertyOptional({ type: String, maxLength: 500, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  description?: string;
+  description?: string | null;
 }

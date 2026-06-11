@@ -6,8 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+/**
+ * @nullable
+ */
 export type UpdateDictionaryItemDtoBadgeVariant =
-  (typeof UpdateDictionaryItemDtoBadgeVariant)[keyof typeof UpdateDictionaryItemDtoBadgeVariant];
+  | (typeof UpdateDictionaryItemDtoBadgeVariant)[keyof typeof UpdateDictionaryItemDtoBadgeVariant]
+  | null;
 
 export const UpdateDictionaryItemDtoBadgeVariant = {
   DEFAULT: "DEFAULT",

@@ -189,4 +189,61 @@ describe('OpenAPI operation ids', () => {
       await app.close();
     }
   });
+
+  it('documents nullable dictionary update fields', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(PrismaService)
+      .useValue({
+        $connect: jest.fn(),
+        $disconnect: jest.fn(),
+      })
+      .compile();
+    const app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api');
+
+    try {
+      await app.init();
+      const document = createOpenApiDocument(app);
+
+      expect(
+        document.components?.schemas?.UpdateDictionaryTypeDto?.properties
+          ?.description,
+      ).toEqual(
+        expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
+      );
+      expect(
+        document.components?.schemas?.UpdateDictionaryItemDto?.properties
+          ?.description,
+      ).toEqual(
+        expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
+      );
+      expect(
+        document.components?.schemas?.UpdateDictionaryItemDto?.properties
+          ?.badgeVariant,
+      ).toEqual(
+        expect.objectContaining({
+          nullable: true,
+        }),
+      );
+      expect(
+        document.components?.schemas?.UpdateDictionaryItemDto?.properties
+          ?.metadata,
+      ).toEqual(
+        expect.objectContaining({
+          type: 'object',
+          nullable: true,
+        }),
+      );
+    } finally {
+      await app.close();
+    }
+  });
 });

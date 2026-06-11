@@ -23,6 +23,7 @@ import type {
   DictionaryTypeListQuery,
   DictionaryTypeListResponse,
   DictionaryTypeRecord,
+  UpdateDictionaryItemRequest,
   UpdateDictionaryTypeRequest,
 } from './dictionaries.types'
 import { DictionariesPage } from './DictionariesPage'
@@ -460,12 +461,16 @@ describe('DictionariesPage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('omits empty optional fields when updating a dictionary type', async () => {
+  it('sends null when clearing a dictionary type description', async () => {
     const user = userEvent.setup()
+    const describedType: DictionaryTypeRecord = {
+      ...commonStatusType,
+      description: 'Common status labels',
+    }
     dictionariesApiMock.listDictionaryTypes.mockResolvedValue(
-      typeListResponse([commonStatusType]),
+      typeListResponse([describedType]),
     )
-    dictionariesApiMock.updateDictionaryType.mockResolvedValue(commonStatusType)
+    dictionariesApiMock.updateDictionaryType.mockResolvedValue(describedType)
 
     renderDictionariesPage()
     const typeButton = await screen.findByRole('button', {
@@ -474,6 +479,7 @@ describe('DictionariesPage', () => {
 
     fireEvent.contextMenu(typeButton)
     await user.click(screen.getByRole('menuitem', { name: 'Edit' }))
+    await user.clear(screen.getByLabelText('Description'))
     await user.click(
       within(screen.getByRole('dialog', { name: 'Edit' })).getByRole('button', {
         name: 'Edit',
@@ -487,31 +493,37 @@ describe('DictionariesPage', () => {
       )
     })
     const payload = dictionariesApiMock.updateDictionaryType.mock.calls[0]?.[1]
-    expect(payload).not.toHaveProperty('description')
+    expect(payload).toEqual(
+      expect.objectContaining<UpdateDictionaryTypeRequest>({
+        description: null,
+      }),
+    )
   })
 
-  it('omits empty optional fields when updating a dictionary item', async () => {
+  it('sends null when clearing dictionary item optional fields', async () => {
     const user = userEvent.setup()
-    const plainItem: DictionaryItemRecord = {
+    const describedItem: DictionaryItemRecord = {
       ...standardItem,
-      id: 'item-plain',
-      value: 'PLAIN',
-      label: 'Plain',
-      badgeVariant: undefined,
-      description: undefined,
+      id: 'item-described',
+      value: 'DESCRIBED',
+      label: 'Described',
+      badgeVariant: 'NEUTRAL',
+      description: 'Displayed with a neutral badge',
     }
     dictionariesApiMock.listDictionaryTypes.mockResolvedValue(
       typeListResponse([userRoleType]),
     )
     dictionariesApiMock.listDictionaryItems.mockResolvedValue(
-      itemListResponse([plainItem]),
+      itemListResponse([describedItem]),
     )
-    dictionariesApiMock.updateDictionaryItem.mockResolvedValue(plainItem)
+    dictionariesApiMock.updateDictionaryItem.mockResolvedValue(describedItem)
 
     renderDictionariesPage()
-    const itemRow = (await screen.findByText('PLAIN')).closest('tr')
+    const itemRow = (await screen.findByText('DESCRIBED')).closest('tr')
 
     await user.click(within(itemRow!).getByRole('button', { name: 'Edit' }))
+    await user.selectOptions(screen.getByLabelText('Badge variant'), '')
+    await user.clear(screen.getByLabelText('Description'))
     await user.click(
       within(screen.getByRole('dialog', { name: 'Edit' })).getByRole('button', {
         name: 'Edit',
@@ -520,13 +532,17 @@ describe('DictionariesPage', () => {
 
     await waitFor(() => {
       expect(dictionariesApiMock.updateDictionaryItem).toHaveBeenCalledWith(
-        'item-plain',
+        'item-described',
         expect.any(Object),
       )
     })
     const payload = dictionariesApiMock.updateDictionaryItem.mock.calls[0]?.[1]
-    expect(payload).not.toHaveProperty('badgeVariant')
-    expect(payload).not.toHaveProperty('description')
+    expect(payload).toEqual(
+      expect.objectContaining<UpdateDictionaryItemRequest>({
+        badgeVariant: null,
+        description: null,
+      }),
+    )
   })
 
   it('shows confirmation before deleting a non-system item', async () => {

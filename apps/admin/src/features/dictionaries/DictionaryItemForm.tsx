@@ -123,8 +123,8 @@ export function DictionaryItemForm({
 
     const payload: UpdateDictionaryItemRequest = {
       ...basePayload,
-      ...(value.badgeVariant ? { badgeVariant: value.badgeVariant } : {}),
-      ...(description ? { description } : {}),
+      badgeVariant: value.badgeVariant || null,
+      description: description || null,
     }
 
     onSubmit(payload)
