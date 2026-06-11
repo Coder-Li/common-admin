@@ -21,6 +21,10 @@ import { useAuthStore } from '../stores/auth-store'
 import { ThemeSwitcher } from '../theme/ThemeSwitcher'
 import type { UserProfile } from '../types/auth'
 
+type CurrentUserPayload = Awaited<ReturnType<typeof getCurrentUser>> & {
+  permissions?: string[]
+}
+
 function navItemClass(isActive: boolean) {
   return [
     'inline-flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition',
@@ -30,12 +34,43 @@ function navItemClass(isActive: boolean) {
   ].join(' ')
 }
 
-function isCurrentUserProfile(value: unknown): value is UserProfile {
-  return Boolean(
-    value &&
-      typeof value === 'object' &&
-      'id' in value &&
-      typeof value.id === 'string',
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object')
+}
+
+function hasStringField(value: Record<string, unknown>, field: string) {
+  return typeof value[field] === 'string'
+}
+
+function isRoleSummaryArray(value: unknown) {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (role) =>
+        isRecord(role) &&
+        typeof role.code === 'string' &&
+        typeof role.name === 'string',
+    )
+  )
+}
+
+function isStringArray(value: unknown) {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+function isCurrentUserProfile(value: unknown): value is CurrentUserPayload {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  return (
+    hasStringField(value, 'id') &&
+    hasStringField(value, 'email') &&
+    hasStringField(value, 'username') &&
+    hasStringField(value, 'firstName') &&
+    hasStringField(value, 'lastName') &&
+    isRoleSummaryArray(value.roles) &&
+    (!('permissions' in value) || isStringArray(value.permissions))
   )
 }
 
@@ -70,7 +105,7 @@ export function AdminShell() {
       const profile = {
         ...currentUser,
         roles: currentUser.roles ?? roles,
-        permissions,
+        permissions: currentUser.permissions ?? permissions,
       } as UserProfile
       setUser(profile)
       return profile

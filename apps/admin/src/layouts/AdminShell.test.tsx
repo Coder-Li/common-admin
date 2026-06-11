@@ -253,6 +253,46 @@ describe('AdminShell i18n', () => {
     expect(useAuthStore.getState().permissions).toEqual(['user.read'])
   })
 
+  it('uses permissions returned by the current-user response over stale store permissions', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValueOnce(
+      currentUserResponse(['role.read']),
+    )
+
+    const { router } = renderAdminShell('/users', ['user.read'])
+
+    await waitFor(() => {
+      expect(getCurrentUser).toHaveBeenCalled()
+    })
+    await waitFor(() => {
+      expect(useAuthStore.getState().permissions).toEqual(['role.read'])
+    })
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/403')
+    })
+  })
+
+  it('ignores partial current-user objects without replacing the session user', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValueOnce({
+      id: 'server-user',
+      email: 'server@example.com',
+    } as never)
+
+    renderAdminShell('/users', ['user.read'])
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Users' }),
+    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(getCurrentUser).toHaveBeenCalled()
+    })
+    expect(useAuthStore.getState().user).toMatchObject({
+      id: 'user-1',
+      email: 'admin@example.com',
+      username: 'admin',
+    })
+    expect(useAuthStore.getState().permissions).toEqual(['user.read'])
+  })
+
   it('does not render links to unauthorized routes', async () => {
     renderAdminShell('/dashboard', ['dashboard.view', 'file.read'])
 
