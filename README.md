@@ -123,3 +123,14 @@ pnpm test
 pnpm lint
 pnpm format
 ```
+
+## API 契约生成
+
+后端 DTO 和 Swagger metadata 是 API 契约来源，前端 API 类型、endpoint
+functions、React Query hooks 和 query keys 由 OpenAPI + Orval 生成。新增或修改
+API 后参考 `docs/patterns/admin-api-contract-generation-guide.md`。
+
+```bash
+pnpm api:generate
+pnpm api:check
+```

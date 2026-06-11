@@ -7,6 +7,18 @@ Currently, two official plugins are available:
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
+## API Contract Generation
+
+Admin API types, endpoint functions, React Query hooks, and query keys are
+generated from the backend OpenAPI document. See
+`../../docs/patterns/admin-api-contract-generation-guide.md` before adding or
+changing API-backed pages.
+
+```bash
+pnpm api:generate
+pnpm api:check
+```
+
 ## React Compiler
 
 The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).

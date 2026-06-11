@@ -90,15 +90,19 @@
 
 ### 6. API 契约与类型生成
 
-当前状态：后端 DTO 和前端 types 分开维护。
+当前状态：API 契约与类型生成已经完成第一版实现。后端 DTO 和 Swagger metadata 是契约来源，`apps/api/openapi.json` 由脚本生成，Admin 端 API types、endpoint functions、React Query hooks 和 query keys 由 Orval 生成，旧 handwritten API client 已移除。
+
+设计、实施与使用文档：
+
+- `docs/superpowers/specs/2026-06-10-api-contract-generation-design.md`
+- `docs/superpowers/plans/2026-06-10-api-contract-generation.md`
+- `docs/patterns/admin-api-contract-generation-guide.md`
 
 后续可讨论：
 
-- 是否从 OpenAPI 生成前端类型。
-- 是否生成 API client。
-- 如何降低前后端契约漂移。
-- 生成文件放在哪里。
-- 当前 feature-local API wrapper 是否保留。
+- 是否在 CI 中强制执行 `pnpm api:check`。
+- 是否为新增 API 模块提供脚手架或更细的 checklist。
+- 是否在后续统一异常处理主题中规范 generated mutator 的错误模型。
 
 价值：随着模块增加，自动生成契约能减少重复劳动和隐性字段不一致。
 
