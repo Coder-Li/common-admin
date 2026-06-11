@@ -12,7 +12,6 @@ import {
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../../app/api-client'
 import { clearQueryCache } from '../../app/query-client'
 import { I18nProvider } from '../../i18n/I18nProvider'
 import { AdminRouterProvider } from '../../routes/router'
@@ -57,14 +56,6 @@ vi.mock('../../generated/api/endpoints/users/users', () => ({
 }))
 
 vi.mock('../roles/roles.api', () => rolesApiMock)
-
-vi.mock('../../app/api-client', () => ({
-  api: {
-    me: vi.fn(),
-    logout: vi.fn(),
-    refresh: vi.fn(),
-  },
-}))
 
 vi.mock('../../app/query-client', () => ({
   clearQueryCache: vi.fn(),
@@ -212,15 +203,6 @@ function renderUsersRoute(
       permissions,
     },
   })
-  vi.mocked(api.me).mockResolvedValue({
-    id: currentUser.id,
-    email: currentUser.email,
-    username: currentUser.username,
-    firstName: currentUser.firstName,
-    lastName: currentUser.lastName,
-    roles: [{ code: 'admin', name: 'Admin' }],
-    permissions,
-  })
 
   const router = createAdminRouter({
     history: createMemoryHistory({ initialEntries: ['/users'] }),
@@ -244,24 +226,6 @@ describe('UsersPage', () => {
   beforeEach(() => {
     window.scrollTo = vi.fn()
     window.localStorage.clear()
-    vi.mocked(api.me).mockReset()
-    vi.mocked(api.me).mockResolvedValue({
-      id: 'current-user',
-      email: 'admin@example.com',
-      username: 'admin',
-      firstName: 'Admin',
-      lastName: 'User',
-      roles: [{ code: 'admin', name: 'Admin' }],
-      permissions: [
-        'user.create',
-        'user.update',
-        'user.delete',
-        'user.assign_roles',
-      ],
-    })
-    vi.mocked(api.logout).mockReset()
-    vi.mocked(api.logout).mockResolvedValue(undefined)
-    vi.mocked(api.refresh).mockReset()
     vi.mocked(clearQueryCache).mockReset()
     vi.mocked(createUser).mockReset()
     vi.mocked(deleteUser).mockReset()
