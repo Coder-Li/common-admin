@@ -65,6 +65,10 @@ type OpenApiPathOperation = {
   >;
 };
 
+type OpenApiSchemaWithProperties = {
+  properties?: Record<string, unknown>;
+};
+
 function hasOperationId(value: unknown): value is SwaggerOperationLike {
   return (
     typeof value === 'object' &&
@@ -117,6 +121,24 @@ function getOperation(
   ];
 
   return pathItem?.[method] as OpenApiPathOperation;
+}
+
+function getSchemaProperty(
+  document: OpenAPIObject,
+  schemaName: string,
+  propertyName: string,
+) {
+  const schema = document.components?.schemas?.[schemaName] as
+    | OpenApiSchemaWithProperties
+    | undefined;
+
+  return schema?.properties?.[propertyName];
+}
+
+function getInlineSchemaProperty(schema: unknown, propertyName: string) {
+  return (schema as OpenApiSchemaWithProperties | undefined)?.properties?.[
+    propertyName
+  ];
 }
 
 describe('openapi helpers', () => {
@@ -215,7 +237,7 @@ describe('OpenAPI operation ids', () => {
       const document = createOpenApiDocument(app);
 
       expect(
-        document.components?.schemas?.UpdateRoleDto?.properties?.description,
+        getSchemaProperty(document, 'UpdateRoleDto', 'description'),
       ).toEqual(
         expect.objectContaining({
           type: 'string',
@@ -223,7 +245,7 @@ describe('OpenAPI operation ids', () => {
         }),
       );
       expect(
-        document.components?.schemas?.RoleResponseDto?.properties?.description,
+        getSchemaProperty(document, 'RoleResponseDto', 'description'),
       ).toEqual(
         expect.objectContaining({
           type: 'string',
@@ -253,8 +275,7 @@ describe('OpenAPI operation ids', () => {
       const document = createOpenApiDocument(app);
 
       expect(
-        document.components?.schemas?.UpdateDictionaryTypeDto?.properties
-          ?.description,
+        getSchemaProperty(document, 'UpdateDictionaryTypeDto', 'description'),
       ).toEqual(
         expect.objectContaining({
           type: 'string',
@@ -262,8 +283,7 @@ describe('OpenAPI operation ids', () => {
         }),
       );
       expect(
-        document.components?.schemas?.UpdateDictionaryItemDto?.properties
-          ?.description,
+        getSchemaProperty(document, 'UpdateDictionaryItemDto', 'description'),
       ).toEqual(
         expect.objectContaining({
           type: 'string',
@@ -271,16 +291,14 @@ describe('OpenAPI operation ids', () => {
         }),
       );
       expect(
-        document.components?.schemas?.UpdateDictionaryItemDto?.properties
-          ?.badgeVariant,
+        getSchemaProperty(document, 'UpdateDictionaryItemDto', 'badgeVariant'),
       ).toEqual(
         expect.objectContaining({
           nullable: true,
         }),
       );
       expect(
-        document.components?.schemas?.UpdateDictionaryItemDto?.properties
-          ?.metadata,
+        getSchemaProperty(document, 'UpdateDictionaryItemDto', 'metadata'),
       ).toEqual(
         expect.objectContaining({
           type: 'object',
@@ -301,14 +319,10 @@ describe('OpenAPI operation ids', () => {
         operation.requestBody?.content?.['multipart/form-data'];
 
       expect(multipartContent).toBeDefined();
-      expect(multipartContent?.schema).toEqual(
+      expect(getInlineSchemaProperty(multipartContent?.schema, 'file')).toEqual(
         expect.objectContaining({
-          properties: expect.objectContaining({
-            file: expect.objectContaining({
-              type: 'string',
-              format: 'binary',
-            }),
-          }),
+          type: 'string',
+          format: 'binary',
         }),
       );
     } finally {
@@ -339,7 +353,7 @@ describe('OpenAPI operation ids', () => {
 
     try {
       expect(
-        document.components?.schemas?.UpdateFileDto?.properties?.description,
+        getSchemaProperty(document, 'UpdateFileDto', 'description'),
       ).toEqual(
         expect.objectContaining({
           type: 'string',
@@ -347,7 +361,7 @@ describe('OpenAPI operation ids', () => {
         }),
       );
       expect(
-        document.components?.schemas?.FileResponseDto?.properties?.description,
+        getSchemaProperty(document, 'FileResponseDto', 'description'),
       ).toEqual(
         expect.objectContaining({
           type: 'string',
@@ -355,7 +369,7 @@ describe('OpenAPI operation ids', () => {
         }),
       );
       expect(
-        document.components?.schemas?.FileResponseDto?.properties?.extension,
+        getSchemaProperty(document, 'FileResponseDto', 'extension'),
       ).toEqual(
         expect.objectContaining({
           type: 'string',
@@ -363,7 +377,7 @@ describe('OpenAPI operation ids', () => {
         }),
       );
       expect(
-        document.components?.schemas?.FileResponseDto?.properties?.uploadedById,
+        getSchemaProperty(document, 'FileResponseDto', 'uploadedById'),
       ).toEqual(
         expect.objectContaining({
           type: 'string',
