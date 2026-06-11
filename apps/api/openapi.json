@@ -2193,7 +2193,7 @@
             "type": "string"
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "status": {
@@ -2295,7 +2295,7 @@
             "maxLength": 120
           },
           "description": {
-            "type": "object",
+            "type": "string",
             "maxLength": 500,
             "nullable": true
           },

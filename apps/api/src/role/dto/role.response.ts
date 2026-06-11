@@ -20,7 +20,7 @@ export class RoleResponseDto {
   @ApiProperty()
   name!: string;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({ type: String, nullable: true })
   description!: string | null;
 
   @ApiProperty({ enum: RoleStatus })

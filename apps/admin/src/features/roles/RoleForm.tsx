@@ -88,7 +88,7 @@ export function RoleForm({
 
     onSubmit({
       ...payload,
-      description: (description || null) as UpdateRoleRequest['description'],
+      description: description || null,
       status: value.status,
     })
   }

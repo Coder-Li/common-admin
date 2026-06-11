@@ -5,7 +5,6 @@
  * API for the common admin starter template
  * OpenAPI spec version: 0.1.0
  */
-import type { UpdateRoleDtoDescription } from "./updateRoleDtoDescription";
 import type { UpdateRoleDtoStatus } from "./updateRoleDtoStatus";
 
 export interface UpdateRoleDto {
@@ -15,7 +14,7 @@ export interface UpdateRoleDto {
    * @maxLength 500
    * @nullable
    */
-  description?: UpdateRoleDtoDescription;
+  description?: string | null;
   status?: UpdateRoleDtoStatus;
   isDefault?: boolean;
 }

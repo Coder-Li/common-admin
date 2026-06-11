@@ -852,7 +852,6 @@ describe('api client', () => {
     const createPayload = {
       code: 'operator',
       name: 'Operator',
-      description: null,
       isDefault: false,
     }
     const updatePayload = { name: 'Ops', status: 'ACTIVE' as const }

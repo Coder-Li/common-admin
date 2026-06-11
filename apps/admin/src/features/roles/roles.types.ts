@@ -18,13 +18,9 @@ export type RoleRecord = RoleResponseDto
 
 export type RoleListResponse = RoleListResponseDto
 
-export type CreateRoleRequest = Omit<CreateRoleDto, 'description'> & {
-  description?: string | null
-}
+export type CreateRoleRequest = CreateRoleDto
 
-export type UpdateRoleRequest = Omit<UpdateRoleDto, 'description'> & {
-  description?: string | null
-}
+export type UpdateRoleRequest = UpdateRoleDto
 
 export type ListRolesParams = GeneratedListRolesParams
 

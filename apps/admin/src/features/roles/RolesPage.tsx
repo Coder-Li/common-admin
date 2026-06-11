@@ -21,11 +21,7 @@ import {
   replaceRolePermissions,
   updateRole,
 } from '../../generated/api/endpoints/roles/roles'
-import type {
-  CreateRoleDto,
-  ListRolesParams,
-  UpdateRoleDto,
-} from '../../generated/api/schemas'
+import type { ListRolesParams } from '../../generated/api/schemas'
 import { useI18n } from '../../i18n/useI18n'
 import { can } from '../../lib/permissions'
 import { useAuthStore } from '../../stores/auth-store'
@@ -122,8 +118,7 @@ export function RolesPage() {
     queryClient.invalidateQueries({ queryKey: getListRolesQueryKey() })
 
   const createMutation = useMutation({
-    mutationFn: (payload: CreateRoleRequest) =>
-      createRole(payload as CreateRoleDto),
+    mutationFn: (payload: CreateRoleRequest) => createRole(payload),
     onError: (error) => {
       toast.error(mutationErrorMessage(error) ?? t('roles.error.create'))
     },
@@ -136,7 +131,7 @@ export function RolesPage() {
 
   const updateMutation = useMutation({
     mutationFn: (payload: { id: string; value: UpdateRoleRequest }) =>
-      updateRole(payload.id, payload.value as UpdateRoleDto),
+      updateRole(payload.id, payload.value),
     onError: (error) => {
       toast.error(mutationErrorMessage(error) ?? t('roles.error.update'))
     },

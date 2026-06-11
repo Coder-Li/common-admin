@@ -53,7 +53,7 @@ export class UpdateRoleDto {
   @MaxLength(120)
   name?: string;
 
-  @ApiPropertyOptional({ maxLength: 500, nullable: true })
+  @ApiPropertyOptional({ type: String, maxLength: 500, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(500)

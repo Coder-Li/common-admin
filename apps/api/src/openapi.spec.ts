@@ -151,4 +151,42 @@ describe('OpenAPI operation ids', () => {
       await app.close();
     }
   });
+
+  it('documents nullable role descriptions as strings', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(PrismaService)
+      .useValue({
+        $connect: jest.fn(),
+        $disconnect: jest.fn(),
+      })
+      .compile();
+    const app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api');
+
+    try {
+      await app.init();
+      const document = createOpenApiDocument(app);
+
+      expect(
+        document.components?.schemas?.UpdateRoleDto?.properties?.description,
+      ).toEqual(
+        expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
+      );
+      expect(
+        document.components?.schemas?.RoleResponseDto?.properties?.description,
+      ).toEqual(
+        expect.objectContaining({
+          type: 'string',
+          nullable: true,
+        }),
+      );
+    } finally {
+      await app.close();
+    }
+  });
 });

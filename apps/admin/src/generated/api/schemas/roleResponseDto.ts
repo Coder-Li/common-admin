@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { RolePermissionSummaryDto } from "./rolePermissionSummaryDto";
-import type { RoleResponseDtoDescription } from "./roleResponseDtoDescription";
 import type { RoleResponseDtoStatus } from "./roleResponseDtoStatus";
 
 export interface RoleResponseDto {
@@ -14,7 +13,7 @@ export interface RoleResponseDto {
   code: string;
   name: string;
   /** @nullable */
-  description?: RoleResponseDtoDescription;
+  description?: string | null;
   status: RoleResponseDtoStatus;
   isSystem: boolean;
   isDefault: boolean;
