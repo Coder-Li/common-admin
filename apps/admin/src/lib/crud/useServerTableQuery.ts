@@ -1,11 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ListResponse } from '../api'
 import {
   type ApiListQuery,
   createListQueryKey,
   toApiListQuery,
   type ServerListState,
 } from './list-query'
+
+interface ListResponse<TItem> {
+  items: TItem[]
+  total: number
+  page: number
+  pageSize: number
+}
 
 export function useServerTableQuery<
   TItem,

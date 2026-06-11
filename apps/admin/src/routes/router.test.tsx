@@ -6,7 +6,6 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../app/api-client'
 import { apiRefreshCoordinator } from '../app/api-mutator'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { useAuthStore } from '../stores/auth-store'
@@ -14,15 +13,6 @@ import { ThemeProvider } from '../theme/ThemeProvider'
 import type { AuthSession, AuthStatus } from '../types/auth'
 import { createAdminRouter } from './router-factory'
 import { AdminRouterProvider } from './router'
-
-vi.mock('../app/api-client', () => ({
-  api: {
-    login: vi.fn(),
-    logout: vi.fn(),
-    me: vi.fn(),
-    refresh: vi.fn(),
-  },
-}))
 
 vi.mock('../app/api-mutator', () => ({
   apiMutator: vi.fn(),
@@ -116,12 +106,7 @@ function renderRouter({
 describe('admin router guards', () => {
   beforeEach(() => {
     window.scrollTo = vi.fn()
-    vi.mocked(api.login).mockReset()
-    vi.mocked(api.logout).mockReset()
-    vi.mocked(api.me).mockReset()
-    vi.mocked(api.refresh).mockReset()
     vi.mocked(apiRefreshCoordinator.refresh).mockReset()
-    vi.mocked(api.me).mockResolvedValue(session.user)
     useAuthStore.getState().reset()
   })
 
@@ -231,12 +216,7 @@ describe('admin router guards', () => {
 describe('admin router startup refresh', () => {
   beforeEach(() => {
     window.scrollTo = vi.fn()
-    vi.mocked(api.login).mockReset()
-    vi.mocked(api.logout).mockReset()
-    vi.mocked(api.me).mockReset()
-    vi.mocked(api.refresh).mockReset()
     vi.mocked(apiRefreshCoordinator.refresh).mockReset()
-    vi.mocked(api.me).mockResolvedValue(session.user)
     useAuthStore.getState().reset()
   })
 
