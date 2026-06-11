@@ -30,6 +30,9 @@ vi.mock('../../generated/api/endpoints/auth/auth', () => ({
 
 vi.mock('../../generated/api/endpoints/users/users', () => ({
   getCurrentUser: vi.fn(),
+  getListUsersQueryKey: vi.fn((params?: unknown) =>
+    params ? ['/users', params] : ['/users'],
+  ),
 }))
 
 vi.mock('../../app/query-client', () => ({

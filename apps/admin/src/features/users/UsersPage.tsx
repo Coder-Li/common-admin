@@ -14,7 +14,7 @@ import type {
   SortingState,
 } from '../../components/data-table/DataTable'
 import { useI18n } from '../../i18n/useI18n'
-import { useServerTableQuery } from '../../lib/crud/useServerTableQuery'
+import { toApiListQuery } from '../../lib/crud/list-query'
 import { can } from '../../lib/permissions'
 import { rolesApi } from '../roles/roles.api'
 import { useAuthStore } from '../../stores/auth-store'
@@ -98,23 +98,27 @@ export function UsersPage() {
   })
   const roleOptions = rolesQuery.data?.items ?? []
 
-  const usersQuery = useServerTableQuery<UserRecord, { roleCode?: string }, UserListQuery>({
-    resource: 'users',
-    state: {
-      filters: roleCode === allRoleFilter ? {} : { roleCode },
-      pageIndex: pagination.pageIndex,
-      pageSize: pagination.pageSize,
-      search,
-      sort: toSortParam(sorting),
-    },
-    queryFn: (query) => listUsers(query as unknown as ListUsersParams),
+  const usersQueryParams = useMemo(
+    () =>
+      toApiListQuery<{ roleCode?: string }, UserListQuery>({
+        filters: roleCode === allRoleFilter ? {} : { roleCode },
+        pageIndex: pagination.pageIndex,
+        pageSize: pagination.pageSize,
+        search,
+        sort: toSortParam(sorting),
+      }),
+    [pagination.pageIndex, pagination.pageSize, roleCode, search, sorting],
+  )
+
+  const usersQuery = useQuery({
+    queryKey: getListUsersQueryKey(
+      usersQueryParams as unknown as ListUsersParams,
+    ),
+    queryFn: () => listUsers(usersQueryParams as unknown as ListUsersParams),
   })
 
   const invalidateUsers = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() }),
-      queryClient.invalidateQueries({ queryKey: ['users', 'list'] }),
-    ])
+    await queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() })
   }
 
   const createMutation = useMutation({
