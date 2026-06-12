@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { messages } from '../i18n/messages'
+import {
+  messages,
+  type MessageKey,
+  type TranslationValues,
+} from '../i18n/messages'
 import { getErrorMessage } from './api-error-messages'
 import type { ApiError } from './api-error'
 
 const englishMessages: Record<string, string> = messages['en-US']
 
-const t = (key: string, values: Record<string, string> = {}) =>
+const t = (key: MessageKey, values: TranslationValues = {}) =>
   englishMessages[key].replace(/\{(\w+)\}/g, (token, valueKey: string) =>
-    values[valueKey] ?? token,
+    String(values[valueKey] ?? token),
   )
 
 function apiError(

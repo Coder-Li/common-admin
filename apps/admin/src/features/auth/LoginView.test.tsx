@@ -135,6 +135,20 @@ const usersOnlyCurrentUser = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
 
+const apiError = {
+  code: 'INTERNAL_SERVER_ERROR',
+  message: 'Internal server error',
+  statusCode: 500,
+  requestId: 'req_test123',
+}
+
+const unauthorizedError = {
+  code: 'UNAUTHORIZED',
+  message: 'Unauthorized',
+  statusCode: 401,
+  requestId: 'req_login401',
+}
+
 describe('LoginView i18n', () => {
   afterEach(() => {
     cleanup()
@@ -199,6 +213,40 @@ describe('LoginView i18n', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/users')
     })
+  })
+
+  it('reports shared API errors for non-auth login failures', async () => {
+    const user = userEvent.setup()
+    vi.mocked(login).mockRejectedValueOnce(apiError)
+
+    renderLoginRouter()
+
+    await user.click(await screen.findByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Something went wrong. Request ID: req_test123',
+      )
+    })
+    expect(toast.error).not.toHaveBeenCalledWith('Invalid username or password')
+    expect(toast.error).not.toHaveBeenCalledWith('Internal server error')
+  })
+
+  it('reports invalid credentials for auth login failures', async () => {
+    const user = userEvent.setup()
+    vi.mocked(login).mockRejectedValueOnce(unauthorizedError)
+
+    renderLoginRouter()
+
+    await user.click(await screen.findByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Invalid username or password')
+    })
+    expect(toast.error).not.toHaveBeenCalledWith(
+      'Something went wrong. Request ID: req_login401',
+    )
+    expect(toast.error).not.toHaveBeenCalledWith('Unauthorized')
   })
 
   it('does not report invalid credentials when navigation fails after login succeeds', async () => {

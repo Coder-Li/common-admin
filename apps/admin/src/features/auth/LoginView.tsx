@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { LogIn, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
+import { getErrorMessage } from '../../app/api-error-messages'
+import { toApiError } from '../../app/api-error'
 import { clearQueryCache } from '../../app/query-client'
 import { login } from '../../generated/api/endpoints/auth/auth'
 import { LanguageSwitcher } from '../../i18n/LanguageSwitcher'
@@ -10,6 +12,12 @@ import { useI18n } from '../../i18n/useI18n'
 import { getFirstAccessibleRoute } from '../../routes/admin-route-registry'
 import { useAuthStore } from '../../stores/auth-store'
 import { ThemeSwitcher } from '../../theme/ThemeSwitcher'
+
+function isLoginAuthFailure(error: unknown) {
+  const apiError = toApiError(error)
+
+  return apiError.code === 'UNAUTHORIZED' || apiError.statusCode === 401
+}
 
 export function LoginView() {
   const { t } = useI18n()
@@ -25,8 +33,13 @@ export function LoginView() {
     let session
     try {
       session = await login({ usernameOrEmail, password })
-    } catch {
-      toast.error(t('auth.invalidCredentials'))
+    } catch (error) {
+      const invalidCredentials = t('auth.invalidCredentials')
+      toast.error(
+        isLoginAuthFailure(error)
+          ? invalidCredentials
+          : getErrorMessage(error, invalidCredentials, t),
+      )
       setIsSubmitting(false)
       return
     }

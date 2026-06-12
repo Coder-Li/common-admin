@@ -3,6 +3,7 @@ import type { OnChangeFn } from '@tanstack/react-table'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Upload } from 'lucide-react'
 import { toast } from 'sonner'
+import { getErrorMessage } from '../../app/api-error-messages'
 import { DataTable } from '../../components/data-table/DataTable'
 import { DataTableToolbar } from '../../components/data-table/DataTableToolbar'
 import type {
@@ -30,10 +31,6 @@ import type { FileListQuery, FileRecord, UpdateFileRequest } from './files.types
 type FileTableQuery = FileListQuery & {
   page: number
   pageSize: number
-}
-
-function mutationErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : undefined
 }
 
 function toSortParam(sorting: SortingState) {
@@ -92,7 +89,7 @@ export function FilesPage() {
   const uploadMutation = useMutation({
     mutationFn: (formData: FormData) => uploadFile(formData),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('files.error.upload'))
+      toast.error(getErrorMessage(error, t('files.error.upload'), t))
     },
     onSuccess: async () => {
       toast.success(t('files.success.upload'))
@@ -105,7 +102,7 @@ export function FilesPage() {
     mutationFn: (payload: { id: string; value: UpdateFileRequest }) =>
       updateFile(payload.id, payload.value),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('files.error.update'))
+      toast.error(getErrorMessage(error, t('files.error.update'), t))
     },
     onSuccess: async () => {
       toast.success(t('files.success.update'))
@@ -117,7 +114,7 @@ export function FilesPage() {
   const editMutation = useMutation({
     mutationFn: (id: string) => getFile(id),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('files.error.load'))
+      toast.error(getErrorMessage(error, t('files.error.load'), t))
     },
     onSuccess: (file) => {
       setEditTarget(file)
@@ -127,7 +124,7 @@ export function FilesPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteFile(id),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('files.delete.error'))
+      toast.error(getErrorMessage(error, t('files.delete.error'), t))
     },
     onSuccess: async () => {
       toast.success(t('files.delete.success'))
@@ -139,7 +136,7 @@ export function FilesPage() {
   const downloadMutation = useMutation({
     mutationFn: (file: FileRecord) => downloadFile(file.id),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('files.error.download'))
+      toast.error(getErrorMessage(error, t('files.error.download'), t))
     },
     onSuccess: (blob, file) => {
       const url = URL.createObjectURL(blob)
@@ -201,13 +198,6 @@ export function FilesPage() {
     }))
   }
 
-  const listError =
-    filesQuery.error instanceof Error
-      ? filesQuery.error
-      : filesQuery.error
-        ? new Error(t('files.error.load'))
-        : null
-
   return (
     <section className="grid gap-4 p-5">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -230,8 +220,9 @@ export function FilesPage() {
         columns={columns}
         data={filesQuery.data?.items ?? []}
         emptyLabel={t('files.state.empty')}
-        error={listError}
+        error={filesQuery.error}
         errorLabel={t('files.error.load')}
+        formatError={(error, fallback) => getErrorMessage(error, fallback, t)}
         isLoading={filesQuery.isLoading}
         loadingLabel={t('files.state.loading')}
         onPaginationChange={handlePaginationChange}

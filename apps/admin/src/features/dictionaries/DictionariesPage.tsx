@@ -19,6 +19,7 @@ import {
   Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { getErrorMessage } from '../../app/api-error-messages'
 import { DataTable } from '../../components/data-table/DataTable'
 import { DataTableToolbar } from '../../components/data-table/DataTableToolbar'
 import type {
@@ -85,10 +86,6 @@ type TypeContextMenuState = {
   x: number
   y: number
 } | null
-
-function mutationErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : undefined
-}
 
 function toSortParam(sorting: SortingState) {
   const firstSort = sorting[0]
@@ -239,7 +236,7 @@ export function DictionariesPage() {
     mutationFn: (payload: CreateDictionaryTypeRequest) =>
       createDictionaryType(payload),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('dictionaries.error.createType'))
+      toast.error(getErrorMessage(error, t('dictionaries.error.createType'), t))
     },
     onSuccess: async () => {
       toast.success(t('dictionaries.success.createType'))
@@ -252,7 +249,7 @@ export function DictionariesPage() {
     mutationFn: (payload: { id: string; value: UpdateDictionaryTypeRequest }) =>
       updateDictionaryType(payload.id, payload.value),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('dictionaries.error.updateType'))
+      toast.error(getErrorMessage(error, t('dictionaries.error.updateType'), t))
     },
     onSuccess: async () => {
       const typeCode = typeFormState?.mode === 'edit'
@@ -268,7 +265,7 @@ export function DictionariesPage() {
   const deleteTypeMutation = useMutation({
     mutationFn: (id: string) => deleteDictionaryType(id),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('dictionaries.delete.typeError'))
+      toast.error(getErrorMessage(error, t('dictionaries.delete.typeError'), t))
     },
     onSuccess: async () => {
       const typeCode = deleteState?.kind === 'type'
@@ -287,7 +284,7 @@ export function DictionariesPage() {
     mutationFn: (payload: CreateDictionaryItemRequest) =>
       createDictionaryItem(payload),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('dictionaries.error.createItem'))
+      toast.error(getErrorMessage(error, t('dictionaries.error.createItem'), t))
     },
     onSuccess: async () => {
       toast.success(t('dictionaries.success.createItem'))
@@ -301,7 +298,7 @@ export function DictionariesPage() {
     mutationFn: (payload: { id: string; value: UpdateDictionaryItemRequest }) =>
       updateDictionaryItem(payload.id, payload.value),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('dictionaries.error.updateItem'))
+      toast.error(getErrorMessage(error, t('dictionaries.error.updateItem'), t))
     },
     onSuccess: async () => {
       const typeCode = itemFormState?.mode === 'edit'
@@ -317,7 +314,7 @@ export function DictionariesPage() {
   const deleteItemMutation = useMutation({
     mutationFn: (id: string) => deleteDictionaryItem(id),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('dictionaries.delete.itemError'))
+      toast.error(getErrorMessage(error, t('dictionaries.delete.itemError'), t))
     },
     onSuccess: async () => {
       const typeCode = deleteState?.kind === 'item'
@@ -445,19 +442,6 @@ export function DictionariesPage() {
     }
   }
 
-  const typeError =
-    typeQuery.error instanceof Error
-      ? typeQuery.error
-      : typeQuery.error
-        ? new Error(t('dictionaries.error.loadTypes'))
-        : null
-  const itemError =
-    itemQuery.error instanceof Error
-      ? itemQuery.error
-      : itemQuery.error
-        ? new Error(t('dictionaries.error.loadItems'))
-        : null
-
   return (
     <section className="grid min-h-[calc(100vh-8rem)] gap-0 bg-white lg:grid-cols-[300px_minmax(0,1fr)]">
       <aside className="flex min-h-[22rem] min-w-0 flex-col border-b border-slate-200 bg-white lg:border-b-0 lg:border-r">
@@ -508,8 +492,9 @@ export function DictionariesPage() {
           deleteLabel={t('dictionaries.action.delete')}
           editLabel={t('dictionaries.action.edit')}
           emptyLabel={t('dictionaries.state.emptyTypes')}
-          error={typeError}
+          error={typeQuery.error}
           errorLabel={t('dictionaries.error.loadTypes')}
+          formatError={(error, fallback) => getErrorMessage(error, fallback, t)}
           isLoading={typeQuery.isLoading}
           items={typeItems}
           loadingLabel={t('dictionaries.state.loadingTypes')}
@@ -554,8 +539,9 @@ export function DictionariesPage() {
           columns={itemColumns}
           data={itemQuery.data?.items ?? []}
           emptyLabel={t('dictionaries.state.emptyItems')}
-          error={itemError}
+          error={itemQuery.error}
           errorLabel={t('dictionaries.error.loadItems')}
+          formatError={(error, fallback) => getErrorMessage(error, fallback, t)}
           isLoading={itemQuery.isLoading}
           loadingLabel={t('dictionaries.state.loadingItems')}
           onPaginationChange={handleItemPaginationChange}
@@ -689,6 +675,7 @@ function DictionaryTypeList({
   emptyLabel,
   error,
   errorLabel,
+  formatError,
   isLoading,
   items,
   loadingLabel,
@@ -705,8 +692,9 @@ function DictionaryTypeList({
   deleteLabel: string
   editLabel: string
   emptyLabel: string
-  error: Error | null
+  error: unknown
   errorLabel: string
+  formatError: (error: unknown, fallback: string) => string
   isLoading: boolean
   items: DictionaryTypeRecord[]
   loadingLabel: string
@@ -731,7 +719,7 @@ function DictionaryTypeList({
     return (
       <div className="grid flex-1 place-items-center px-4 text-center text-sm text-slate-500">
         <div className="grid justify-items-center gap-3">
-          <span>{error.message || errorLabel}</span>
+          <span>{formatError(error, errorLabel)}</span>
           <button
             className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
             onClick={onRetry}

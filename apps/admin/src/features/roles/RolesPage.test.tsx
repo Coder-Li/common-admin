@@ -94,6 +94,13 @@ const modules: PermissionModule[] = [
   },
 ]
 
+const apiError = {
+  code: 'INTERNAL_SERVER_ERROR',
+  message: 'Internal server error',
+  statusCode: 500,
+  requestId: 'req_test123',
+}
+
 function renderRolesPage(permissions = [
   'role.read',
   'role.create',
@@ -167,6 +174,29 @@ describe('RolesPage', () => {
     expect(
       screen.queryByRole('heading', { name: 'Available permissions' }),
     ).not.toBeInTheDocument()
+  })
+
+  it('renders an error state with retry', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listRoles)
+      .mockRejectedValueOnce(apiError)
+      .mockResolvedValueOnce({
+        items: roles,
+        total: roles.length,
+        page: 1,
+        pageSize: 20,
+      })
+
+    renderRolesPage()
+
+    expect(
+      await screen.findByText('Something went wrong. Request ID: req_test123'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Internal server error')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('Admin')).toBeInTheDocument()
+    expect(listRoles).toHaveBeenCalledTimes(2)
   })
 
   it('opens create dialog when role.create is granted', async () => {

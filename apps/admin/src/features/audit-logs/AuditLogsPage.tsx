@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { OnChangeFn } from '@tanstack/react-table'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { getErrorMessage } from '../../app/api-error-messages'
 import { DataTable } from '../../components/data-table/DataTable'
 import { DataTableToolbar } from '../../components/data-table/DataTableToolbar'
 import type {
@@ -67,10 +68,6 @@ function compactFilters(filters: AuditLogFilters) {
   ) as AuditLogFilters
 }
 
-function mutationErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : undefined
-}
-
 function toListAuditLogsParams(query: AuditLogTableQuery): ListAuditLogsParams {
   return {
     ...query,
@@ -109,7 +106,7 @@ export function AuditLogsPage() {
   const detailsMutation = useMutation({
     mutationFn: (auditLog: AuditLogListItem) => getAuditLog(auditLog.id),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('auditLogs.error.detail'))
+      toast.error(getErrorMessage(error, t('auditLogs.error.detail'), t))
     },
     onSuccess: (auditLog) => setDetails(auditLog),
   })
@@ -170,13 +167,6 @@ export function AuditLogsPage() {
     resetToFirstPage()
   }
 
-  const listError =
-    auditLogsQuery.error instanceof Error
-      ? auditLogsQuery.error
-      : auditLogsQuery.error
-        ? new Error(t('auditLogs.error.load'))
-        : null
-
   return (
     <section className="grid gap-4 p-5">
       <div className="flex min-w-0 items-center justify-between">
@@ -189,8 +179,9 @@ export function AuditLogsPage() {
         columns={columns}
         data={auditLogsQuery.data?.items ?? []}
         emptyLabel={t('auditLogs.state.empty')}
-        error={listError}
+        error={auditLogsQuery.error}
         errorLabel={t('auditLogs.error.load')}
+        formatError={(error, fallback) => getErrorMessage(error, fallback, t)}
         isLoading={auditLogsQuery.isLoading}
         loadingLabel={t('auditLogs.state.loading')}
         onPaginationChange={handlePaginationChange}

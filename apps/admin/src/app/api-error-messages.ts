@@ -1,7 +1,11 @@
-import { messages, type MessageKey } from '../i18n/messages'
+import {
+  messages,
+  type MessageKey,
+  type TranslationValues,
+} from '../i18n/messages'
 import { isApiError, toApiError } from './api-error'
 
-type Translator = (key: string, values?: Record<string, string>) => string
+type Translator = (key: MessageKey, values?: TranslationValues) => string
 
 const codeMessageKeys: Record<string, MessageKey> = {
   NETWORK_ERROR: 'errors.network',
@@ -25,7 +29,7 @@ const codeMessageKeys: Record<string, MessageKey> = {
 function translate(
   key: MessageKey,
   t?: Translator,
-  values?: Record<string, string>,
+  values?: TranslationValues,
 ) {
   return t ? t(key, values) : messages['en-US'][key]
 }

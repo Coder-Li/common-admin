@@ -55,6 +55,13 @@ const dictionariesApiMock = {
   ...dictionaryTypesApiMock,
 }
 
+const apiError = {
+  code: 'INTERNAL_SERVER_ERROR',
+  message: 'Internal server error',
+  statusCode: 500,
+  requestId: 'req_test123',
+}
+
 vi.mock(
   '../../generated/api/endpoints/dictionary-items/dictionary-items',
   () => dictionaryItemsApiMock,
@@ -660,14 +667,15 @@ describe('DictionariesPage', () => {
   it('renders an error state with retry for dictionary types', async () => {
     const user = userEvent.setup()
     dictionariesApiMock.listDictionaryTypes
-      .mockRejectedValueOnce(new Error('Dictionary types are unavailable'))
+      .mockRejectedValueOnce(apiError)
       .mockResolvedValueOnce(typeListResponse([userRoleType]))
 
     renderDictionariesPage()
 
     expect(
-      await screen.findByText('Dictionary types are unavailable'),
+      await screen.findByText('Something went wrong. Request ID: req_test123'),
     ).toBeInTheDocument()
+    expect(screen.queryByText('Internal server error')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(

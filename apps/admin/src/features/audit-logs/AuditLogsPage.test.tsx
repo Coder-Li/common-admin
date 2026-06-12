@@ -59,6 +59,13 @@ const auditLog: AuditLogRecord = {
   createdAt: '2026-06-09T01:02:03.000Z',
 }
 
+const apiError = {
+  code: 'INTERNAL_SERVER_ERROR',
+  message: 'Internal server error',
+  statusCode: 500,
+  requestId: 'req_test123',
+}
+
 function listResponse(items: AuditLogRecord[]): AuditLogListResponse {
   return {
     items,
@@ -142,14 +149,15 @@ describe('AuditLogsPage', () => {
   it('renders an error state with retry', async () => {
     const user = userEvent.setup()
     auditLogsApiMock.listAuditLogs
-      .mockRejectedValueOnce(new Error('Audit logs are unavailable'))
+      .mockRejectedValueOnce(apiError)
       .mockResolvedValueOnce(listResponse([auditLog]))
 
     renderAuditLogsPage()
 
     expect(
-      await screen.findByText('Audit logs are unavailable'),
+      await screen.findByText('Something went wrong. Request ID: req_test123'),
     ).toBeInTheDocument()
+    expect(screen.queryByText('Internal server error')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(await screen.findByText('admin@example.com')).toBeInTheDocument()

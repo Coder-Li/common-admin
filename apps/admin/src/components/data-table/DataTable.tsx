@@ -22,7 +22,8 @@ interface DataTableProps<TData> {
   sorting: SortingState
   onSortingChange: OnChangeFn<SortingState>
   isLoading?: boolean
-  error?: Error | null
+  error?: unknown
+  formatError?: (error: unknown, fallback: string) => string
   onRetry?: () => void
   loadingLabel?: string
   emptyLabel?: string
@@ -45,6 +46,7 @@ export function DataTable<TData>({
   loadingLabel = 'Loading rows',
   emptyLabel = 'No rows found',
   errorLabel = 'Unable to load rows',
+  formatError,
   retryLabel = 'Retry',
   toolbar,
 }: DataTableProps<TData>) {
@@ -154,7 +156,9 @@ export function DataTable<TData>({
                   colSpan={leafColumnCount}
                 >
                   <div className="flex flex-col items-center justify-center gap-3">
-                    <span>{error.message || errorLabel}</span>
+                    <span>
+                      {formatError ? formatError(error, errorLabel) : errorLabel}
+                    </span>
                     {onRetry ? (
                       <button
                         className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"

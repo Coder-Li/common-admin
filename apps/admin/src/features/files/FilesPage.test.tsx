@@ -61,6 +61,13 @@ const report: FileRecord = {
   updatedAt: '2026-06-09T04:05:06.000Z',
 }
 
+const apiError = {
+  code: 'INTERNAL_SERVER_ERROR',
+  message: 'Internal server error',
+  statusCode: 500,
+  requestId: 'req_test123',
+}
+
 function listResponse(items: FileRecord[]): FileListResponse {
   return {
     items,
@@ -155,12 +162,15 @@ describe('FilesPage', () => {
   it('renders an error state with retry', async () => {
     const user = userEvent.setup()
     vi.mocked(listFiles)
-      .mockRejectedValueOnce(new Error('Files are unavailable'))
+      .mockRejectedValueOnce(apiError)
       .mockResolvedValueOnce(listResponse([report]))
 
     renderFilesPage()
 
-    expect(await screen.findByText('Files are unavailable')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Something went wrong. Request ID: req_test123'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Internal server error')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(await screen.findByText('Report')).toBeInTheDocument()

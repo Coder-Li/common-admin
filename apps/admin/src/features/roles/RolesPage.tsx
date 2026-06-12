@@ -3,6 +3,7 @@ import type { OnChangeFn } from '@tanstack/react-table'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import { getErrorMessage } from '../../app/api-error-messages'
 import { DataTable } from '../../components/data-table/DataTable'
 import { DataTableToolbar } from '../../components/data-table/DataTableToolbar'
 import type {
@@ -39,10 +40,6 @@ type FormState =
   | { mode: 'create'; role?: undefined }
   | { mode: 'edit'; role: RoleRecord }
   | null
-
-function mutationErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : undefined
-}
 
 function toSortParam(sorting: SortingState) {
   const firstSort = sorting[0]
@@ -120,7 +117,7 @@ export function RolesPage() {
   const createMutation = useMutation({
     mutationFn: (payload: CreateRoleRequest) => createRole(payload),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('roles.error.create'))
+      toast.error(getErrorMessage(error, t('roles.error.create'), t))
     },
     onSuccess: async () => {
       toast.success(t('roles.success.create'))
@@ -133,7 +130,7 @@ export function RolesPage() {
     mutationFn: (payload: { id: string; value: UpdateRoleRequest }) =>
       updateRole(payload.id, payload.value),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('roles.error.update'))
+      toast.error(getErrorMessage(error, t('roles.error.update'), t))
     },
     onSuccess: async () => {
       toast.success(t('roles.success.update'))
@@ -145,7 +142,7 @@ export function RolesPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteRole(id),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('roles.error.delete'))
+      toast.error(getErrorMessage(error, t('roles.error.delete'), t))
     },
     onSuccess: async () => {
       toast.success(t('roles.success.delete'))
@@ -160,9 +157,7 @@ export function RolesPage() {
         permissionCodes: payload.permissionCodes,
       }),
     onError: (error) => {
-      toast.error(
-        mutationErrorMessage(error) ?? t('roles.error.permissions'),
-      )
+      toast.error(getErrorMessage(error, t('roles.error.permissions'), t))
     },
     onSuccess: async () => {
       toast.success(t('roles.success.permissions'))
@@ -235,13 +230,6 @@ export function RolesPage() {
     createMutation.mutate(value as CreateRoleRequest)
   }
 
-  const listError =
-    rolesQuery.error instanceof Error
-      ? rolesQuery.error
-      : rolesQuery.error
-        ? new Error(t('roles.error.load'))
-        : null
-
   return (
     <section className="grid gap-4 p-5">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -254,8 +242,9 @@ export function RolesPage() {
         columns={columns}
         data={rolesQuery.data?.items ?? []}
         emptyLabel={t('roles.state.empty')}
-        error={listError}
+        error={rolesQuery.error}
         errorLabel={t('roles.error.load')}
+        formatError={(error, fallback) => getErrorMessage(error, fallback, t)}
         isLoading={rolesQuery.isLoading}
         loadingLabel={t('roles.state.loading')}
         onPaginationChange={handlePaginationChange}

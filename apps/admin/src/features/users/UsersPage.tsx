@@ -6,6 +6,7 @@ import type { OnChangeFn } from '@tanstack/react-table'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
+import { getErrorMessage } from '../../app/api-error-messages'
 import { clearQueryCache } from '../../app/query-client'
 import { DataTable } from '../../components/data-table/DataTable'
 import { DataTableToolbar } from '../../components/data-table/DataTableToolbar'
@@ -51,10 +52,6 @@ type FormState =
   | null
 
 const allRoleFilter = 'ALL'
-
-function mutationErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : undefined
-}
 
 function toSortParam(sorting: SortingState) {
   const firstSort = sorting[0]
@@ -135,7 +132,7 @@ export function UsersPage() {
   const createMutation = useMutation({
     mutationFn: (payload: CreateUserRequest) => createUser(payload),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('users.error.create'))
+      toast.error(getErrorMessage(error, t('users.error.create'), t))
     },
     onSuccess: async () => {
       toast.success(t('users.success.create'))
@@ -162,7 +159,7 @@ export function UsersPage() {
       return updatedUser
     },
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('users.error.update'))
+      toast.error(getErrorMessage(error, t('users.error.update'), t))
     },
     onSuccess: async () => {
       toast.success(t('users.success.update'))
@@ -174,7 +171,7 @@ export function UsersPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteUser(id),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('users.delete.error'))
+      toast.error(getErrorMessage(error, t('users.delete.error'), t))
     },
     onSuccess: async () => {
       toast.success(t('users.delete.success'))
@@ -187,7 +184,7 @@ export function UsersPage() {
     mutationFn: (payload: { id: string } & ResetUserPasswordRequest) =>
       resetUserPassword(payload.id, { newPassword: payload.newPassword }),
     onError: (error) => {
-      toast.error(mutationErrorMessage(error) ?? t('users.resetPassword.error'))
+      toast.error(getErrorMessage(error, t('users.resetPassword.error'), t))
     },
     onSuccess: async (_data, variables) => {
       toast.success(t('users.resetPassword.success'))
@@ -295,13 +292,6 @@ export function UsersPage() {
     })
   }
 
-  const listError =
-    usersQuery.error instanceof Error
-      ? usersQuery.error
-      : usersQuery.error
-        ? new Error(t('users.error.load'))
-        : null
-
   return (
     <section className="grid gap-4 p-5">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -324,8 +314,9 @@ export function UsersPage() {
         columns={columns}
         data={usersQuery.data?.items ?? []}
         emptyLabel={t('users.state.empty')}
-        error={listError}
+        error={usersQuery.error}
         errorLabel={t('users.error.load')}
+        formatError={(error, fallback) => getErrorMessage(error, fallback, t)}
         isLoading={usersQuery.isLoading}
         loadingLabel={t('users.state.loading')}
         onPaginationChange={handlePaginationChange}

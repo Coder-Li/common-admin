@@ -94,6 +94,13 @@ const bruno: UserRecord = {
   updatedAt: '2026-01-03T03:04:05.000Z',
 }
 
+const apiError = {
+  code: 'INTERNAL_SERVER_ERROR',
+  message: 'Internal server error',
+  statusCode: 500,
+  requestId: 'req_test123',
+}
+
 function listResponse(items: UserRecord[]): UserListResponse {
   return {
     items,
@@ -630,12 +637,15 @@ describe('UsersPage', () => {
   it('renders an error state with retry', async () => {
     const user = userEvent.setup()
     vi.mocked(listUsers)
-      .mockRejectedValueOnce(new Error('Users are unavailable'))
+      .mockRejectedValueOnce(apiError)
       .mockResolvedValueOnce(listResponse([alice]))
 
     renderUsersPage()
 
-    expect(await screen.findByText('Users are unavailable')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Something went wrong. Request ID: req_test123'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Internal server error')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     expect(await screen.findByText('alice')).toBeInTheDocument()

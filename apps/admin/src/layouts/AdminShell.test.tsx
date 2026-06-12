@@ -6,6 +6,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { toast } from 'sonner'
 import { clearQueryCache } from '../app/query-client'
 import { changePassword, logout } from '../generated/api/endpoints/auth/auth'
 import { getCurrentUser } from '../generated/api/endpoints/users/users'
@@ -33,6 +34,13 @@ const user: UserProfile = {
     'audit_log.read',
     'setting.read',
   ],
+}
+
+const apiError = {
+  code: 'INTERNAL_SERVER_ERROR',
+  message: 'Internal server error',
+  statusCode: 500,
+  requestId: 'req_test123',
 }
 
 function currentUserResponse(
@@ -67,6 +75,13 @@ vi.mock('../generated/api/endpoints/users/users', () => ({
 
 vi.mock('../app/query-client', () => ({
   clearQueryCache: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
 }))
 
 vi.mock('../features/files/FilesPage', () => ({
@@ -140,6 +155,8 @@ describe('AdminShell i18n', () => {
     vi.mocked(getCurrentUser).mockReset()
     vi.mocked(getCurrentUser).mockResolvedValue(currentUserResponse())
     vi.mocked(clearQueryCache).mockReset()
+    vi.mocked(toast.error).mockReset()
+    vi.mocked(toast.success).mockReset()
   })
 
   it('renders English shell and dashboard copy by default', async () => {
@@ -373,5 +390,37 @@ describe('AdminShell i18n', () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(clearQueryCache).toHaveBeenCalledOnce()
+  })
+
+  it('shows a shared API error when change password fails', async () => {
+    const testUser = userEvent.setup()
+    vi.mocked(changePassword).mockRejectedValueOnce(apiError)
+
+    const { router } = renderAdminShell()
+
+    await testUser.click(
+      await screen.findByRole('button', { name: /change password/i }),
+    )
+    await testUser.type(screen.getByLabelText('Current password'), 'OldPass123!')
+    await testUser.type(screen.getByLabelText('New password'), 'NewPass123!')
+    await testUser.click(
+      screen.getByRole('button', { name: /^change password$/i }),
+    )
+
+    await waitFor(() => {
+      expect(changePassword).toHaveBeenCalledWith({
+        currentPassword: 'OldPass123!',
+        newPassword: 'NewPass123!',
+      })
+    })
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Something went wrong. Request ID: req_test123',
+      )
+    })
+    expect(toast.error).not.toHaveBeenCalledWith('Internal server error')
+    expect(router.state.location.pathname).toBe('/dashboard')
+    expect(useAuthStore.getState().isAuthenticated).toBe(true)
+    expect(clearQueryCache).not.toHaveBeenCalled()
   })
 })

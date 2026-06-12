@@ -4,6 +4,7 @@ import { Circle, KeyRound, Lock, LogOut } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { toast } from 'sonner'
+import { getErrorMessage } from '../app/api-error-messages'
 import { clearQueryCache } from '../app/query-client'
 import {
   changePassword as changePasswordRequest,
@@ -138,9 +139,7 @@ export function AdminShell() {
       setNewPassword('')
       leaveSession()
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : t('page.changePassword.error'),
-      )
+      toast.error(getErrorMessage(error, t('page.changePassword.error'), t))
     } finally {
       setIsChangingPassword(false)
     }
