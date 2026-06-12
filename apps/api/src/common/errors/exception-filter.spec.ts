@@ -19,9 +19,8 @@ type MockResponse = {
 };
 
 type MockLogger = {
-  error: jest.MockedFunction<
-    (message: string, trace?: string, context?: string) => void
-  >;
+  error: jest.MockedFunction<(object: object, message?: string) => void>;
+  setContext: jest.MockedFunction<(context: string) => void>;
 };
 
 function createHttpHost(request: Record<string, unknown> = {}) {
@@ -44,16 +43,13 @@ function createHttpHost(request: Record<string, unknown> = {}) {
 }
 
 function createFilter(logger: MockLogger) {
-  const filter = new GlobalExceptionFilter();
-
-  (filter as unknown as { logger: MockLogger }).logger = logger;
-
-  return filter;
+  return new GlobalExceptionFilter(logger as never);
 }
 
 function createLogger(): MockLogger {
   return {
     error: jest.fn(),
+    setContext: jest.fn(),
   };
 }
 
@@ -131,15 +127,15 @@ describe('GlobalExceptionFilter', () => {
 
     expect(logger.error).toHaveBeenCalledTimes(1);
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('"code":"INTERNAL_SERVER_ERROR"'),
-      exception.stack,
+      {
+        err: exception,
+        code: ERROR_CODES.INTERNAL_SERVER_ERROR,
+        requestId: 'unknown',
+        method: 'POST',
+        path: '/api/auth/login',
+        userId: 'user_123',
+      },
       'Unhandled exception',
-    );
-    expect(logger.error.mock.calls[0]?.[0]).toEqual(
-      expect.stringContaining('"err":{"name":"Error","message":"boom"}'),
-    );
-    expect(logger.error.mock.calls[0]?.[0]).toEqual(
-      expect.stringContaining('"userId":"user_123"'),
     );
   });
 

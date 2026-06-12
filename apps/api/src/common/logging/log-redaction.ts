@@ -1,0 +1,15 @@
+export const LOG_REDACTION_PATHS = [
+  'req.headers.authorization',
+  'req.headers.cookie',
+  'res.headers.set-cookie',
+  '*.password',
+  '*.oldPassword',
+  '*.newPassword',
+  '*.accessToken',
+  '*.refreshToken',
+  'password',
+  'oldPassword',
+  'newPassword',
+  'accessToken',
+  'refreshToken',
+];

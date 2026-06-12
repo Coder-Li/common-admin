@@ -6,6 +6,17 @@ describe('main bootstrap', () => {
     const mainSource = readFileSync(join(__dirname, 'main.ts'), 'utf8');
 
     expect(mainSource).toMatch(/void\s+bootstrap\(\)\.catch\(/);
+    expect(mainSource).toContain('console.error(error);');
+  });
+
+  it('buffers bootstrap logs and switches to the nestjs-pino logger', () => {
+    const mainSource = readFileSync(join(__dirname, 'main.ts'), 'utf8');
+
+    expect(mainSource).toContain("import { Logger } from 'nestjs-pino';");
+    expect(mainSource).toMatch(
+      /NestFactory\.create\(AppModule,\s*\{\s*bufferLogs:\s*true\s*\}\)/,
+    );
+    expect(mainSource).toMatch(/app\.useLogger\(app\.get\(Logger\)\);/);
   });
 
   it('registers the global exception filter from the Nest container', () => {

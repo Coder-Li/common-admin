@@ -1,5 +1,6 @@
-import { ArgumentsHost, Catch, ExceptionFilter, Logger } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { PinoLogger } from 'nestjs-pino';
 import { getRequestIdFromRequest } from '../logging/request-context';
 import { mapExceptionToErrorResponse } from './exception-mapper';
 
@@ -11,7 +12,9 @@ type RequestWithUser = Request & {
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(GlobalExceptionFilter.name);
+  constructor(private readonly logger: PinoLogger) {
+    this.logger.setContext(GlobalExceptionFilter.name);
+  }
 
   catch(exception: unknown, host: ArgumentsHost) {
     const http = host.switchToHttp();
@@ -25,16 +28,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     if (mapped.shouldLogException) {
       this.logger.error(
-        JSON.stringify({
-          err: serializeExceptionForLog(exception),
+        {
+          err: exception,
           code: mapped.response.code,
           requestId: mapped.response.requestId,
           method: request.method,
           path: mapped.response.path,
           userId: request.user?.sub,
-        }),
-        exception instanceof Error ? exception.stack : undefined,
-        getLogContext(mapped.response.statusCode),
+        },
+        getLogMessage(mapped.response.statusCode),
       );
     }
 
@@ -42,20 +44,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   }
 }
 
-function serializeExceptionForLog(exception: unknown) {
-  if (exception instanceof Error) {
-    return {
-      name: exception.name,
-      message: exception.message,
-    };
-  }
-
-  return {
-    name: 'NonErrorException',
-    message: String(exception),
-  };
-}
-
-function getLogContext(statusCode: number): string {
+function getLogMessage(statusCode: number): string {
   return statusCode >= 500 ? 'Unhandled exception' : 'Request exception';
 }

@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './auth/permissions.guard';
 import { GlobalExceptionFilter } from './common/errors/exception-filter';
+import { LoggingModule } from './common/logging/logging.module';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { validateEnv } from './config/env.config';
 import { DictionaryModule } from './dictionary/dictionary.module';
@@ -24,6 +25,7 @@ import { UserModule } from './user/user.module';
       isGlobal: true,
       validate: validateEnv,
     }),
+    LoggingModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60000,

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { AppException } from './common/errors/app-exception';
 import { ERROR_CODES } from './common/errors/error-codes';
@@ -12,7 +13,8 @@ import { flattenValidationErrors } from './common/errors/validation-errors';
 import { createOpenApiDocument } from './openapi';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
   const configService = app.get(ConfigService);
   const allowedOrigins = configService
     .getOrThrow<string>('ALLOWED_ORIGINS')
