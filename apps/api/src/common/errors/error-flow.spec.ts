@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Server } from 'node:http';
@@ -26,6 +25,16 @@ interface ErrorEnvelope {
 
 function errorBody(response: Response): ErrorEnvelope {
   return response.body as ErrorEnvelope;
+}
+
+function headerValue(response: Response, name: string): string {
+  const value = response.headers[name];
+
+  if (typeof value !== 'string') {
+    throw new Error(`Expected ${name} response header`);
+  }
+
+  return value;
 }
 
 describe('Error flow', () => {
@@ -68,15 +77,16 @@ describe('Error flow', () => {
       .set('Origin', allowedOrigin)
       .expect(404);
     const body = errorBody(response);
+    const requestId = headerValue(response, 'x-request-id');
 
-    expect(response.headers['x-request-id']).toEqual(expect.any(String));
+    expect(requestId).toEqual(expect.any(String));
+    expect(typeof body.message).toBe('string');
+    expect(typeof body.timestamp).toBe('string');
     expect(body).toMatchObject({
       code: 'NOT_FOUND',
-      message: expect.any(String),
       statusCode: 404,
-      requestId: response.headers['x-request-id'],
+      requestId,
       path: '/api/does-not-exist',
-      timestamp: expect.any(String),
     });
     expect(Number.isNaN(Date.parse(body.timestamp))).toBe(false);
   });
@@ -88,26 +98,27 @@ describe('Error flow', () => {
       .send({ usernameOrEmail: 123, password: 'short' })
       .expect(400);
     const body = errorBody(response);
+    const requestId = headerValue(response, 'x-request-id');
 
     expect(body).toMatchObject({
       code: 'VALIDATION_ERROR',
       message: 'Request validation failed',
       statusCode: 400,
-      requestId: response.headers['x-request-id'],
+      requestId,
       path: '/api/auth/login',
     });
-    expect(body.details?.fields).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          field: 'usernameOrEmail',
-          message: expect.any(String),
-        }),
-        expect.objectContaining({
-          field: 'password',
-          message: expect.any(String),
-        }),
-      ]),
+    const fields = body.details?.fields ?? [];
+    const usernameError = fields.find(
+      (fieldError) => fieldError.field === 'usernameOrEmail',
     );
+    const passwordError = fields.find(
+      (fieldError) => fieldError.field === 'password',
+    );
+
+    expect(usernameError).toBeDefined();
+    expect(typeof usernameError?.message).toBe('string');
+    expect(passwordError).toBeDefined();
+    expect(typeof passwordError?.message).toBe('string');
   });
 
   it('echoes a valid incoming request id', async () => {
@@ -118,7 +129,7 @@ describe('Error flow', () => {
       .set('x-request-id', incomingRequestId)
       .expect(404);
 
-    expect(response.headers['x-request-id']).toBe(incomingRequestId);
+    expect(headerValue(response, 'x-request-id')).toBe(incomingRequestId);
     expect(errorBody(response).requestId).toBe(incomingRequestId);
   });
 
@@ -127,7 +138,7 @@ describe('Error flow', () => {
       .get('/api/does-not-exist')
       .set('x-request-id', 'bad id')
       .expect(404);
-    const selectedRequestId = response.headers['x-request-id'] as string;
+    const selectedRequestId = headerValue(response, 'x-request-id');
 
     expect(selectedRequestId).toEqual(expect.any(String));
     expect(selectedRequestId).not.toBe('bad id');

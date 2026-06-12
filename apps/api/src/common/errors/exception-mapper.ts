@@ -221,9 +221,9 @@ function isPrismaErrorCode(
   return isRecord(exception) && exception.code === code;
 }
 
-function getMulterFileSizeLimitDetails(
-  exception: { limit?: unknown },
-): { limit: number } | undefined {
+function getMulterFileSizeLimitDetails(exception: {
+  limit?: unknown;
+}): { limit: number } | undefined {
   return typeof exception.limit === 'number' && Number.isFinite(exception.limit)
     ? { limit: exception.limit }
     : undefined;

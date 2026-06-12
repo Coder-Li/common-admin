@@ -33,7 +33,10 @@ describe('main bootstrap', () => {
   });
 
   it('registers the global exception filter from the Nest container', () => {
-    const appSetupSource = readFileSync(join(__dirname, 'app.setup.ts'), 'utf8');
+    const appSetupSource = readFileSync(
+      join(__dirname, 'app.setup.ts'),
+      'utf8',
+    );
 
     expect(appSetupSource).toContain(
       "import { GlobalExceptionFilter } from './common/errors/exception-filter';",
@@ -44,7 +47,10 @@ describe('main bootstrap', () => {
   });
 
   it('uses AppException for validation pipe failures', () => {
-    const appSetupSource = readFileSync(join(__dirname, 'app.setup.ts'), 'utf8');
+    const appSetupSource = readFileSync(
+      join(__dirname, 'app.setup.ts'),
+      'utf8',
+    );
 
     expect(appSetupSource).toContain(
       "import { AppException } from './common/errors/app-exception';",
@@ -66,7 +72,10 @@ describe('main bootstrap', () => {
   });
 
   it('allows and exposes request id CORS headers', () => {
-    const appSetupSource = readFileSync(join(__dirname, 'app.setup.ts'), 'utf8');
+    const appSetupSource = readFileSync(
+      join(__dirname, 'app.setup.ts'),
+      'utf8',
+    );
 
     expect(appSetupSource).toContain(
       "allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id']",
