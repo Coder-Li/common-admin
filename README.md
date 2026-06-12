@@ -124,6 +124,18 @@ pnpm lint
 pnpm format
 ```
 
+## 二次开发文档
+
+基于模板继续开发时，先阅读项目开发入口：
+
+- `docs/development/common-admin-development-guide.md`
+
+常用模式文档：
+
+- `docs/patterns/admin-api-contract-generation-guide.md`
+- `docs/patterns/admin-crud-table-pattern-guide.md`
+- `docs/patterns/admin-rbac-crud-permission-pattern-guide.md`
+
 ## API 契约生成
 
 后端 DTO 和 Swagger metadata 是 API 契约来源，前端 API 类型、endpoint

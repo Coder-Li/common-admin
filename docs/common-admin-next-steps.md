@@ -94,6 +94,7 @@
 
 设计、实施与使用文档：
 
+- `docs/development/common-admin-development-guide.md`
 - `docs/superpowers/specs/2026-06-10-api-contract-generation-design.md`
 - `docs/superpowers/plans/2026-06-10-api-contract-generation.md`
 - `docs/patterns/admin-api-contract-generation-guide.md`

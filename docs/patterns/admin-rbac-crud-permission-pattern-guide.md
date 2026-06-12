@@ -3,9 +3,14 @@
 This guide is for developers and AI agents adding a new admin CRUD module to
 the current RBAC permission system.
 
-Use it together with `docs/patterns/admin-crud-table-pattern-guide.md`. That
-guide explains the CRUD table shape. This guide explains how the same module
-should declare, seed, enforce, and consume permissions.
+Use it together with:
+
+- `docs/patterns/admin-crud-table-pattern-guide.md` for the CRUD table shape.
+- `docs/patterns/admin-api-contract-generation-guide.md` for generated API
+  contracts.
+
+This guide explains how the same module should declare, seed, enforce, and
+consume permissions.
 
 Current RBAC integration points:
 
@@ -21,8 +26,9 @@ Current RBAC integration points:
   `apps/admin/src/lib/permissions.ts`
 - Frontend role management:
   `apps/admin/src/features/roles/RolesPage.tsx`
-- Frontend role/permission API wrappers:
-  `apps/admin/src/features/roles/roles.api.ts`
+- Generated role/permission endpoints:
+  `apps/admin/src/generated/api/endpoints/roles/roles.ts`
+  `apps/admin/src/generated/api/endpoints/permissions/permissions.ts`
 
 ## Core Rule
 
@@ -210,7 +216,8 @@ Rules:
 
 ## Frontend Page Pattern
 
-Use the permission helper for every page action.
+Use generated API endpoints or hooks for data access, and use the permission
+helper for every page action.
 
 Example:
 
@@ -233,6 +240,8 @@ Rules:
 
 - Hide actions the user cannot use.
 - Keep the API call protected even when the UI hides the action.
+- Do not create one-method feature-local API wrappers for permission-protected
+  calls; use generated endpoints and generated query key helpers.
 - If an action is visible in multiple places, centralize the permission code in
   a module-local constant.
 - Avoid stringly-typed permission codes scattered across a large page.
@@ -261,21 +270,29 @@ Existing examples:
 
 ## Frontend API Pattern
 
-Frontend API wrappers do not need to pass permission codes. Authorization is
-enforced by backend guards.
+Generated API functions and hooks do not receive permission codes. They express
+request and response contracts only. Authorization is enforced by backend guards;
+route metadata and page action gates provide the frontend UX.
 
-The wrapper should remain focused on request/response contracts:
+Use generated endpoints directly:
 
 ```ts
-api.articles.list(query)
-api.articles.create(input)
-api.articles.update(id, input)
-api.articles.remove(id)
+import {
+  createArticle,
+  deleteArticle,
+  listArticles,
+  updateArticle,
+} from '../../generated/api/endpoints/articles/articles'
+
+await listArticles(query)
+await createArticle(input)
+await updateArticle(id, input)
+await deleteArticle(id)
 ```
 
-Do not make frontend API wrappers decide whether a user is allowed to call the
-endpoint. Use page and route permission checks for UX, and backend guards for
-security.
+Do not make generated API usage, local helpers, or feature facades decide
+whether a user is allowed to call an endpoint. Use page and route permission
+checks for UX, and backend guards for security.
 
 ## Testing Checklist
 
