@@ -21,3 +21,13 @@ export function getAuditRequestMeta(request: MinimalRequest): AuditRequestMeta {
     ...(typeof userAgent === 'string' ? { userAgent } : {}),
   };
 }
+
+export function withAuditRequestId(
+  metadata: Record<string, unknown> | undefined,
+  requestId: string,
+): Record<string, unknown> {
+  return {
+    ...(metadata ?? {}),
+    requestId,
+  };
+}

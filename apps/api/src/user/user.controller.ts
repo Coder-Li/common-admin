@@ -25,8 +25,10 @@ import {
 import {
   buildAuditActor,
   getAuditRequestMeta,
+  withAuditRequestId,
 } from '../audit-log/audit-log-request-meta';
 import { Permissions } from '../auth/permissions.decorator';
+import { getRequestIdFromRequest } from '../common/logging/request-context';
 import { CurrentUser } from './current-user.decorator';
 import {
   CreateUserDto,
@@ -82,10 +84,13 @@ export class UserController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<UserResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.userService.createUser(
       body,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -101,11 +106,14 @@ export class UserController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<UserResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.userService.updateUser(
       id,
       body,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -121,11 +129,14 @@ export class UserController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<UserResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.userService.resetPassword(
       id,
       body.newPassword,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -141,12 +152,15 @@ export class UserController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<UserResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.userService.replaceRoles(
       id,
       body.roleCodes,
       user.sub,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -162,10 +176,13 @@ export class UserController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<void> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.userService.deleteUser(
       id,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 }

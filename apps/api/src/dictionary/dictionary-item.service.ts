@@ -88,6 +88,7 @@ export class DictionaryItemService {
     dto: CreateDictionaryItemDto,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<DictionaryItemResponseDto> {
     const type = await this.prisma.dictionaryType.findUnique({
       where: { id: dto.typeId },
@@ -137,6 +138,7 @@ export class DictionaryItemService {
             resourceId: item.id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             after: response,
           },
           tx,
@@ -154,6 +156,7 @@ export class DictionaryItemService {
     dto: UpdateDictionaryItemDto,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<DictionaryItemResponseDto> {
     const existingItem = await this.prisma.dictionaryItem.findUnique({
       where: { id },
@@ -225,6 +228,7 @@ export class DictionaryItemService {
             resourceId: id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             before: toDictionaryItemResponse(before),
             after: response,
           },
@@ -242,6 +246,7 @@ export class DictionaryItemService {
     id: string,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const existingItem = await this.prisma.dictionaryItem.findUnique({
       where: { id },
@@ -279,6 +284,7 @@ export class DictionaryItemService {
             resourceId: id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             before: toDictionaryItemResponse(before),
           },
           tx,

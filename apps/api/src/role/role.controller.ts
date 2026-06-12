@@ -25,8 +25,10 @@ import {
 import {
   buildAuditActor,
   getAuditRequestMeta,
+  withAuditRequestId,
 } from '../audit-log/audit-log-request-meta';
 import { Permissions } from '../auth/permissions.decorator';
+import { getRequestIdFromRequest } from '../common/logging/request-context';
 import { CurrentUser } from '../user/current-user.decorator';
 import type { JwtUserPayload } from '../user/user.types';
 import {
@@ -63,10 +65,13 @@ export class RoleController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<RoleResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.roleService.createRole(
       body,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -92,11 +97,14 @@ export class RoleController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<RoleResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.roleService.updateRole(
       id,
       body,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -112,10 +120,13 @@ export class RoleController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<void> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.roleService.deleteRole(
       id,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -131,11 +142,14 @@ export class RoleController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<RoleResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.roleService.replaceRolePermissions(
       id,
       body.permissionCodes,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 }

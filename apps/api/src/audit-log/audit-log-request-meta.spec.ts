@@ -1,6 +1,10 @@
 import type { JwtUserPayload } from '../user/user.types';
 
-import { buildAuditActor, getAuditRequestMeta } from './audit-log-request-meta';
+import {
+  buildAuditActor,
+  getAuditRequestMeta,
+  withAuditRequestId,
+} from './audit-log-request-meta';
 
 describe('audit log request helpers', () => {
   it('maps JWT user payload to an audit actor', () => {
@@ -84,5 +88,38 @@ describe('audit log request helpers', () => {
     ).toStrictEqual({
       ipAddress: '203.0.113.10',
     });
+  });
+
+  it('adds the request id to audit metadata', () => {
+    expect(withAuditRequestId(undefined, 'req_12345678')).toEqual({
+      requestId: 'req_12345678',
+    });
+  });
+
+  it('preserves existing audit metadata when adding the request id', () => {
+    expect(withAuditRequestId({ reason: 'support' }, 'req_12345678')).toEqual({
+      reason: 'support',
+      requestId: 'req_12345678',
+    });
+  });
+
+  it('overwrites caller-provided request ids in audit metadata', () => {
+    expect(
+      withAuditRequestId({ requestId: 'caller-value' }, 'req_12345678'),
+    ).toEqual({
+      requestId: 'req_12345678',
+    });
+  });
+
+  it('does not include request id in request metadata', () => {
+    const request = {
+      ip: '203.0.113.10',
+      headers: {
+        'user-agent': 'Mozilla/5.0',
+      },
+      requestId: 'req_12345678',
+    };
+
+    expect(getAuditRequestMeta(request)).not.toHaveProperty('requestId');
   });
 });

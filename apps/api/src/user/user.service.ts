@@ -94,6 +94,7 @@ export class UserService {
     dto: CreateUserDto,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<UserResponseDto> {
     const { password, roleCodes, ...data } = dto;
     const passwordHash = await bcrypt.hash(password, 10);
@@ -120,6 +121,7 @@ export class UserService {
             resourceId: user.id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             after: response,
           },
           tx,
@@ -137,6 +139,7 @@ export class UserService {
     dto: UpdateUserDto,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<UserResponseDto> {
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -163,6 +166,7 @@ export class UserService {
             resourceId: id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             before: toUserResponse(before),
             after: response,
           },
@@ -181,6 +185,7 @@ export class UserService {
     newPassword: string,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<UserResponseDto> {
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
@@ -207,6 +212,7 @@ export class UserService {
             resourceId: id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             after: {
               id: response.id,
               email: response.email,
@@ -227,6 +233,7 @@ export class UserService {
     id: string,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<void> {
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -247,6 +254,7 @@ export class UserService {
             resourceId: id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             before: toUserResponse(before),
           },
           tx,
@@ -279,6 +287,7 @@ export class UserService {
     actorUserId: string,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<UserResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -326,6 +335,7 @@ export class UserService {
           resourceId: id,
           actor,
           requestMeta,
+          ...(auditMetadata ? { metadata: auditMetadata } : {}),
           before: { roleCodes: beforeRoleCodes },
           after: { roleCodes: this.toRoleCodes(nextUser) },
         },

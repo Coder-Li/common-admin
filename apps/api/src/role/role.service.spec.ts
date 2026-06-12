@@ -75,6 +75,9 @@ describe('RoleService', () => {
     ipAddress: '127.0.0.1',
     userAgent: 'jest',
   };
+  const auditMetadata = {
+    requestId: 'req_12345678',
+  };
 
   const role = (overrides: Record<string, unknown> = {}) => ({
     id: 'role-1',
@@ -126,6 +129,7 @@ describe('RoleService', () => {
       },
       auditActor,
       auditRequestMeta,
+      auditMetadata,
     );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -142,6 +146,7 @@ describe('RoleService', () => {
         resourceId: 'role-1',
         actor: auditActor,
         requestMeta: auditRequestMeta,
+        metadata: expect.objectContaining({ requestId: 'req_12345678' }),
         after: toRoleResponse(created),
       },
       tx,
@@ -244,6 +249,7 @@ describe('RoleService', () => {
       { name: 'Operations' },
       auditActor,
       auditRequestMeta,
+      auditMetadata,
     );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -264,6 +270,7 @@ describe('RoleService', () => {
         resourceId: 'role-1',
         actor: auditActor,
         requestMeta: auditRequestMeta,
+        metadata: expect.objectContaining({ requestId: 'req_12345678' }),
         before: toRoleResponse(before),
         after: toRoleResponse(after),
       },
@@ -303,7 +310,12 @@ describe('RoleService', () => {
     prisma.userRole.count.mockResolvedValue(0);
     tx.role.delete.mockResolvedValue(before);
 
-    await service.deleteRole('role-1', auditActor, auditRequestMeta);
+    await service.deleteRole(
+      'role-1',
+      auditActor,
+      auditRequestMeta,
+      auditMetadata,
+    );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.role.delete).toHaveBeenCalledWith({
@@ -318,6 +330,7 @@ describe('RoleService', () => {
         resourceId: 'role-1',
         actor: auditActor,
         requestMeta: auditRequestMeta,
+        metadata: expect.objectContaining({ requestId: 'req_12345678' }),
         before: toRoleResponse(before),
       },
       tx,
@@ -353,6 +366,7 @@ describe('RoleService', () => {
       ['user.update', 'user.read', 'user.read'],
       auditActor,
       auditRequestMeta,
+      auditMetadata,
     );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -383,6 +397,7 @@ describe('RoleService', () => {
         resourceId: 'role-1',
         actor: auditActor,
         requestMeta: auditRequestMeta,
+        metadata: expect.objectContaining({ requestId: 'req_12345678' }),
         before: { permissionCodes: ['setting.read'] },
         after: { permissionCodes: ['user.read', 'user.update'] },
       },

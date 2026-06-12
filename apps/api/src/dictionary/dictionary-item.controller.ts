@@ -25,8 +25,10 @@ import {
 import {
   buildAuditActor,
   getAuditRequestMeta,
+  withAuditRequestId,
 } from '../audit-log/audit-log-request-meta';
 import { Permissions } from '../auth/permissions.decorator';
+import { getRequestIdFromRequest } from '../common/logging/request-context';
 import { CurrentUser } from '../user/current-user.decorator';
 import type { JwtUserPayload } from '../user/user.types';
 import { DictionaryItemService } from './dictionary-item.service';
@@ -79,10 +81,13 @@ export class DictionaryItemController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<DictionaryItemResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.dictionaryItemService.createItem(
       body,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -99,11 +104,14 @@ export class DictionaryItemController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<DictionaryItemResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.dictionaryItemService.updateItem(
       id,
       body,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -122,10 +130,13 @@ export class DictionaryItemController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<void> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.dictionaryItemService.deleteItem(
       id,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 }

@@ -278,6 +278,9 @@ describe('FileService', () => {
     ipAddress: '127.0.0.1',
     userAgent: 'jest',
   };
+  const auditMetadata = {
+    requestId: 'req_12345678',
+  };
 
   function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
     const firstCall = mock.mock.calls[0];
@@ -532,6 +535,7 @@ describe('FileService', () => {
         'user-1',
         auditActor,
         auditRequestMeta,
+        auditMetadata,
       );
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -546,6 +550,9 @@ describe('FileService', () => {
           resourceId: 'file-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           after: toFileResponse(persisted),
         },
         tx,
@@ -623,6 +630,7 @@ describe('FileService', () => {
         { displayName: ' After ', metadata: { reviewed: true } },
         auditActor,
         auditRequestMeta,
+        auditMetadata,
       );
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -645,6 +653,9 @@ describe('FileService', () => {
           resourceId: 'file-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           before: toFileResponse(before),
           after: toFileResponse(after),
         },
@@ -726,7 +737,12 @@ describe('FileService', () => {
         makeFile({ deletedAt: new Date('2026-06-09T05:06:07.000Z') }),
       );
 
-      await service.deleteFile('file-1', auditActor, auditRequestMeta);
+      await service.deleteFile(
+        'file-1',
+        auditActor,
+        auditRequestMeta,
+        auditMetadata,
+      );
 
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(storage.delete.mock.invocationCallOrder[0]).toBeLessThan(
@@ -744,6 +760,9 @@ describe('FileService', () => {
           resourceId: 'file-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           before: toFileResponse(before),
         },
         tx,

@@ -83,6 +83,7 @@ export class DictionaryTypeService {
     dto: CreateDictionaryTypeDto,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<DictionaryTypeResponseDto> {
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -96,6 +97,7 @@ export class DictionaryTypeService {
             resourceId: type.id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             after: response,
           },
           tx,
@@ -113,6 +115,7 @@ export class DictionaryTypeService {
     dto: UpdateDictionaryTypeDto,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<DictionaryTypeResponseDto> {
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -135,6 +138,7 @@ export class DictionaryTypeService {
             resourceId: id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             before: toDictionaryTypeResponse(before),
             after: response,
           },
@@ -152,6 +156,7 @@ export class DictionaryTypeService {
     id: string,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const type = await this.prisma.dictionaryType.findUnique({ where: { id } });
 
@@ -182,6 +187,7 @@ export class DictionaryTypeService {
             resourceId: id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             before: toDictionaryTypeResponse(deleted),
           },
           tx,

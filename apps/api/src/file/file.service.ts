@@ -94,6 +94,7 @@ export class FileService {
     uploadedById?: string,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<FileResponseDto> {
     if (!file) {
       throw new BadRequestException('File upload is required');
@@ -149,6 +150,7 @@ export class FileService {
             resourceId: persisted.id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             after: response,
           },
           tx,
@@ -167,6 +169,7 @@ export class FileService {
     dto: UpdateFileDto,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<FileResponseDto> {
     if (!hasUpdateFileFields(dto)) {
       throw new BadRequestException('At least one file field must be provided');
@@ -210,6 +213,7 @@ export class FileService {
             resourceId: id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             before: toFileResponse(before),
             after: response,
           },
@@ -231,6 +235,7 @@ export class FileService {
     id: string,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const file = await this.findExistingFile(id);
 
@@ -247,6 +252,7 @@ export class FileService {
           resourceId: id,
           actor,
           requestMeta,
+          ...(auditMetadata ? { metadata: auditMetadata } : {}),
           before: toFileResponse(file),
         },
         tx,

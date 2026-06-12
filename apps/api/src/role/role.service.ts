@@ -110,6 +110,7 @@ export class RoleService {
     dto: CreateRoleDto,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<RoleResponseDto> {
     try {
       const response = await this.prisma.$transaction(async (tx) => {
@@ -135,6 +136,7 @@ export class RoleService {
             resourceId: role.id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             after: response,
           },
           tx,
@@ -156,6 +158,7 @@ export class RoleService {
     dto: UpdateRoleDto,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<RoleResponseDto> {
     const existing = await this.requireRole(id);
 
@@ -201,6 +204,7 @@ export class RoleService {
             resourceId: id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             before: toRoleResponse(before),
             after: response,
           },
@@ -222,6 +226,7 @@ export class RoleService {
     id: string,
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<void> {
     const role = await this.requireRole(id);
 
@@ -251,6 +256,7 @@ export class RoleService {
             resourceId: id,
             actor,
             requestMeta,
+            ...(auditMetadata ? { metadata: auditMetadata } : {}),
             before: toRoleResponse(deleted),
           },
           tx,
@@ -267,6 +273,7 @@ export class RoleService {
     permissionCodes: string[],
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
+    auditMetadata?: Record<string, unknown>,
   ): Promise<RoleResponseDto> {
     await this.requireRole(roleId);
     const uniqueCodes = [...new Set(permissionCodes)].sort();
@@ -320,6 +327,7 @@ export class RoleService {
           resourceId: roleId,
           actor,
           requestMeta,
+          ...(auditMetadata ? { metadata: auditMetadata } : {}),
           before: { permissionCodes: this.toPermissionCodes(before) },
           after: { permissionCodes: this.toPermissionCodes(updated) },
         },

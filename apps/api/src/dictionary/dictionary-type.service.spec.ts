@@ -14,6 +14,7 @@ import type {
   AuditActor,
   AuditRequestMeta,
 } from '../audit-log/audit-log.types';
+import { setRequestId } from '../common/logging/request-context';
 import {
   CreateDictionaryTypeDto,
   DictionaryTypeListQueryDto,
@@ -243,6 +244,9 @@ describe('DictionaryTypeService', () => {
     ipAddress: '127.0.0.1',
     userAgent: 'jest',
   };
+  const auditMetadata = {
+    requestId: 'req_12345678',
+  };
 
   beforeEach(() => {
     jest.restoreAllMocks();
@@ -327,6 +331,7 @@ describe('DictionaryTypeService', () => {
           },
           auditActor,
           auditRequestMeta,
+          auditMetadata,
         ),
       ).resolves.toEqual(toDictionaryTypeResponse(createdType));
 
@@ -345,6 +350,9 @@ describe('DictionaryTypeService', () => {
           resourceId: 'type-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           after: toDictionaryTypeResponse(createdType),
         },
         tx,
@@ -431,6 +439,7 @@ describe('DictionaryTypeService', () => {
           { name: 'User roles' },
           auditActor,
           auditRequestMeta,
+          auditMetadata,
         ),
       ).resolves.toEqual(toDictionaryTypeResponse(after));
 
@@ -450,6 +459,9 @@ describe('DictionaryTypeService', () => {
           resourceId: 'type-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           before: toDictionaryTypeResponse(before),
           after: toDictionaryTypeResponse(after),
         },
@@ -502,7 +514,12 @@ describe('DictionaryTypeService', () => {
       prisma.dictionaryItem.count.mockResolvedValue(0);
       tx.dictionaryType.delete.mockResolvedValue(before);
 
-      await service.deleteType('type-1', auditActor, auditRequestMeta);
+      await service.deleteType(
+        'type-1',
+        auditActor,
+        auditRequestMeta,
+        auditMetadata,
+      );
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(tx.dictionaryType.delete).toHaveBeenCalledWith({
@@ -516,6 +533,9 @@ describe('DictionaryTypeService', () => {
           resourceId: 'type-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           before: toDictionaryTypeResponse(before),
         },
         tx,
@@ -575,6 +595,7 @@ describe('DictionaryTypeController', () => {
       ip: '127.0.0.1',
       headers: { 'user-agent': 'jest' },
     };
+    setRequestId(request as never, 'req_12345678');
 
     await expect(
       controller.deleteType('type-1', user, request as never),
@@ -590,6 +611,9 @@ describe('DictionaryTypeController', () => {
       {
         ipAddress: '127.0.0.1',
         userAgent: 'jest',
+      },
+      {
+        requestId: 'req_12345678',
       },
     );
     expect(

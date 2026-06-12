@@ -25,8 +25,10 @@ import {
 import {
   buildAuditActor,
   getAuditRequestMeta,
+  withAuditRequestId,
 } from '../audit-log/audit-log-request-meta';
 import { Permissions } from '../auth/permissions.decorator';
+import { getRequestIdFromRequest } from '../common/logging/request-context';
 import { CurrentUser } from '../user/current-user.decorator';
 import type { JwtUserPayload } from '../user/user.types';
 import {
@@ -78,10 +80,13 @@ export class DictionaryTypeController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<DictionaryTypeResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.dictionaryTypeService.createType(
       body,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -97,11 +102,14 @@ export class DictionaryTypeController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<DictionaryTypeResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.dictionaryTypeService.updateType(
       id,
       body,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -118,10 +126,13 @@ export class DictionaryTypeController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<void> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.dictionaryTypeService.deleteType(
       id,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 }

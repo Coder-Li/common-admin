@@ -3,6 +3,7 @@ import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import { FileStorageDriver, FileVisibility } from '@prisma/client';
 import { Readable } from 'node:stream';
 import { PERMISSIONS_KEY } from '../auth/permissions.decorator';
+import { setRequestId } from '../common/logging/request-context';
 import { FileListQueryDto, UpdateFileDto } from './dto/file.request';
 import { FileController } from './file.controller';
 import { FileService } from './file.service';
@@ -53,6 +54,9 @@ describe('FileController', () => {
   const auditRequestMeta = {
     ipAddress: '127.0.0.1',
     userAgent: 'jest',
+  };
+  const auditMetadata = {
+    requestId: 'req_12345678',
   };
 
   const createService = () => {
@@ -135,6 +139,7 @@ describe('FileController', () => {
     const controller = new FileController(service as unknown as FileService);
     const file = { originalname: 'report.pdf' } as Express.Multer.File;
     const body = { displayName: 'Report' };
+    setRequestId(request as never, 'req_12345678');
 
     await expect(
       controller.uploadFile(file, body, user as never, request as never),
@@ -145,6 +150,7 @@ describe('FileController', () => {
       'actor-1',
       auditActor,
       auditRequestMeta,
+      auditMetadata,
     );
   });
 
@@ -153,6 +159,7 @@ describe('FileController', () => {
     const controller = new FileController(service as unknown as FileService);
     const body = new UpdateFileDto();
     body.displayName = 'Updated';
+    setRequestId(request as never, 'req_12345678');
 
     await expect(
       controller.updateFile('file-1', body, user as never, request as never),
@@ -162,12 +169,14 @@ describe('FileController', () => {
       body,
       auditActor,
       auditRequestMeta,
+      auditMetadata,
     );
   });
 
   it('DELETE /files/:id calls FileService.deleteFile() with actor and request metadata', async () => {
     const service = createService();
     const controller = new FileController(service as unknown as FileService);
+    setRequestId(request as never, 'req_12345678');
 
     await expect(
       controller.deleteFile('file-1', user as never, request as never),
@@ -176,6 +185,7 @@ describe('FileController', () => {
       'file-1',
       auditActor,
       auditRequestMeta,
+      auditMetadata,
     );
   });
 

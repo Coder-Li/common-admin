@@ -15,6 +15,7 @@ import type {
   AuditRequestMeta,
 } from '../audit-log/audit-log.types';
 import { PERMISSIONS_KEY } from '../auth/permissions.decorator';
+import { setRequestId } from '../common/logging/request-context';
 import { DictionaryItemController } from './dictionary-item.controller';
 import {
   CreateDictionaryItemDto,
@@ -110,6 +111,7 @@ describe('DictionaryItemController', () => {
       ip: '127.0.0.1',
       headers: { 'user-agent': 'jest' },
     };
+    setRequestId(request as never, 'req_12345678');
 
     await expect(
       controller.deleteItem('item-1', user, request as never),
@@ -125,6 +127,9 @@ describe('DictionaryItemController', () => {
       {
         ipAddress: '127.0.0.1',
         userAgent: 'jest',
+      },
+      {
+        requestId: 'req_12345678',
       },
     );
     expect(
@@ -404,6 +409,9 @@ describe('DictionaryItemService', () => {
     ipAddress: '127.0.0.1',
     userAgent: 'jest',
   };
+  const auditMetadata = {
+    requestId: 'req_12345678',
+  };
 
   beforeEach(() => {
     jest.restoreAllMocks();
@@ -560,6 +568,7 @@ describe('DictionaryItemService', () => {
           },
           auditActor,
           auditRequestMeta,
+          auditMetadata,
         ),
       ).resolves.toEqual(toDictionaryItemResponse(createdItem));
 
@@ -580,6 +589,9 @@ describe('DictionaryItemService', () => {
           resourceId: 'item-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           after: toDictionaryItemResponse(createdItem),
         },
         tx,
@@ -602,6 +614,7 @@ describe('DictionaryItemService', () => {
         },
         auditActor,
         auditRequestMeta,
+        auditMetadata,
       );
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -631,6 +644,9 @@ describe('DictionaryItemService', () => {
           resourceId: 'item-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           after: toDictionaryItemResponse(createdItem),
         },
         tx,
@@ -770,6 +786,7 @@ describe('DictionaryItemService', () => {
         { isDefault: true },
         auditActor,
         auditRequestMeta,
+        auditMetadata,
       );
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -791,6 +808,9 @@ describe('DictionaryItemService', () => {
           resourceId: 'item-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           before: toDictionaryItemResponse(transactionalBefore),
           after: toDictionaryItemResponse(updatedItem),
         },
@@ -813,6 +833,7 @@ describe('DictionaryItemService', () => {
           { label: 'Administrator' },
           auditActor,
           auditRequestMeta,
+          auditMetadata,
         ),
       ).resolves.toEqual(toDictionaryItemResponse(after));
 
@@ -834,6 +855,9 @@ describe('DictionaryItemService', () => {
           resourceId: 'item-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           before: toDictionaryItemResponse(transactionalBefore),
           after: toDictionaryItemResponse(after),
         },
@@ -890,7 +914,12 @@ describe('DictionaryItemService', () => {
       tx.dictionaryItem.findUnique.mockResolvedValue(transactionalBefore);
       tx.dictionaryItem.delete.mockResolvedValue(transactionalBefore);
 
-      await service.deleteItem('item-1', auditActor, auditRequestMeta);
+      await service.deleteItem(
+        'item-1',
+        auditActor,
+        auditRequestMeta,
+        auditMetadata,
+      );
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(tx.dictionaryItem.findUnique).toHaveBeenCalledWith({
@@ -909,6 +938,9 @@ describe('DictionaryItemService', () => {
           resourceId: 'item-1',
           actor: auditActor,
           requestMeta: auditRequestMeta,
+          metadata: expect.objectContaining({
+            requestId: 'req_12345678',
+          }) as unknown,
           before: toDictionaryItemResponse(transactionalBefore),
         },
         tx,

@@ -32,8 +32,10 @@ import type { Request, Response } from 'express';
 import {
   buildAuditActor,
   getAuditRequestMeta,
+  withAuditRequestId,
 } from '../audit-log/audit-log-request-meta';
 import { Permissions } from '../auth/permissions.decorator';
+import { getRequestIdFromRequest } from '../common/logging/request-context';
 import { CurrentUser } from '../user/current-user.decorator';
 import type { JwtUserPayload } from '../user/user.types';
 import {
@@ -103,12 +105,15 @@ export class FileController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<FileResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.fileService.createFile(
       file,
       body,
       user.sub,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -164,11 +169,14 @@ export class FileController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<FileResponseDto> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.fileService.updateFile(
       id,
       body,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 
@@ -184,10 +192,13 @@ export class FileController {
     @CurrentUser() user: JwtUserPayload,
     @Req() request: Request,
   ): Promise<void> {
+    const requestId = getRequestIdFromRequest(request);
+
     return this.fileService.deleteFile(
       id,
       buildAuditActor(user),
       getAuditRequestMeta(request),
+      withAuditRequestId(undefined, requestId),
     );
   }
 }

@@ -189,6 +189,9 @@ describe('UserService', () => {
     ipAddress: '127.0.0.1',
     userAgent: 'jest',
   };
+  const auditMetadata = {
+    requestId: 'req_12345678',
+  };
 
   function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
     const firstCall = mock.mock.calls[0];
@@ -279,6 +282,7 @@ describe('UserService', () => {
       },
       auditActor,
       auditRequestMeta,
+      auditMetadata,
     );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -295,6 +299,7 @@ describe('UserService', () => {
         resourceId: 'user-1',
         actor: auditActor,
         requestMeta: auditRequestMeta,
+        metadata: expect.objectContaining({ requestId: 'req_12345678' }),
         after: toUserResponse(created),
       },
       tx,
@@ -343,6 +348,7 @@ describe('UserService', () => {
       { firstName: 'Augusta' },
       auditActor,
       auditRequestMeta,
+      auditMetadata,
     );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -364,6 +370,7 @@ describe('UserService', () => {
         resourceId: 'user-1',
         actor: auditActor,
         requestMeta: auditRequestMeta,
+        metadata: expect.objectContaining({ requestId: 'req_12345678' }),
         before: toUserResponse(before),
         after: toUserResponse(after),
       },
@@ -433,6 +440,7 @@ describe('UserService', () => {
       'NewSecure123!',
       auditActor,
       auditRequestMeta,
+      auditMetadata,
     );
 
     expect(auditLogService.record).toHaveBeenCalledWith(
@@ -442,6 +450,7 @@ describe('UserService', () => {
         resourceId: 'user-1',
         actor: auditActor,
         requestMeta: auditRequestMeta,
+        metadata: expect.objectContaining({ requestId: 'req_12345678' }),
         after: {
           id: 'user-1',
           email: 'ada@example.com',
@@ -497,7 +506,12 @@ describe('UserService', () => {
     tx.user.findUnique.mockResolvedValue(before);
     tx.user.delete.mockResolvedValue(before);
 
-    await service.deleteUser('user-1', auditActor, auditRequestMeta);
+    await service.deleteUser(
+      'user-1',
+      auditActor,
+      auditRequestMeta,
+      auditMetadata,
+    );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.user.findUnique).toHaveBeenCalledWith({
@@ -514,6 +528,7 @@ describe('UserService', () => {
         resourceId: 'user-1',
         actor: auditActor,
         requestMeta: auditRequestMeta,
+        metadata: expect.objectContaining({ requestId: 'req_12345678' }),
         before: toUserResponse(before),
       },
       tx,
@@ -547,6 +562,7 @@ describe('UserService', () => {
       'actor-1',
       auditActor,
       auditRequestMeta,
+      auditMetadata,
     );
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
@@ -574,6 +590,7 @@ describe('UserService', () => {
         resourceId: 'user-1',
         actor: auditActor,
         requestMeta: auditRequestMeta,
+        metadata: expect.objectContaining({ requestId: 'req_12345678' }),
         before: { roleCodes: ['standard'] },
         after: { roleCodes: ['admin'] },
       },
