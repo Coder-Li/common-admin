@@ -115,6 +115,18 @@ AUTH_REFRESH_COOKIE_SECURE=true
 
 如果未来前端和 API 分不同站点部署，再根据实际域名调整 `AUTH_REFRESH_COOKIE_SAME_SITE` 和 `AUTH_REFRESH_COOKIE_DOMAIN`；`AUTH_REFRESH_COOKIE_SAME_SITE=none` 必须同时使用 `AUTH_REFRESH_COOKIE_SECURE=true`。
 
+### 本地日志观测
+
+本地部署可以叠加 Loki、Grafana 和 Alloy 观测覆盖层，用于查看 API stdout/stderr JSON 日志：
+
+```bash
+docker compose --env-file .env.deploy -f docker-compose.yml -f docker-compose.observability.yml up
+```
+
+Grafana 默认地址是 `http://localhost:${GRAFANA_HTTP_PORT:-3000}`，数据源名称是 `Loki`，预置仪表盘是 `Common Admin API Logs`。
+
+生产环境不要求使用这套覆盖层；可以接入任意 stdout/stderr 日志采集器。错误信封、请求 ID、运行日志字段、LogQL 示例和诊断端点注意事项见 [docs/patterns/admin-error-logging-observability-guide.md](docs/patterns/admin-error-logging-observability-guide.md)。
+
 ## 常用命令
 
 ```bash
