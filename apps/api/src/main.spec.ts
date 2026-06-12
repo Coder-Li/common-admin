@@ -40,4 +40,13 @@ describe('main bootstrap', () => {
       'details: { fields: flattenValidationErrors(errors) }',
     );
   });
+
+  it('allows and exposes request id CORS headers', () => {
+    const mainSource = readFileSync(join(__dirname, 'main.ts'), 'utf8');
+
+    expect(mainSource).toContain(
+      "allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id']",
+    );
+    expect(mainSource).toContain("exposedHeaders: ['x-request-id']");
+  });
 });
