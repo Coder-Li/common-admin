@@ -54,7 +54,10 @@ export function PermissionsPage() {
     queryFn: () => listPermissions(),
   })
 
-  const permissions = permissionsQuery.data ?? []
+  const permissions = useMemo(
+    () => permissionsQuery.data ?? [],
+    [permissionsQuery.data],
+  )
 
   const filteredPermissions = useMemo(() => {
     const nextPermissions = permissions.filter((permission) =>

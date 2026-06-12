@@ -40,6 +40,11 @@ export default defineConfig({
       mode: 'tags-split',
       target: 'src/generated/api/endpoints',
       schemas: 'src/generated/api/schemas',
+      tsconfig: {
+        compilerOptions: {
+          target: 'es2023',
+        },
+      },
       client: 'react-query',
       httpClient: 'axios',
       clean: true,
