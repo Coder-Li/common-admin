@@ -19,45 +19,58 @@ describe('main bootstrap', () => {
     expect(mainSource).toMatch(/app\.useLogger\(app\.get\(Logger\)\);/);
   });
 
-  it('registers the global exception filter from the Nest container', () => {
+  it('delegates shared HTTP setup and keeps Swagger setup in main', () => {
     const mainSource = readFileSync(join(__dirname, 'main.ts'), 'utf8');
 
+    expect(mainSource).toContain("import { configureApp } from './app.setup';");
+    expect(mainSource).toMatch(/configureApp\(app,\s*configService\);/);
     expect(mainSource).toContain(
+      'const document = createOpenApiDocument(app);',
+    );
+    expect(mainSource).toContain(
+      "SwaggerModule.setup('api/docs', app, document);",
+    );
+  });
+
+  it('registers the global exception filter from the Nest container', () => {
+    const appSetupSource = readFileSync(join(__dirname, 'app.setup.ts'), 'utf8');
+
+    expect(appSetupSource).toContain(
       "import { GlobalExceptionFilter } from './common/errors/exception-filter';",
     );
-    expect(mainSource).toMatch(
+    expect(appSetupSource).toMatch(
       /app\.useGlobalFilters\(app\.get\(GlobalExceptionFilter\)\);/,
     );
   });
 
   it('uses AppException for validation pipe failures', () => {
-    const mainSource = readFileSync(join(__dirname, 'main.ts'), 'utf8');
+    const appSetupSource = readFileSync(join(__dirname, 'app.setup.ts'), 'utf8');
 
-    expect(mainSource).toContain(
+    expect(appSetupSource).toContain(
       "import { AppException } from './common/errors/app-exception';",
     );
-    expect(mainSource).toContain(
+    expect(appSetupSource).toContain(
       "import { ERROR_CODES } from './common/errors/error-codes';",
     );
-    expect(mainSource).toContain(
+    expect(appSetupSource).toContain(
       "import { flattenValidationErrors } from './common/errors/validation-errors';",
     );
-    expect(mainSource).toMatch(
+    expect(appSetupSource).toMatch(
       /exceptionFactory:\s*\(errors\)\s*=>\s*new AppException\(\{/,
     );
-    expect(mainSource).toContain('code: ERROR_CODES.VALIDATION_ERROR');
-    expect(mainSource).toContain("message: 'Request validation failed'");
-    expect(mainSource).toContain(
+    expect(appSetupSource).toContain('code: ERROR_CODES.VALIDATION_ERROR');
+    expect(appSetupSource).toContain("message: 'Request validation failed'");
+    expect(appSetupSource).toContain(
       'details: { fields: flattenValidationErrors(errors) }',
     );
   });
 
   it('allows and exposes request id CORS headers', () => {
-    const mainSource = readFileSync(join(__dirname, 'main.ts'), 'utf8');
+    const appSetupSource = readFileSync(join(__dirname, 'app.setup.ts'), 'utf8');
 
-    expect(mainSource).toContain(
+    expect(appSetupSource).toContain(
       "allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id']",
     );
-    expect(mainSource).toContain("exposedHeaders: ['x-request-id']");
+    expect(appSetupSource).toContain("exposedHeaders: ['x-request-id']");
   });
 });
