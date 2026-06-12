@@ -38,6 +38,41 @@ describe('validateEnv', () => {
     });
   });
 
+  it('provides logging and application defaults', () => {
+    expect(validateEnv({}).LOG_LEVEL).toBe('debug');
+    expect(validateEnv({}).LOG_PRETTY).toBe(true);
+    expect(validateEnv({ NODE_ENV: 'test' }).LOG_LEVEL).toBe('silent');
+    expect(
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_ACCESS_TOKEN_SECRET: 'configured-secret-123',
+        AUTH_REFRESH_COOKIE_SECURE: 'true',
+      }).LOG_LEVEL,
+    ).toBe('info');
+    expect(
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_ACCESS_TOKEN_SECRET: 'configured-secret-123',
+        AUTH_REFRESH_COOKIE_SECURE: 'true',
+      }).LOG_PRETTY,
+    ).toBe(false);
+    expect(validateEnv({}).SERVICE_NAME).toBe('api');
+    expect(validateEnv({}).APP_ENV).toBe('development');
+    expect(validateEnv({}).ENABLE_DIAGNOSTIC_ERROR_ENDPOINT).toBe(false);
+    expect(
+      validateEnv({ ENABLE_DIAGNOSTIC_ERROR_ENDPOINT: 'true' })
+        .ENABLE_DIAGNOSTIC_ERROR_ENDPOINT,
+    ).toBe(true);
+    expect(
+      validateEnv({ ENABLE_DIAGNOSTIC_ERROR_ENDPOINT: '0' })
+        .ENABLE_DIAGNOSTIC_ERROR_ENDPOINT,
+    ).toBe(false);
+    expect(
+      validateEnv({ ENABLE_DIAGNOSTIC_ERROR_ENDPOINT: 'yes' })
+        .ENABLE_DIAGNOSTIC_ERROR_ENDPOINT,
+    ).toBe(false);
+  });
+
   it('allows sameSite none with secure cookies in production', () => {
     expect(
       validateEnv({

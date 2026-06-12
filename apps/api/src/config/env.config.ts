@@ -1,9 +1,34 @@
 import { z } from 'zod';
 
+function parseBooleanLike(value: unknown): unknown {
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  return value;
+}
+
+function parseExplicitTrue(value: unknown): boolean {
+  return value === true || value === 'true';
+}
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),
+  LOG_LEVEL: z
+    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+    .optional(),
+  LOG_PRETTY: z.preprocess(parseBooleanLike, z.coerce.boolean()).optional(),
+  SERVICE_NAME: z.string().min(1).default('api'),
+  APP_ENV: z.string().min(1).optional(),
+  ENABLE_DIAGNOSTIC_ERROR_ENDPOINT: z
+    .preprocess(parseExplicitTrue, z.boolean())
+    .default(false),
   PORT: z.coerce.number().int().positive().default(13001),
   DATABASE_URL: z
     .string()
@@ -25,17 +50,7 @@ const envSchema = z.object({
     .default(14),
   AUTH_REFRESH_COOKIE_NAME: z.string().min(1).default('common_admin_refresh'),
   AUTH_REFRESH_COOKIE_SECURE: z
-    .preprocess((value) => {
-      if (value === 'true') {
-        return true;
-      }
-
-      if (value === 'false') {
-        return false;
-      }
-
-      return value;
-    }, z.coerce.boolean())
+    .preprocess(parseBooleanLike, z.coerce.boolean())
     .default(false),
   AUTH_REFRESH_COOKIE_SAME_SITE: z
     .enum(['lax', 'strict', 'none'])
@@ -66,10 +81,28 @@ const envSchema = z.object({
     }),
 });
 
-export type AppEnv = z.infer<typeof envSchema>;
+type LogLevel = NonNullable<z.infer<typeof envSchema>['LOG_LEVEL']>;
+
+export type AppEnv = z.infer<typeof envSchema> & {
+  LOG_LEVEL: LogLevel;
+  LOG_PRETTY: boolean;
+  APP_ENV: string;
+};
 
 export function validateEnv(config: Record<string, unknown>): AppEnv {
-  const env = envSchema.parse(config);
+  const parsedEnv = envSchema.parse(config);
+  const defaultLogLevel =
+    parsedEnv.NODE_ENV === 'production'
+      ? 'info'
+      : parsedEnv.NODE_ENV === 'test'
+        ? 'silent'
+        : 'debug';
+  const env = {
+    ...parsedEnv,
+    LOG_LEVEL: parsedEnv.LOG_LEVEL ?? defaultLogLevel,
+    LOG_PRETTY: parsedEnv.LOG_PRETTY ?? parsedEnv.NODE_ENV !== 'production',
+    APP_ENV: parsedEnv.APP_ENV ?? parsedEnv.NODE_ENV,
+  };
 
   if (
     env.NODE_ENV === 'production' &&
