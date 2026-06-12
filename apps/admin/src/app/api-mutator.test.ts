@@ -1,4 +1,9 @@
-import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+import type {
+  AxiosError,
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+} from 'axios'
 import type { Mock } from 'vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthSession } from '../types/auth'
@@ -48,6 +53,32 @@ function response<T>(
     headers: {},
     config: config as AxiosResponse<T>['config'],
   }
+}
+
+function axiosError(
+  data: unknown,
+  status: number,
+  config: AxiosRequestConfig = {},
+): AxiosError {
+  return {
+    isAxiosError: true,
+    message: 'Request failed',
+    response: {
+      data,
+      status,
+      statusText: 'Error',
+      headers: {},
+      config: config as AxiosResponse['config'],
+    },
+    config: config as AxiosError['config'],
+  } as AxiosError
+}
+
+function networkError(): AxiosError {
+  return {
+    isAxiosError: true,
+    message: 'Network Error',
+  } as AxiosError
 }
 
 function unauthorizedError(config: AxiosRequestConfig): Error & {
@@ -126,6 +157,56 @@ describe('api mutator', () => {
     )
   })
 
+  it('rejects non-401 server errors with an ApiError', async () => {
+    const { apiMutator, request, axiosRequest } = await loadMutator()
+    const error = axiosError(
+      {
+        code: 'FORBIDDEN',
+        message: 'Forbidden',
+        requestId: 'req-1',
+      },
+      403,
+      { url: '/users/me' },
+    )
+    request.mockRejectedValueOnce(error)
+
+    await expect(
+      apiMutator({ url: '/users/me', method: 'GET' }),
+    ).rejects.toEqual({
+      code: 'FORBIDDEN',
+      message: 'Forbidden',
+      statusCode: 403,
+      requestId: 'req-1',
+    })
+
+    expect(axiosRequest).not.toHaveBeenCalled()
+  })
+
+  it('does not refresh login 401 responses and rejects with an ApiError', async () => {
+    const { apiMutator, request, axiosRequest } = await loadMutator()
+    request.mockRejectedValueOnce(
+      axiosError(
+        {
+          code: 'INVALID_CREDENTIALS',
+          message: 'Invalid credentials',
+        },
+        401,
+        { url: '/auth/login' },
+      ),
+    )
+
+    await expect(
+      apiMutator({ url: '/auth/login', method: 'POST' }),
+    ).rejects.toEqual({
+      code: 'INVALID_CREDENTIALS',
+      message: 'Invalid credentials',
+      statusCode: 401,
+    })
+
+    expect(axiosRequest).not.toHaveBeenCalled()
+    expect(request).toHaveBeenCalledOnce()
+  })
+
   it('refreshes through the shared coordinator and replays an ordinary 401 once', async () => {
     const { apiMutator, request, axiosRequest, useAuthStore } =
       await loadMutator()
@@ -156,6 +237,54 @@ describe('api mutator', () => {
     )
   })
 
+  it('shares one refresh request for concurrent ordinary 401 responses and replays each original request', async () => {
+    const { apiMutator, request, axiosRequest, useAuthStore } =
+      await loadMutator()
+    useAuthStore.setState({ accessToken: 'stale-access-token' })
+    let resolveRefresh: (value: AxiosResponse<AuthSession>) => void
+    const refreshPromise = new Promise<AxiosResponse<AuthSession>>(
+      (resolve) => {
+        resolveRefresh = resolve
+      },
+    )
+    request
+      .mockRejectedValueOnce(unauthorizedError({ url: '/users/me' }))
+      .mockRejectedValueOnce(unauthorizedError({ url: '/settings' }))
+      .mockResolvedValueOnce(response({ id: 'user-1' }))
+      .mockResolvedValueOnce(response({ theme: 'system' }))
+    axiosRequest.mockReturnValueOnce(refreshPromise)
+
+    const firstRequest = apiMutator({ url: '/users/me', method: 'GET' })
+    const secondRequest = apiMutator({ url: '/settings', method: 'GET' })
+
+    await Promise.resolve()
+    expect(axiosRequest).toHaveBeenCalledOnce()
+    resolveRefresh!(response(session))
+
+    await expect(Promise.all([firstRequest, secondRequest])).resolves.toEqual([
+      { id: 'user-1' },
+      { theme: 'system' },
+    ])
+
+    expect(request).toHaveBeenCalledTimes(4)
+    expect(request.mock.calls[2]?.[0]).toEqual(
+      expect.objectContaining({
+        url: '/users/me',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer fresh-access-token',
+        }),
+      }),
+    )
+    expect(request.mock.calls[3]?.[0]).toEqual(
+      expect.objectContaining({
+        url: '/settings',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer fresh-access-token',
+        }),
+      }),
+    )
+  })
+
   it('clears auth and query cache when refresh fails', async () => {
     const { apiMutator, request, axiosRequest, useAuthStore } =
       await loadMutator()
@@ -163,17 +292,71 @@ describe('api mutator', () => {
       ...session,
       accessToken: 'stale-access-token',
     })
-    const refreshError = new Error('refresh failed')
+    const refreshError = axiosError(
+      {
+        code: 'SESSION_EXPIRED',
+        message: 'Session expired',
+      },
+      401,
+      { url: '/auth/refresh' },
+    )
     request.mockRejectedValueOnce(unauthorizedError({ url: '/users/me' }))
     axiosRequest.mockRejectedValueOnce(refreshError)
 
     await expect(
       apiMutator({ url: '/users/me', method: 'GET' }),
-    ).rejects.toBe(refreshError)
+    ).rejects.toEqual({
+      code: 'SESSION_EXPIRED',
+      message: 'Session expired',
+      statusCode: 401,
+    })
 
     expect(useAuthStore.getState().status).toBe('anonymous')
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(clearQueryCache).toHaveBeenCalledOnce()
+  })
+
+  it('rejects replay failures after a successful refresh with an ApiError', async () => {
+    const { apiMutator, request, axiosRequest, useAuthStore } =
+      await loadMutator()
+    useAuthStore.setState({ accessToken: 'stale-access-token' })
+    request
+      .mockRejectedValueOnce(unauthorizedError({ url: '/users/me' }))
+      .mockRejectedValueOnce(
+        axiosError(
+          {
+            code: 'FORBIDDEN',
+            message: 'Forbidden',
+          },
+          403,
+          { url: '/users/me' },
+        ),
+      )
+    axiosRequest.mockResolvedValueOnce(response(session))
+
+    await expect(
+      apiMutator({ url: '/users/me', method: 'GET' }),
+    ).rejects.toEqual({
+      code: 'FORBIDDEN',
+      message: 'Forbidden',
+      statusCode: 403,
+    })
+  })
+
+  it('rejects network errors with NETWORK_ERROR', async () => {
+    const { apiMutator, request, axiosRequest } = await loadMutator()
+    const error = networkError()
+    request.mockRejectedValueOnce(error)
+
+    await expect(
+      apiMutator({ url: '/users/me', method: 'GET' }),
+    ).rejects.toEqual({
+      code: 'NETWORK_ERROR',
+      message: 'Network request failed',
+      cause: error,
+    })
+
+    expect(axiosRequest).not.toHaveBeenCalled()
   })
 
   it.each(['/auth/login', '/auth/refresh', '/auth/logout'])(
@@ -183,7 +366,12 @@ describe('api mutator', () => {
       const error = unauthorizedError({ url })
       request.mockRejectedValueOnce(error)
 
-      await expect(apiMutator({ url, method: 'POST' })).rejects.toBe(error)
+      await expect(apiMutator({ url, method: 'POST' })).rejects.toEqual({
+        code: 'UNKNOWN_API_ERROR',
+        message: 'Unknown API error',
+        statusCode: 401,
+        cause: error,
+      })
 
       expect(axiosRequest).not.toHaveBeenCalled()
       expect(request).toHaveBeenCalledOnce()

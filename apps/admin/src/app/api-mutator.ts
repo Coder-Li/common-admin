@@ -3,6 +3,7 @@ import { clearQueryCache } from './query-client'
 import { useAuthStore } from '../stores/auth-store'
 import type { AuthSession } from '../types/auth'
 import { createRefreshCoordinator } from './api-refresh-coordinator'
+import { toApiError } from './api-error'
 
 const apiBaseURL = import.meta.env.VITE_API_BASE_URL ?? '/api'
 const skipRefreshPaths = new Set([
@@ -144,15 +145,19 @@ export async function apiMutator<T>(
     return response.data
   } catch (error) {
     if (!isUnauthorizedError(error) || shouldSkipRefresh(config.url)) {
-      throw error
+      throw toApiError(error)
     }
 
-    await apiRefreshCoordinator.refresh()
+    try {
+      await apiRefreshCoordinator.refresh()
 
-    const replayResponse = await apiClient.request<T>(
-      mergeRequestConfig(config, options),
-    )
+      const replayResponse = await apiClient.request<T>(
+        mergeRequestConfig(config, options),
+      )
 
-    return replayResponse.data
+      return replayResponse.data
+    } catch (replayOrRefreshError) {
+      throw toApiError(replayOrRefreshError)
+    }
   }
 }
