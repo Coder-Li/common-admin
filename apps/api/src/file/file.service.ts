@@ -20,6 +20,8 @@ import type {
 } from '../audit-log/audit-log.types';
 import { createListResponse } from '../common/dto/list-response.dto';
 import type { AppEnv } from '../config/env.config';
+import { AppException } from '../common/errors/app-exception';
+import { ERROR_CODES } from '../common/errors/error-codes';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   FileListQueryDto,
@@ -97,7 +99,11 @@ export class FileService {
     auditMetadata?: Record<string, unknown>,
   ): Promise<FileResponseDto> {
     if (!file) {
-      throw new BadRequestException('File upload is required');
+      throw new AppException({
+        code: ERROR_CODES.FILE_UPLOAD_REQUIRED,
+        message: 'File upload is required',
+        statusCode: 400,
+      });
     }
 
     this.assertAllowedMimeType(file.mimetype);
@@ -341,7 +347,11 @@ export class FileService {
       .filter(Boolean);
 
     if (!allowedMimeTypes.includes(mimeType)) {
-      throw new BadRequestException('File type is not allowed');
+      throw new AppException({
+        code: ERROR_CODES.UNSUPPORTED_MEDIA_TYPE,
+        message: 'File type is not allowed',
+        statusCode: 415,
+      });
     }
   }
 

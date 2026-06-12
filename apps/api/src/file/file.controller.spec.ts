@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import { FileStorageDriver, FileVisibility } from '@prisma/client';
 import { Readable } from 'node:stream';
@@ -187,17 +186,6 @@ describe('FileController', () => {
       auditRequestMeta,
       auditMetadata,
     );
-  });
-
-  it('propagates upload BadRequestException from the service', async () => {
-    const service = createService();
-    const controller = new FileController(service as unknown as FileService);
-    const error = new BadRequestException('File upload is required');
-    service.createFile.mockRejectedValue(error);
-
-    await expect(
-      controller.uploadFile(undefined, {}, user as never, request as never),
-    ).rejects.toBe(error);
   });
 
   it('download sets Content-Type, Content-Length, and Content-Disposition without audit metadata', async () => {

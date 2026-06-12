@@ -121,6 +121,9 @@ export function mapExceptionToErrorResponse(
         ? 'Uploaded file is too large'
         : 'Invalid upload',
       statusCode: isFileSizeLimit ? 413 : 400,
+      details: isFileSizeLimit
+        ? getMulterFileSizeLimitDetails(exception)
+        : undefined,
       shouldLogException: false,
     });
   }
@@ -218,7 +221,17 @@ function isPrismaErrorCode(
   return isRecord(exception) && exception.code === code;
 }
 
-function isMulterError(exception: unknown): exception is { code: string } {
+function getMulterFileSizeLimitDetails(
+  exception: { limit?: unknown },
+): { limit: number } | undefined {
+  return typeof exception.limit === 'number' && Number.isFinite(exception.limit)
+    ? { limit: exception.limit }
+    : undefined;
+}
+
+function isMulterError(
+  exception: unknown,
+): exception is { code: string; limit?: unknown } {
   return (
     isRecord(exception) &&
     typeof exception.code === 'string' &&

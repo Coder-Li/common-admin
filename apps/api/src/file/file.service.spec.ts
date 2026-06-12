@@ -12,6 +12,7 @@ import type {
   RecordAuditLogInput,
 } from '../audit-log/audit-log.types';
 import type { AppEnv } from '../config/env.config';
+import { ERROR_CODES } from '../common/errors/error-codes';
 import type { PrismaService } from '../prisma/prisma.service';
 import {
   FileListQueryDto,
@@ -397,9 +398,11 @@ describe('FileService', () => {
     it('rejects missing uploads', async () => {
       const { service } = createService();
 
-      await expect(service.createFile(undefined, {})).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(service.createFile(undefined, {})).rejects.toMatchObject({
+        code: ERROR_CODES.FILE_UPLOAD_REQUIRED,
+        message: 'File upload is required',
+        status: 400,
+      });
     });
 
     it('rejects MIME types outside FILE_ALLOWED_MIME_TYPES', async () => {
@@ -407,7 +410,11 @@ describe('FileService', () => {
 
       await expect(
         service.createFile(makeUpload({ mimetype: 'application/zip' }), {}),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({
+        code: ERROR_CODES.UNSUPPORTED_MEDIA_TYPE,
+        message: 'File type is not allowed',
+        status: 415,
+      });
     });
 
     it('normalizes original name and falls back to uploaded-file', async () => {
@@ -566,12 +573,14 @@ describe('FileService', () => {
     it('does not audit rejected upload or MIME validation paths', async () => {
       const { auditLogService, service } = createService();
 
-      await expect(service.createFile(undefined, {})).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(service.createFile(undefined, {})).rejects.toMatchObject({
+        code: ERROR_CODES.FILE_UPLOAD_REQUIRED,
+      });
       await expect(
         service.createFile(makeUpload({ mimetype: 'application/zip' }), {}),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toMatchObject({
+        code: ERROR_CODES.UNSUPPORTED_MEDIA_TYPE,
+      });
 
       expect(auditLogService.record).not.toHaveBeenCalled();
     });

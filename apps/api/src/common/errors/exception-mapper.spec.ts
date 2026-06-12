@@ -216,7 +216,7 @@ describe('mapExceptionToErrorResponse', () => {
 
   it('maps Multer LIMIT_FILE_SIZE errors to PAYLOAD_TOO_LARGE', () => {
     const mapped = mapExceptionToErrorResponse(
-      { code: 'LIMIT_FILE_SIZE' },
+      { code: 'LIMIT_FILE_SIZE', field: 'file', limit: 20 * 1024 * 1024 },
       context,
     );
 
@@ -224,7 +224,44 @@ describe('mapExceptionToErrorResponse', () => {
       code: ERROR_CODES.PAYLOAD_TOO_LARGE,
       message: 'Uploaded file is too large',
       statusCode: 413,
+      details: { limit: 20 * 1024 * 1024 },
     });
+  });
+
+  it('maps unsupported MIME upload validation to UNSUPPORTED_MEDIA_TYPE', () => {
+    const exception = new AppException({
+      code: ERROR_CODES.UNSUPPORTED_MEDIA_TYPE,
+      message: 'File type is not allowed',
+      statusCode: 415,
+    });
+
+    const mapped = mapExceptionToErrorResponse(exception, context);
+
+    expect(mapped.response).toMatchObject({
+      code: ERROR_CODES.UNSUPPORTED_MEDIA_TYPE,
+      message: 'File type is not allowed',
+      statusCode: 415,
+    });
+    expect(mapped.logLevel).toBe('warn');
+    expect(mapped.shouldLogException).toBe(false);
+  });
+
+  it('maps missing upload file validation to FILE_UPLOAD_REQUIRED', () => {
+    const exception = new AppException({
+      code: ERROR_CODES.FILE_UPLOAD_REQUIRED,
+      message: 'File upload is required',
+      statusCode: 400,
+    });
+
+    const mapped = mapExceptionToErrorResponse(exception, context);
+
+    expect(mapped.response).toMatchObject({
+      code: ERROR_CODES.FILE_UPLOAD_REQUIRED,
+      message: 'File upload is required',
+      statusCode: 400,
+    });
+    expect(mapped.logLevel).toBe('warn');
+    expect(mapped.shouldLogException).toBe(false);
   });
 
   it('maps other Multer errors to BAD_REQUEST', () => {
