@@ -1,8 +1,8 @@
 # Admin CRUD Table Pattern Guide
 
 This guide is for AI agents and developers adding a new standard admin CRUD
-resource to this repository. Use the existing users implementation as the
-reference pattern.
+resource to this repository. Use the existing users, roles, dictionaries, files,
+and audit log implementations as reference patterns.
 
 The goal is to reuse the current backend and frontend CRUD table shape without
 introducing a second admin architecture.
@@ -11,6 +11,8 @@ Authorization note:
 
 - The admin app uses the RBAC permission system. Every new admin CRUD module
   must follow `docs/patterns/admin-rbac-crud-permission-pattern-guide.md`.
+- The admin app uses generated API contracts. Every new API-backed module must
+  follow `docs/patterns/admin-api-contract-generation-guide.md`.
 - Use permission registry entries and `@Permissions()` for admin CRUD
   endpoints. Do not add role-name checks such as `@Roles(Role.ADMIN)`.
 - Menus, routes, pages, and buttons must consume the same permission codes.
@@ -36,23 +38,35 @@ Frontend:
 - `apps/admin/src/routes/admin-route-registry.tsx`
 - `apps/admin/src/lib/permissions.ts`
 - `apps/admin/src/lib/crud/list-query.ts`
-- `apps/admin/src/lib/crud/useServerTableQuery.ts`
 - `apps/admin/src/components/data-table/DataTable.tsx`
 - `apps/admin/src/components/data-table/DataTablePagination.tsx`
 - `apps/admin/src/components/data-table/DataTableToolbar.tsx`
 - `apps/admin/src/features/users/users.types.ts`
-- `apps/admin/src/features/users/users.api.ts`
 - `apps/admin/src/features/users/users.columns.tsx`
 - `apps/admin/src/features/users/UserForm.tsx`
 - `apps/admin/src/features/users/UsersPage.tsx`
 - `apps/admin/src/features/users/UsersPage.test.tsx`
 - `apps/admin/src/features/roles/RolesPage.tsx`
+- `apps/admin/src/generated/api/endpoints/users/users.ts`
+- `apps/admin/src/generated/api/schemas/index.ts`
 - `apps/admin/src/layouts/AdminShell.tsx`
 - `apps/admin/src/i18n/messages.ts`
 
 ## API Contract
 
 Standard list endpoints use server-side pagination.
+
+The backend DTOs and Swagger metadata are the source of truth. After adding or
+changing CRUD endpoints, run:
+
+```bash
+pnpm api:generate
+pnpm api:check
+```
+
+Do not create handwritten frontend API DTOs or one-method API wrappers. Use the
+generated schema types, endpoint functions, hooks, and query key helpers from
+`apps/admin/src/generated/api/`.
 
 Request query:
 
@@ -235,68 +249,88 @@ Each standard CRUD resource should follow this shape:
 ```text
 apps/admin/src/features/<resource>/
   <resource>.types.ts
-  <resource>.api.ts
   <resource>.columns.tsx
   <Resource>Form.tsx
   <Resource>Page.tsx
   <Resource>Page.test.tsx
 ```
 
-Use shared table/query infrastructure:
+Use shared table/query infrastructure and generated API helpers:
 
 - `apps/admin/src/lib/crud/list-query.ts`
-- `apps/admin/src/lib/crud/useServerTableQuery.ts`
 - `apps/admin/src/components/data-table/DataTable.tsx`
 - `apps/admin/src/components/data-table/DataTableToolbar.tsx`
 - `apps/admin/src/components/data-table/DataTablePagination.tsx`
+- `apps/admin/src/generated/api/endpoints/<tag>/<tag>.ts`
+- `apps/admin/src/generated/api/schemas`
 
 ### Types
 
-Define frontend request and response types matching the backend contract.
+Feature-local type files should not duplicate backend DTOs. Import generated
+schema types and re-export aliases only when doing so makes page code easier to
+read. Keep UI-only form, filter, selected-row, and derived view types local.
 
 Example:
 
 ```ts
-export interface ExampleListQuery {
-  page: number
-  pageSize: number
-  search?: string
-  sort?: string
-  status?: ExampleStatus
-}
+import type {
+  CreateArticleDto,
+  ListArticlesParams,
+  UpdateArticleDto,
+  ArticleResponseDto,
+} from '../../generated/api/schemas'
 
-export interface ExampleRecord {
-  id: string
-  name: string
-  status: ExampleStatus
-  createdAt: string
-  updatedAt: string
-}
+export type ArticleRecord = ArticleResponseDto
+export type ArticleListQuery = ListArticlesParams
+export type CreateArticleRequest = CreateArticleDto
+export type UpdateArticleRequest = UpdateArticleDto
 
-export interface ExampleListResponse {
-  items: ExampleRecord[]
-  total: number
-  page: number
-  pageSize: number
+export interface ArticleFormValue {
+  title: string
+  status: 'DRAFT' | 'PUBLISHED'
 }
 ```
 
-### API Wrapper
+### Generated API Usage
 
-Create feature-local wrapper functions around the global API client. Pages
-should import these wrappers, not the global `api` object directly. This keeps
-page tests easy to mock.
+Pages should import generated endpoint functions, hooks, and query key helpers
+directly. Feature-local `.api.ts` wrappers are allowed only when they perform
+real page-level composition, not simple forwarding.
 
 Example:
 
 ```ts
-export function listExamples(query: ExampleListQuery) {
-  return api.examples.list(query)
-}
-```
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  createArticle,
+  deleteArticle,
+  getListArticlesQueryKey,
+  listArticles,
+  updateArticle,
+} from '../../generated/api/endpoints/articles/articles'
+import type { ListArticlesParams } from '../../generated/api/schemas'
 
-Also extend `apps/admin/src/lib/api.ts` if the resource needs new API client
-methods.
+const params = {
+  page: pagination.pageIndex + 1,
+  pageSize: pagination.pageSize,
+  search: search || undefined,
+  sort: toSortParam(sorting),
+} satisfies ListArticlesParams
+
+const articlesQuery = useQuery({
+  queryKey: getListArticlesQueryKey(params),
+  queryFn: () => listArticles(params),
+})
+
+const createMutation = useMutation({
+  mutationFn: createArticle,
+  onSuccess: async () => {
+    await queryClient.invalidateQueries({
+      queryKey: getListArticlesQueryKey(),
+    })
+  },
+})
+```
 
 ### Columns
 
@@ -324,11 +358,12 @@ Forms should:
 
 Pages should:
 
-- use `useServerTableQuery`
+- use generated endpoint functions or generated React Query hooks
 - keep list state local to the page
 - not sync list state to the URL unless explicitly requested
 - use React Query mutations for create/update/delete
-- invalidate or refetch the resource list after successful mutations
+- invalidate or refetch the resource list after successful mutations using
+  generated query key helpers
 - show success and error toasts
 - render `DataTable`, `DataTableToolbar`, and the resource form
 - keep UI dense and operational
@@ -363,7 +398,8 @@ Add page tests for:
 - delete confirmation calls delete and refetches
 - error state and retry
 
-Mock feature-local API wrappers in page tests.
+Mock generated endpoint modules in page tests. Do not test generated code
+internals.
 
 ## Required Constraints
 
@@ -372,8 +408,12 @@ Do not break these constraints when adding a new CRUD resource:
 - Do not expose sensitive backend fields.
 - Do not allow arbitrary sort fields.
 - Do not silently clamp invalid backend query values.
-- Do not bypass the shared API client.
-- Do not import the global `api` object directly in resource pages.
+- Do not bypass the generated API mutator.
+- Do not reintroduce `apps/admin/src/lib/api.ts`,
+  `apps/admin/src/app/api-client.ts`, or one-method feature-local `.api.ts`
+  wrappers.
+- Do not write raw React Query key strings when a generated query key helper
+  exists.
 - Do not introduce a TanStack Router migration as part of a CRUD page.
 - Do not put users-specific behavior into shared table components.
 - Do not add role-name based authorization such as `@Roles(Role.ADMIN)`.
@@ -425,6 +465,8 @@ Special rules:
 
 Route/menu metadata entry:
 Permission codes:
+OpenAPI tag:
+Operation IDs:
 ```
 
 ## AI Prompt Template
@@ -436,11 +478,12 @@ Please implement Admin CRUD Table functionality for <resource> in the current
 repository.
 
 First read and follow:
+- docs/patterns/admin-api-contract-generation-guide.md
 - docs/patterns/admin-crud-table-pattern-guide.md
 - docs/patterns/admin-rbac-crud-permission-pattern-guide.md
 
-Use users as the reference implementation. Do not invent a separate CRUD
-architecture.
+Use existing users, roles, dictionaries, files, and audit logs as reference
+implementations. Do not invent a separate CRUD architecture.
 
 Backend reference files:
 - apps/api/src/common/dto/list-query.dto.ts
@@ -457,17 +500,17 @@ Frontend reference files:
 - apps/admin/src/routes/admin-route-registry.tsx
 - apps/admin/src/lib/permissions.ts
 - apps/admin/src/lib/crud/list-query.ts
-- apps/admin/src/lib/crud/useServerTableQuery.ts
 - apps/admin/src/components/data-table/DataTable.tsx
 - apps/admin/src/components/data-table/DataTableToolbar.tsx
 - apps/admin/src/components/data-table/DataTablePagination.tsx
 - apps/admin/src/features/users/users.types.ts
-- apps/admin/src/features/users/users.api.ts
 - apps/admin/src/features/users/users.columns.tsx
 - apps/admin/src/features/users/UserForm.tsx
 - apps/admin/src/features/users/UsersPage.tsx
 - apps/admin/src/features/users/UsersPage.test.tsx
 - apps/admin/src/features/roles/RolesPage.tsx
+- apps/admin/src/generated/api/endpoints/users/users.ts
+- apps/admin/src/generated/api/schemas/index.ts
 - apps/admin/src/layouts/AdminShell.tsx
 - apps/admin/src/i18n/messages.ts
 
@@ -488,20 +531,25 @@ Resource details:
 Requirements:
 - Define permission codes for the resource before implementing.
 - Add permission registry entries and seed/upsert support.
+- Add explicit `@ApiOperation({ operationId })` values for every endpoint.
+- Add complete backend DTO validation and Swagger metadata.
 - Use server-side pagination/search/sort/filter.
 - List responses must use { items, total, page, pageSize }.
 - Sort fields must use a backend allowlist.
 - Do not expose sensitive fields.
 - Use method-level `@Permissions()` decorators for admin CRUD endpoints.
+- Run `pnpm api:generate` after backend contract changes.
+- Use generated schema types, endpoint functions/hooks, and query key helpers.
+- Do not add one-method feature-local `.api.ts` wrappers.
 - Add the route to permission-aware frontend route/menu metadata.
 - Guard page action buttons with the permission helper.
 - Keep permission code constants feature-local when the page has more than one
   action gate.
-- Use shared frontend DataTable and useServerTableQuery.
-- Use feature-local API wrapper functions.
+- Use shared frontend DataTable components.
 - Do not introduce TanStack Router changes.
 - Add focused backend and frontend tests.
 - Run and pass:
+  - pnpm api:check
   - pnpm --filter api exec jest --runInBand
   - pnpm --filter admin test
   - pnpm --filter api build
@@ -518,6 +566,7 @@ before implementing.
 Run these before claiming the resource is complete:
 
 ```bash
+pnpm api:check
 pnpm --filter api exec jest --runInBand
 pnpm --filter admin test
 pnpm --filter api build
