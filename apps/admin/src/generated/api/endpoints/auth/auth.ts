@@ -16,6 +16,7 @@ import type {
 import type {
   AuthResponseDto,
   ChangePasswordDto,
+  ErrorResponseDto,
   LoginDto,
 } from "../../schemas";
 
@@ -41,7 +42,7 @@ export const login = (
 };
 
 export const getLoginMutationOptions = <
-  TError = unknown,
+  TError = ErrorResponseDto,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -82,9 +83,9 @@ export type LoginMutationResult = NonNullable<
   Awaited<ReturnType<typeof login>>
 >;
 export type LoginMutationBody = LoginDto;
-export type LoginMutationError = unknown;
+export type LoginMutationError = ErrorResponseDto;
 
-export const useLogin = <TError = unknown, TContext = unknown>(
+export const useLogin = <TError = ErrorResponseDto, TContext = unknown>(
   options?: {
     mutation?: UseMutationOptions<
       Awaited<ReturnType<typeof login>>,

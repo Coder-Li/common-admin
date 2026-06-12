@@ -36,6 +36,8 @@ export * from "./dictionaryOptionsResponseDto";
 export * from "./dictionaryTypeListResponseDto";
 export * from "./dictionaryTypeResponseDto";
 export * from "./dictionaryTypeResponseDtoStatus";
+export * from "./errorResponseDto";
+export * from "./errorResponseDtoDetails";
 export * from "./fileListResponseDto";
 export * from "./fileResponseDto";
 export * from "./fileResponseDtoMetadata";
