@@ -18,6 +18,7 @@ import { PermissionModule } from './permission/permission.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { RoleModule } from './role/role.module';
+import { SettingsModule } from './settings/settings.module';
 import { UserModule } from './user/user.module';
 
 @Module({
@@ -42,6 +43,7 @@ import { UserModule } from './user/user.module';
     AuditLogModule,
     DictionaryModule,
     FileModule,
+    SettingsModule,
     HealthModule,
     DiagnosticsModule.register(),
   ],

@@ -3,9 +3,14 @@ import {
   Inject,
   Injectable,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, PrismaClient } from '@prisma/client';
+import {
+  AUDIT_ACTIONS,
+  AUDIT_RESOURCE_TYPES,
+} from '../audit-log/audit-log.constants';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import type {
   AuditActor,
@@ -53,10 +58,6 @@ type SettingsTransactionClient = Pick<
 type SystemSettingJsonValue = Prisma.InputJsonValue | typeof Prisma.JsonNull;
 type AuditMetadata = Record<string, unknown> | undefined;
 
-const SETTINGS_UPDATE_ACTION = 'system_setting.update';
-const SETTINGS_CACHE_REFRESH_ACTION = 'system_setting.cache_refresh';
-const SETTINGS_RESOURCE_TYPE = 'system_setting';
-
 const BASIC_SETTING_ENTRIES = [
   ['siteName', SETTING_KEYS.BASIC_SITE_NAME],
   ['siteSubtitle', SETTING_KEYS.BASIC_SITE_SUBTITLE],
@@ -75,7 +76,9 @@ export class SettingsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService<AppEnv, true>,
     private readonly auditLogService: AuditLogService,
-    @Inject(Logger) private readonly logger: Logger,
+    @Optional()
+    @Inject(Logger)
+    private readonly logger: Logger = new Logger(SettingsService.name),
   ) {}
 
   async getBasicSettings(): Promise<BasicSettingsResponseDto> {
@@ -182,8 +185,8 @@ export class SettingsService {
 
     await this.auditLogService.record(
       {
-        action: SETTINGS_CACHE_REFRESH_ACTION,
-        resourceType: SETTINGS_RESOURCE_TYPE,
+        action: AUDIT_ACTIONS.SYSTEM_SETTING_CACHE_REFRESH,
+        resourceType: AUDIT_RESOURCE_TYPES.SYSTEM_SETTING,
         resourceId: 'cache.dictionary',
         actor,
         requestMeta,
@@ -191,7 +194,7 @@ export class SettingsService {
           ...metadata,
           refreshedAt,
         },
-      } as unknown as RecordAuditLogInput,
+      },
       undefined,
     );
 
@@ -360,8 +363,8 @@ export class SettingsService {
     metadata?: AuditMetadata,
   ): RecordAuditLogInput {
     return {
-      action: SETTINGS_UPDATE_ACTION,
-      resourceType: SETTINGS_RESOURCE_TYPE,
+      action: AUDIT_ACTIONS.SYSTEM_SETTING_UPDATE,
+      resourceType: AUDIT_RESOURCE_TYPES.SYSTEM_SETTING,
       resourceId,
       actor,
       requestMeta,
@@ -371,7 +374,7 @@ export class SettingsService {
         ...metadata,
         changedKeys,
       },
-    } as unknown as RecordAuditLogInput;
+    };
   }
 }
 
