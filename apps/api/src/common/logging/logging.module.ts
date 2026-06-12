@@ -33,7 +33,7 @@ export function createPinoHttpOptions(env: LoggingEnv): Params {
             },
           }
         : undefined,
-      customProps: (request) => getRequestLogContext(request),
+      customProps: () => ({}),
       customAttributeKeys: {
         req: 'req',
         res: 'res',
@@ -50,17 +50,22 @@ export function createPinoHttpOptions(env: LoggingEnv): Params {
         return 'info';
       },
       customSuccessMessage: () => 'request completed',
-      customSuccessObject: (_request, response, value) =>
-        withStatusCode(value, response.statusCode),
-      customErrorObject: (_request, response, _error, value) =>
-        withStatusCode(value, response.statusCode),
+      customSuccessObject: (request, response, value) =>
+        withRequestContext(value, request, response.statusCode),
+      customErrorObject: (request, response, _error, value) =>
+        withRequestContext(value, request, response.statusCode),
     },
   };
 }
 
-function withStatusCode(value: unknown, statusCode: number) {
+function withRequestContext(
+  value: unknown,
+  request: Parameters<typeof getRequestLogContext>[0],
+  statusCode: number,
+) {
   return {
     ...(isRecord(value) ? value : {}),
+    ...getRequestLogContext(request),
     statusCode,
   };
 }

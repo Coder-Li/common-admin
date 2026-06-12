@@ -181,18 +181,11 @@ describe('createPinoHttpOptions', () => {
     );
   });
 
-  it('adds request context as top-level custom props', () => {
+  it('defers request context until completion logs', () => {
     const options = createOptions();
     const request = createRequest({ user: { sub: 'user_123' } });
 
-    expect(options.customProps?.(request, {} as Response)).toEqual({
-      requestId: 'req_123',
-      method: 'POST',
-      path: '/api/auth/login',
-      userId: 'user_123',
-      ip: '203.0.113.10',
-      userAgent: 'jest',
-    });
+    expect(options.customProps?.(request, {} as Response)).toEqual({});
     expect(options.customAttributeKeys).toEqual(
       expect.objectContaining({
         responseTime: 'durationMs',
@@ -203,7 +196,7 @@ describe('createPinoHttpOptions', () => {
     );
   });
 
-  it('adds status code at the top level of request completion logs', () => {
+  it('adds request context and status code to completion logs', () => {
     const options = createOptions();
 
     expect(
@@ -214,6 +207,9 @@ describe('createPinoHttpOptions', () => {
       ),
     ).toEqual(
       expect.objectContaining({
+        requestId: 'req_123',
+        method: 'POST',
+        path: '/api/auth/login',
         statusCode: 201,
         durationMs: 12,
       }),
@@ -227,6 +223,9 @@ describe('createPinoHttpOptions', () => {
       ),
     ).toEqual(
       expect.objectContaining({
+        requestId: 'req_123',
+        method: 'POST',
+        path: '/api/auth/login',
         statusCode: 503,
         durationMs: 12,
       }),
