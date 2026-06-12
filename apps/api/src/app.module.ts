@@ -10,6 +10,7 @@ import { GlobalExceptionFilter } from './common/errors/exception-filter';
 import { LoggingModule } from './common/logging/logging.module';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { validateEnv } from './config/env.config';
+import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 import { DictionaryModule } from './dictionary/dictionary.module';
 import { FileModule } from './file/file.module';
 import { HealthModule } from './health/health.module';
@@ -42,6 +43,7 @@ import { UserModule } from './user/user.module';
     DictionaryModule,
     FileModule,
     HealthModule,
+    DiagnosticsModule.register(),
   ],
   providers: [
     GlobalExceptionFilter,
