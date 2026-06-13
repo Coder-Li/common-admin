@@ -10,6 +10,7 @@ import { login } from '../../generated/api/endpoints/auth/auth'
 import { LanguageSwitcher } from '../../i18n/LanguageSwitcher'
 import { useI18n } from '../../i18n/useI18n'
 import { getFirstAccessibleRoute } from '../../routes/admin-route-registry'
+import { useBasicSettingsQuery } from '../settings/settings-query'
 import { useAuthStore } from '../../stores/auth-store'
 import { ThemeSwitcher } from '../../theme/ThemeSwitcher'
 
@@ -25,6 +26,10 @@ export function LoginView() {
   const [usernameOrEmail, setUsernameOrEmail] = useState('admin@example.com')
   const [password, setPassword] = useState('Admin123!')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const basicSettingsQuery = useBasicSettingsQuery()
+  const siteName = basicSettingsQuery.data?.siteName ?? 'Common Admin'
+  const siteSubtitle =
+    basicSettingsQuery.data?.siteSubtitle ?? t('app.subtitle')
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -71,10 +76,10 @@ export function LoginView() {
           </div>
           <div>
             <h1 className="text-xl font-semibold tracking-normal">
-              Common Admin
+              {siteName}
             </h1>
             <p className="text-sm text-[var(--color-text-muted)]">
-              {t('auth.signInSubtitle')}
+              {siteSubtitle}
             </p>
           </div>
         </div>

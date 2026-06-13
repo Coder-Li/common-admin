@@ -18,6 +18,7 @@ import {
   getBreadcrumbsForRoute,
   getVisibleAdminMenuGroups,
 } from '../routes/admin-route-registry'
+import { useBasicSettingsQuery } from '../features/settings/settings-query'
 import { useAuthStore } from '../stores/auth-store'
 import { ThemeSwitcher } from '../theme/ThemeSwitcher'
 import type { UserProfile } from '../types/auth'
@@ -88,6 +89,10 @@ export function AdminShell() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const basicSettingsQuery = useBasicSettingsQuery()
+  const siteName = basicSettingsQuery.data?.siteName ?? 'Common Admin'
+  const siteSubtitle =
+    basicSettingsQuery.data?.siteSubtitle ?? t('app.subtitle')
 
   useQuery({
     queryKey: ['me', accessToken],
@@ -185,9 +190,9 @@ export function AdminShell() {
             <Lock size={18} />
           </div>
           <div>
-            <p className="font-semibold">Common Admin</p>
+            <p className="font-semibold">{siteName}</p>
             <p className="text-xs text-[var(--color-text-muted)]">
-              {t('app.subtitle')}
+              {siteSubtitle}
             </p>
           </div>
         </div>

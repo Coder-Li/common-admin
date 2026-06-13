@@ -21,6 +21,7 @@ import { useAuthStore } from '../../stores/auth-store'
 import type { AuthSession } from '../../types/auth'
 import { ThemeProvider } from '../../theme/ThemeProvider'
 import { login } from '../../generated/api/endpoints/auth/auth'
+import { getBasicSettings } from '../../generated/api/endpoints/settings/settings'
 import { getCurrentUser } from '../../generated/api/endpoints/users/users'
 import { LoginView } from './LoginView'
 
@@ -33,6 +34,14 @@ vi.mock('../../generated/api/endpoints/users/users', () => ({
   getListUsersQueryKey: vi.fn((params?: unknown) =>
     params ? ['/users', params] : ['/users'],
   ),
+}))
+
+vi.mock('../../generated/api/endpoints/settings/settings', () => ({
+  getBasicSettings: vi.fn(async () => ({
+    siteName: 'Acme Console',
+    siteSubtitle: 'Operations cockpit',
+  })),
+  getGetBasicSettingsQueryKey: vi.fn(() => ['/settings/basic']),
 }))
 
 vi.mock('../../app/query-client', () => ({
@@ -162,19 +171,40 @@ describe('LoginView i18n', () => {
     window.history.replaceState({}, '', '/login')
     mockBrowserLanguages(['fr-FR', 'en-US'])
     vi.mocked(login).mockReset()
+    vi.mocked(getBasicSettings).mockReset()
+    vi.mocked(getBasicSettings).mockResolvedValue({
+      siteName: 'Acme Console',
+      siteSubtitle: 'Operations cockpit',
+    })
     vi.mocked(getCurrentUser).mockReset()
     vi.mocked(toast.error).mockReset()
     vi.mocked(toast.success).mockReset()
     useAuthStore.getState().reset()
   })
 
-  it('renders English copy by default for a non-Chinese browser language', () => {
+  it('uses the basic settings site name and subtitle for branding', async () => {
+    renderLoginView()
+
+    expect(await screen.findByText('Acme Console')).toBeInTheDocument()
+    expect(screen.getByText('Operations cockpit')).toBeInTheDocument()
+  })
+
+  it('falls back to default branding when the basic settings query fails', async () => {
+    vi.mocked(getBasicSettings).mockRejectedValueOnce(new Error('settings failed'))
+
+    renderLoginView()
+
+    expect(await screen.findByText('Common Admin')).toBeInTheDocument()
+    expect(screen.getByText('Starter template')).toBeInTheDocument()
+  })
+
+  it('renders English copy by default for a non-Chinese browser language', async () => {
     renderLoginView()
 
     expect(
       screen.getByRole('button', { name: 'Switch to dark theme' }),
     ).toBeInTheDocument()
-    expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
+    expect(await screen.findByText('Operations cockpit')).toBeInTheDocument()
     expect(screen.getByText('Username or email')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
   })
@@ -185,7 +215,7 @@ describe('LoginView i18n', () => {
 
     await user.click(screen.getByRole('button', { name: '中文' }))
 
-    expect(screen.getByText('登录后继续')).toBeInTheDocument()
+    expect(screen.getByText('Operations cockpit')).toBeInTheDocument()
     expect(screen.getByText('用户名或邮箱')).toBeInTheDocument()
     expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('zh-CN')
   })
