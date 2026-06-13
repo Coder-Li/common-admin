@@ -238,7 +238,9 @@ describe('FileService', () => {
   });
 
   const createSettingsServiceMock = (): MockSettingsService => ({
-    getEffectiveUploadPolicy: jest.fn().mockResolvedValue(defaultUploadPolicy()),
+    getEffectiveUploadPolicy: jest
+      .fn<Promise<EffectiveUploadPolicy>, []>()
+      .mockResolvedValue(defaultUploadPolicy()),
   });
 
   const createService = () => {

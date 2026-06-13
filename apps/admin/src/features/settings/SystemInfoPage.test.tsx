@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
 import { useAuthStore } from '../../stores/auth-store'
 import { getSystemInfo } from '../../generated/api/endpoints/settings/settings'
+import type { SystemInfoResponseDto } from '../../generated/api/schemas'
 import { SystemInfoPage } from './SystemInfoPage'
 
 vi.mock('../../generated/api/endpoints/settings/settings', () => ({
@@ -14,7 +15,14 @@ vi.mock('../../generated/api/endpoints/settings/settings', () => ({
   getSystemInfo: vi.fn(),
 }))
 
-const systemInfo = {
+const systemInfo: SystemInfoResponseDto & {
+  databaseUrl: string
+  redisUrl: string
+  jwtAccessTokenSecret: string
+  refreshCookieName: string
+  allowedOrigins: string[]
+  apiKey: string
+} = {
   serviceName: 'api',
   appEnv: 'local',
   nodeEnv: 'test',
@@ -28,7 +36,7 @@ const systemInfo = {
   refreshCookieName: 'common_admin_refresh',
   allowedOrigins: ['https://admin.example.com'],
   apiKey: 'secret-api-key',
-} as const
+}
 
 function renderSystemInfoPage() {
   const queryClient = new QueryClient({

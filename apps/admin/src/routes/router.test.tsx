@@ -139,7 +139,7 @@ describe('admin router guards', () => {
   it('redirects anonymous users from / to /login', async () => {
     const router = renderRouter({ path: '/' })
 
-    expect(await screen.findByText('Sign in to continue')).toBeInTheDocument()
+    expect(await screen.findByText('Starter template')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
   })
 
@@ -163,7 +163,7 @@ describe('admin router guards', () => {
   it('redirects anonymous users from protected routes to /login', async () => {
     const router = renderRouter({ path: '/dashboard' })
 
-    expect(await screen.findByText('Sign in to continue')).toBeInTheDocument()
+    expect(await screen.findByText('Starter template')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
   })
 
@@ -285,7 +285,7 @@ describe('admin router startup refresh', () => {
     })
     const router = renderRouter({ path: '/dashboard', status: 'checking' })
 
-    expect(await screen.findByText('Sign in to continue')).toBeInTheDocument()
+    expect(await screen.findByText('Starter template')).toBeInTheDocument()
     expect(useAuthStore.getState().status).toBe('anonymous')
     expect(router.state.location.pathname).toBe('/login')
   })

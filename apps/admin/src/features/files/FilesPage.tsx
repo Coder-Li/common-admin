@@ -22,7 +22,10 @@ import {
   updateFile,
   uploadFile,
 } from '../../generated/api/endpoints/files/files'
-import { getUploadSettings } from '../../generated/api/endpoints/settings/settings'
+import {
+  getGetUploadSettingsQueryKey,
+  getUploadSettings,
+} from '../../generated/api/endpoints/settings/settings'
 import type { ListFilesParams } from '../../generated/api/schemas'
 import { FileForm } from './FileForm'
 import { FileUploadDialog } from './FileUploadDialog'
@@ -82,8 +85,8 @@ export function FilesPage() {
     queryFn: (query) => listFiles(query as unknown as ListFilesParams),
   })
   const uploadSettingsQuery = useQuery({
-    queryKey: ['/settings/upload'],
-    queryFn: () => getUploadSettings(),
+    queryKey: getGetUploadSettingsQueryKey(),
+    queryFn: ({ signal }) => getUploadSettings(undefined, signal),
     retry: false,
   })
 

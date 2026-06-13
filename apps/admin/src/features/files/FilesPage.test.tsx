@@ -22,6 +22,7 @@ import {
   uploadFile,
 } from '../../generated/api/endpoints/files/files'
 import { getUploadSettings } from '../../generated/api/endpoints/settings/settings'
+import type { UploadSettingsResponseDto } from '../../generated/api/schemas'
 import type {
   FileListQuery,
   FileListResponse,
@@ -40,6 +41,7 @@ vi.mock('../../generated/api/endpoints/files/files', () => ({
 }))
 
 vi.mock('../../generated/api/endpoints/settings/settings', () => ({
+  getGetUploadSettingsQueryKey: vi.fn(() => ['/settings/upload']),
   getUploadSettings: vi.fn(),
 }))
 
@@ -73,13 +75,13 @@ const apiError = {
   requestId: 'req_test123',
 }
 
-const uploadSettings = {
+const uploadSettings: UploadSettingsResponseDto = {
   maxSizeMb: 8,
   allowedMimeTypes: ['image/png', 'application/pdf'],
   environmentMaxSizeMb: 10,
   environmentAllowedMimeTypes: ['image/png', 'application/pdf', 'text/plain'],
   storageDriver: 'local',
-} as const
+}
 
 function listResponse(items: FileRecord[]): FileListResponse {
   return {
@@ -265,6 +267,32 @@ describe('FilesPage', () => {
     ).toBeInTheDocument()
 
     const file = new File(['hello'], 'hello.png', { type: 'image/png' })
+    await user.upload(screen.getByLabelText('File'), file)
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Upload file',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(uploadFile).toHaveBeenCalledWith(expect.any(FormData))
+    })
+  })
+
+  it('keeps upload working without policy guidance when upload settings fail', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listFiles).mockResolvedValue(listResponse([]))
+    vi.mocked(getUploadSettings).mockRejectedValue(new Error('settings failed'))
+    vi.mocked(uploadFile).mockResolvedValue(report)
+
+    renderFilesPage()
+    await screen.findByText('No files found')
+
+    await user.click(screen.getByRole('button', { name: 'Upload file' }))
+
+    expect(screen.queryByText(/Allowed MIME types:/)).not.toBeInTheDocument()
+
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' })
     await user.upload(screen.getByLabelText('File'), file)
     await user.click(
       within(screen.getByRole('dialog')).getByRole('button', {

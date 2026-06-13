@@ -4,8 +4,6 @@ import {
   getGetDictionaryOptionsMapQueryKey,
   getGetDictionaryOptionsQueryKey,
 } from '../../generated/api/endpoints/dictionaries/dictionaries'
-import { getListDictionaryItemsQueryKey } from '../../generated/api/endpoints/dictionary-items/dictionary-items'
-import { getListDictionaryTypesQueryKey } from '../../generated/api/endpoints/dictionary-types/dictionary-types'
 import { invalidateDictionaryOptionQueries } from './settings-query'
 
 describe('invalidateDictionaryOptionQueries', () => {
@@ -42,25 +40,22 @@ describe('invalidateDictionaryOptionQueries', () => {
 
   it('does not invalidate dictionary type or item management list keys', async () => {
     const queryClient = new QueryClient()
+    const dictionaryTypesQueryKey = ['/dictionary-types', { page: 1 }]
+    const dictionaryItemsQueryKey = [
+      '/dictionary-items',
+      { typeCode: 'status', page: 1 },
+    ]
 
-    queryClient.setQueryData(getListDictionaryTypesQueryKey({ page: 1 }), {
-      items: [],
-    })
-    queryClient.setQueryData(
-      getListDictionaryItemsQueryKey({ typeCode: 'status', page: 1 }),
-      { items: [] },
-    )
+    queryClient.setQueryData(dictionaryTypesQueryKey, { items: [] })
+    queryClient.setQueryData(dictionaryItemsQueryKey, { items: [] })
 
     await invalidateDictionaryOptionQueries(queryClient)
 
-    expect(
-      queryClient.getQueryState(getListDictionaryTypesQueryKey({ page: 1 }))
-        ?.isInvalidated,
-    ).toBe(false)
-    expect(
-      queryClient.getQueryState(
-        getListDictionaryItemsQueryKey({ typeCode: 'status', page: 1 }),
-      )?.isInvalidated,
-    ).toBe(false)
+    expect(queryClient.getQueryState(dictionaryTypesQueryKey)?.isInvalidated).toBe(
+      false,
+    )
+    expect(queryClient.getQueryState(dictionaryItemsQueryKey)?.isInvalidated).toBe(
+      false,
+    )
   })
 })

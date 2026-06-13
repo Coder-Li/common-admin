@@ -167,6 +167,8 @@ describe('AdminShell i18n', () => {
     vi.mocked(getBasicSettings).mockResolvedValue({
       siteName: 'Acme Console',
       siteSubtitle: 'Operations cockpit',
+      defaultLocale: 'en-US',
+      defaultTheme: 'light',
     })
     vi.mocked(clearQueryCache).mockReset()
     vi.mocked(toast.error).mockReset()

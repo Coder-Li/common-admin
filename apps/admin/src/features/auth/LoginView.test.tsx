@@ -175,6 +175,8 @@ describe('LoginView i18n', () => {
     vi.mocked(getBasicSettings).mockResolvedValue({
       siteName: 'Acme Console',
       siteSubtitle: 'Operations cockpit',
+      defaultLocale: 'en-US',
+      defaultTheme: 'light',
     })
     vi.mocked(getCurrentUser).mockReset()
     vi.mocked(toast.error).mockReset()

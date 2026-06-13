@@ -11,6 +11,7 @@ import {
   getUploadSettings,
   updateUploadSettings,
 } from '../../generated/api/endpoints/settings/settings'
+import type { UploadSettingsResponseDto } from '../../generated/api/schemas'
 import { UploadSettingsPage } from './UploadSettingsPage'
 
 vi.mock('../../generated/api/endpoints/settings/settings', () => ({
@@ -19,7 +20,7 @@ vi.mock('../../generated/api/endpoints/settings/settings', () => ({
   updateUploadSettings: vi.fn(),
 }))
 
-const uploadSettings = {
+const uploadSettings: UploadSettingsResponseDto = {
   maxSizeMb: 8,
   allowedMimeTypes: ['image/png', 'image/jpeg'],
   environmentMaxSizeMb: 10,
@@ -29,7 +30,7 @@ const uploadSettings = {
     'application/pdf',
   ],
   storageDriver: 'local',
-} as const
+}
 
 function renderUploadSettingsPage(
   permissions = ['setting.read', 'setting.update'],

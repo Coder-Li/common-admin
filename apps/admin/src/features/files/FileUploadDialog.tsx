@@ -50,7 +50,7 @@ export function FileUploadDialog({
       <label className="grid min-w-0 gap-1.5 text-sm">
         <span className="font-medium text-slate-700">{t('files.form.file')}</span>
         {policy ? (
-          <p className="text-xs text-[var(--color-text-muted)]">
+          <p className="break-words text-xs text-[var(--color-text-muted)]">
             {t('files.form.uploadPolicy', {
               maxSizeMb: policy.maxSizeMb,
               mimeTypes: policy.allowedMimeTypes.join(', '),

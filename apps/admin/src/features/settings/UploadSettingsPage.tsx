@@ -15,6 +15,11 @@ import {
 import type { UpdateUploadSettingsDto } from '../../generated/api/schemas'
 import { hasPermission, joinMimeTypes } from './settings-form'
 
+type UploadSettingsFormInput = {
+  maxSizeMb: unknown
+  allowedMimeTypes: string[]
+}
+
 type UploadSettingsFormValues = UpdateUploadSettingsDto
 
 export function UploadSettingsPage() {
@@ -61,7 +66,11 @@ export function UploadSettingsPage() {
     handleSubmit,
     register,
     reset,
-  } = useForm<UploadSettingsFormValues>({
+  } = useForm<
+    UploadSettingsFormInput,
+    unknown,
+    UploadSettingsFormValues
+  >({
     resolver: zodResolver(schema),
     defaultValues: {
       maxSizeMb: 1,
