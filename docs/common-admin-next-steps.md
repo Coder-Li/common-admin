@@ -139,15 +139,18 @@
 
 ### 9. 测试与质量门禁
 
-当前状态：已有不少单元测试和 UI 测试，根目录也有 test/lint/build 脚本。
+当前状态：测试与质量门禁已经完成第一版实现，将现有 TDD 基础沉淀为模板级约束：根级 `pnpm quality`、GitHub Actions 质量门禁、API e2e 边界覆盖，以及新增 CRUD 模块最低测试 checklist。
+
+设计与实施文档：
+
+- `docs/superpowers/specs/2026-06-13-testing-quality-gates-design.md`
+- `docs/superpowers/plans/2026-06-13-testing-quality-gates.md`
 
 后续可讨论：
 
-- 新增 CRUD 模块的最低测试要求。
-- auth 和 permission 的 API e2e 覆盖。
-- 前端路由守卫和权限测试。
-- CI 必须通过哪些检查。
-- 是否加入 Playwright 冒烟测试。
+- 是否把 Playwright 登录后后台冒烟测试作为第二阶段门禁。
+- 是否在多个业务模块稳定后引入覆盖率基线。
+- 是否增加真实 Postgres/Redis 的集成测试 job。
 
 价值：当前已经有测试基础，下一步是把它变成模板约束，而不是只靠习惯维持。
 

@@ -401,6 +401,46 @@ Add page tests for:
 Mock generated endpoint modules in page tests. Do not test generated code
 internals.
 
+## Minimum Test Checklist
+
+Every new API-backed CRUD module must add focused backend and frontend tests.
+Use the checklist as a minimum behavior contract; add more cases when the
+resource has special rules.
+
+Backend tests:
+
+- service-level create, read, update, delete, list, search, sort, and
+  pagination behavior as applicable;
+- uniqueness and domain invariant errors;
+- validation and DTO mapping for request and response shapes;
+- controller behavior for success responses and expected error responses;
+- permission guard behavior or permission metadata for every protected action;
+- audit-log behavior when the module mutates important data;
+- OpenAPI operation ids and response metadata when the admin app consumes the
+  endpoint through generated API code.
+
+Frontend tests:
+
+- initial loading and empty states;
+- table rendering with representative data;
+- filtering, search, sort, and pagination behavior where supported;
+- create, edit, delete, enable, disable, or other primary actions;
+- permission-aware visibility for route entries and row/page actions;
+- API error display through the project's normalized error/toast conventions;
+- cache invalidation or query refresh behavior after mutations;
+- route metadata and menu registration.
+
+Testing boundaries:
+
+- Controller tests may mock services.
+- Service tests may mock Prisma.
+- Flow tests should cover only behavior that needs multiple project-owned units
+  working together.
+- Page tests should mock generated hooks or the shared request boundary.
+- Do not test Orval-generated implementation details.
+- Read-only, frontend-only, or thin wrapper modules may use a reduced checklist,
+  but the reason should be stated in the implementation notes or review.
+
 ## Required Constraints
 
 Do not break these constraints when adding a new CRUD resource:

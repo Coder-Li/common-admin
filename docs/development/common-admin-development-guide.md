@@ -106,23 +106,35 @@ logic in page code or a thin helper that still calls generated operations.
 
 ## Verification
 
-Run the contract check before broad verification:
+Run the root quality gate before considering a feature branch ready:
+
+```bash
+pnpm quality
+```
+
+The quality gate runs the same checks expected in CI:
 
 ```bash
 pnpm api:check
 pnpm lint
 pnpm test
+pnpm --filter api test:e2e
 pnpm build
 ```
 
-Use package-scoped commands while iterating:
+Run the individual commands when debugging a failure. Use package-scoped
+commands while iterating:
 
 ```bash
 pnpm --filter api test
 pnpm --filter admin test
+pnpm --filter api test:e2e
 pnpm --filter api build
 pnpm --filter admin build
 ```
+
+For new API-backed CRUD modules, also follow the minimum test checklist in
+`docs/patterns/admin-crud-table-pattern-guide.md`.
 
 ## Documentation Map
 
