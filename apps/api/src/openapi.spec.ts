@@ -46,6 +46,12 @@ const expectedOperationIds = [
   'updateFile',
   'deleteFile',
   'downloadFile',
+  'getBasicSettings',
+  'updateBasicSettings',
+  'getUploadSettings',
+  'updateUploadSettings',
+  'refreshDictionaryCache',
+  'getSystemInfo',
   'listAuditLogs',
   'getAuditLog',
 ] as const;

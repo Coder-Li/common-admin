@@ -1,7 +1,12 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { persistLocale, resolveInitialLocale } from './locale-storage'
-import { messages, type TranslationValues } from './messages'
+import { messages, type Locale, type TranslationValues } from './messages'
 import { I18nContext, type I18nContextValue } from './i18n-context'
+
+interface I18nProviderProps {
+  children: ReactNode
+  defaultLocale?: Locale | null
+}
 
 function interpolate(message: string, values: TranslationValues = {}) {
   return message.replace(/\{(\w+)\}/g, (token, key: string) => {
@@ -10,13 +15,28 @@ function interpolate(message: string, values: TranslationValues = {}) {
   })
 }
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState(resolveInitialLocale)
+export function I18nProvider({
+  children,
+  defaultLocale = null,
+}: I18nProviderProps) {
+  const userChangedLocaleRef = useRef(false)
+  const [locale, setLocaleState] = useState(() =>
+    resolveInitialLocale({ defaultLocale }),
+  )
+
+  useEffect(() => {
+    if (userChangedLocaleRef.current || !defaultLocale) {
+      return
+    }
+
+    setLocaleState(resolveInitialLocale({ defaultLocale }))
+  }, [defaultLocale])
 
   const value = useMemo<I18nContextValue>(() => {
     return {
       locale,
       setLocale: (nextLocale) => {
+        userChangedLocaleRef.current = true
         persistLocale(nextLocale)
         setLocaleState(nextLocale)
       },

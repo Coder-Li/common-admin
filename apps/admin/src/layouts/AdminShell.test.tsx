@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { toast } from 'sonner'
 import { clearQueryCache } from '../app/query-client'
 import { changePassword, logout } from '../generated/api/endpoints/auth/auth'
+import { getBasicSettings } from '../generated/api/endpoints/settings/settings'
 import { getCurrentUser } from '../generated/api/endpoints/users/users'
 import { I18nProvider } from '../i18n/I18nProvider'
 import { LOCALE_STORAGE_KEY } from '../i18n/locale-storage'
@@ -71,6 +72,14 @@ vi.mock('../generated/api/endpoints/users/users', () => ({
   getListUsersQueryKey: vi.fn((params?: unknown) =>
     params ? ['/users', params] : ['/users'],
   ),
+}))
+
+vi.mock('../generated/api/endpoints/settings/settings', () => ({
+  getBasicSettings: vi.fn(async () => ({
+    siteName: 'Acme Console',
+    siteSubtitle: 'Operations cockpit',
+  })),
+  getGetBasicSettingsQueryKey: vi.fn(() => ['/settings/basic']),
 }))
 
 vi.mock('../app/query-client', () => ({
@@ -154,9 +163,45 @@ describe('AdminShell i18n', () => {
     vi.mocked(logout).mockResolvedValue(undefined)
     vi.mocked(getCurrentUser).mockReset()
     vi.mocked(getCurrentUser).mockResolvedValue(currentUserResponse())
+    vi.mocked(getBasicSettings).mockReset()
+    vi.mocked(getBasicSettings).mockResolvedValue({
+      siteName: 'Acme Console',
+      siteSubtitle: 'Operations cockpit',
+      defaultLocale: 'en-US',
+      defaultTheme: 'light',
+    })
     vi.mocked(clearQueryCache).mockReset()
     vi.mocked(toast.error).mockReset()
     vi.mocked(toast.success).mockReset()
+  })
+
+  it('uses the basic settings site name and subtitle for branding', async () => {
+    renderAdminShell()
+
+    expect(await screen.findByText('Acme Console')).toBeInTheDocument()
+    expect(screen.getByText('Operations cockpit')).toBeInTheDocument()
+  })
+
+  it('falls back to default branding when the basic settings query fails', async () => {
+    vi.mocked(getBasicSettings).mockRejectedValueOnce(new Error('settings failed'))
+
+    renderAdminShell()
+
+    expect(await screen.findByText('Common Admin')).toBeInTheDocument()
+    expect(screen.getByText('Starter template')).toBeInTheDocument()
+  })
+
+  it('renders the shell while basic settings are loading', async () => {
+    vi.mocked(getBasicSettings).mockReturnValueOnce(new Promise(() => undefined))
+
+    renderAdminShell()
+
+    expect(await screen.findByTestId('nav-group-workspace')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Dashboard' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Common Admin')).toBeInTheDocument()
+    expect(screen.getByText('Starter template')).toBeInTheDocument()
   })
 
   it('renders English shell and dashboard copy by default', async () => {
@@ -333,7 +378,7 @@ describe('AdminShell i18n', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^sign in$/i })).toBeInTheDocument()
     })
     expect(router.state.location.pathname).toBe('/login')
     expect(logout).toHaveBeenCalledOnce()
@@ -353,7 +398,7 @@ describe('AdminShell i18n', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^sign in$/i })).toBeInTheDocument()
     })
     expect(router.state.location.pathname).toBe('/login')
     expect(logout).toHaveBeenCalledOnce()
@@ -384,7 +429,7 @@ describe('AdminShell i18n', () => {
       })
     })
     await waitFor(() => {
-      expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^sign in$/i })).toBeInTheDocument()
     })
     expect(router.state.location.pathname).toBe('/login')
     expect(useAuthStore.getState().isAuthenticated).toBe(false)

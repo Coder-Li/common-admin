@@ -51,8 +51,9 @@ export function getSavedTheme(
 
 export function resolveInitialTheme(
   storage: ThemeStorageLike | null = getBrowserStorage(),
+  defaultTheme: Theme | null = null,
 ): Theme {
-  return getSavedTheme(storage) ?? (systemPrefersDark() ? 'dark' : 'light')
+  return getSavedTheme(storage) ?? defaultTheme ?? (systemPrefersDark() ? 'dark' : 'light')
 }
 
 export function persistTheme(

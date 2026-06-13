@@ -113,6 +113,10 @@ const protectedRoutes = adminRoutes.map((route) =>
       if (!canAll(context.auth.permissions, route.requiredPermissions)) {
         throw redirect({ to: '/403' })
       }
+
+      if (route.path === '/settings') {
+        throw redirect({ to: '/settings/basic' })
+      }
     },
     component: () => createElement(AdminRoutePage, { path: route.path }),
   }),

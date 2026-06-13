@@ -11,7 +11,7 @@ import { I18nProvider } from '../i18n/I18nProvider'
 import { useAuthStore } from '../stores/auth-store'
 import { ThemeProvider } from '../theme/ThemeProvider'
 import type { AuthSession, AuthStatus } from '../types/auth'
-import { createAdminRouter } from './router-factory'
+import { createAdminRouter, createTestMemoryHistory } from './router-factory'
 import { AdminRouterProvider } from './router'
 
 vi.mock('../app/api-mutator', () => ({
@@ -139,7 +139,7 @@ describe('admin router guards', () => {
   it('redirects anonymous users from / to /login', async () => {
     const router = renderRouter({ path: '/' })
 
-    expect(await screen.findByText('Sign in to continue')).toBeInTheDocument()
+    expect(await screen.findByText('Starter template')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
   })
 
@@ -163,7 +163,7 @@ describe('admin router guards', () => {
   it('redirects anonymous users from protected routes to /login', async () => {
     const router = renderRouter({ path: '/dashboard' })
 
-    expect(await screen.findByText('Sign in to continue')).toBeInTheDocument()
+    expect(await screen.findByText('Starter template')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/login')
   })
 
@@ -195,6 +195,33 @@ describe('admin router guards', () => {
 
     expect(await screen.findByText('Page not found')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/missing')
+  })
+
+  it('redirects /settings to the basic settings page', async () => {
+    const router = createAdminRouter({
+      history: createTestMemoryHistory({
+        initialEntries: ['/settings'],
+      }),
+    })
+    useAuthStore.getState().setUser({
+      id: 'user-1',
+      email: 'admin@example.com',
+      username: 'admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      roles: [],
+      permissions: ['setting.read'],
+    })
+
+    render(
+      <TestProviders>
+        <AdminRouterProvider router={router} />
+      </TestProviders>,
+    )
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/settings/basic'),
+    )
   })
 
   it('invalidates the router when auth status or permissions change', async () => {
@@ -258,7 +285,7 @@ describe('admin router startup refresh', () => {
     })
     const router = renderRouter({ path: '/dashboard', status: 'checking' })
 
-    expect(await screen.findByText('Sign in to continue')).toBeInTheDocument()
+    expect(await screen.findByText('Starter template')).toBeInTheDocument()
     expect(useAuthStore.getState().status).toBe('anonymous')
     expect(router.state.location.pathname).toBe('/login')
   })

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { OnChangeFn } from '@tanstack/react-table'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '../../app/api-error-messages'
@@ -22,6 +22,10 @@ import {
   updateFile,
   uploadFile,
 } from '../../generated/api/endpoints/files/files'
+import {
+  getGetUploadSettingsQueryKey,
+  getUploadSettings,
+} from '../../generated/api/endpoints/settings/settings'
 import type { ListFilesParams } from '../../generated/api/schemas'
 import { FileForm } from './FileForm'
 import { FileUploadDialog } from './FileUploadDialog'
@@ -79,6 +83,11 @@ export function FilesPage() {
       sort: toSortParam(sorting),
     },
     queryFn: (query) => listFiles(query as unknown as ListFilesParams),
+  })
+  const uploadSettingsQuery = useQuery({
+    queryKey: getGetUploadSettingsQueryKey(),
+    queryFn: ({ signal }) => getUploadSettings(undefined, signal),
+    retry: false,
   })
 
   const invalidateFiles = () =>
@@ -247,6 +256,14 @@ export function FilesPage() {
           <FileUploadDialog
             isSubmitting={uploadMutation.isPending}
             onCancel={() => setIsUploadOpen(false)}
+            policy={
+              uploadSettingsQuery.data
+                ? {
+                    maxSizeMb: uploadSettingsQuery.data.maxSizeMb,
+                    allowedMimeTypes: uploadSettingsQuery.data.allowedMimeTypes,
+                  }
+                : undefined
+            }
             onSubmit={(formData) => uploadMutation.mutate(formData)}
           />
         </Modal>

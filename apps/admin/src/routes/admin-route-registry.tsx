@@ -4,9 +4,12 @@ import {
   Database,
   FileArchive,
   Folder,
+  Info,
   Lock,
+  RefreshCcw,
   Shield,
   Settings,
+  Upload,
   Users,
 } from 'lucide-react'
 import { PermissionsPage } from '../features/permissions/PermissionsPage'
@@ -14,9 +17,12 @@ import { AuditLogsPage } from '../features/audit-logs/AuditLogsPage'
 import { DictionariesPage } from '../features/dictionaries/DictionariesPage'
 import { FilesPage } from '../features/files/FilesPage'
 import { RolesPage } from '../features/roles/RolesPage'
+import { BasicSettingsPage } from '../features/settings/BasicSettingsPage'
+import { CacheSettingsPage } from '../features/settings/CacheSettingsPage'
+import { SystemInfoPage } from '../features/settings/SystemInfoPage'
+import { UploadSettingsPage } from '../features/settings/UploadSettingsPage'
 import { UsersPage } from '../features/users/UsersPage'
 import { DashboardContent } from '../pages/DashboardContent'
-import { SettingsPlaceholderPage } from '../pages/SettingsPlaceholderPage'
 import {
   findAdminRouteById as findRouteById,
   findAdminRouteByPath as findRouteByPath,
@@ -93,13 +99,50 @@ export const auditLogsRoute: AdminRouteMeta = {
   icon: ClipboardList,
 }
 
-export const settingsRoute: AdminRouteMeta = {
-  id: 'settings',
+export const settingsBasicRoute: AdminRouteMeta = {
+  id: 'settings-basic',
+  path: '/settings/basic',
+  labelKey: 'nav.settingsBasic',
+  requiredPermissions: ['setting.read'],
+  component: BasicSettingsPage,
+  icon: Settings,
+}
+
+export const settingsUploadRoute: AdminRouteMeta = {
+  id: 'settings-upload',
+  path: '/settings/upload',
+  labelKey: 'nav.settingsUpload',
+  requiredPermissions: ['setting.read'],
+  component: UploadSettingsPage,
+  icon: Upload,
+}
+
+export const settingsCacheRoute: AdminRouteMeta = {
+  id: 'settings-cache',
+  path: '/settings/cache',
+  labelKey: 'nav.settingsCache',
+  requiredPermissions: ['setting.read'],
+  component: CacheSettingsPage,
+  icon: RefreshCcw,
+}
+
+export const settingsSystemInfoRoute: AdminRouteMeta = {
+  id: 'settings-system-info',
+  path: '/settings/system-info',
+  labelKey: 'nav.settingsSystemInfo',
+  requiredPermissions: ['setting.read'],
+  component: SystemInfoPage,
+  icon: Info,
+}
+
+export const settingsIndexRoute: AdminRouteMeta = {
+  id: 'settings-index',
   path: '/settings',
   labelKey: 'nav.settings',
   requiredPermissions: ['setting.read'],
-  component: SettingsPlaceholderPage,
+  component: BasicSettingsPage,
   icon: Settings,
+  hideInMenu: true,
 }
 
 export const adminMenuGroups: AdminMenuGroup[] = [
@@ -128,10 +171,16 @@ export const adminMenuGroups: AdminMenuGroup[] = [
     children: [auditLogsRoute],
   },
   {
-    id: 'configuration',
-    labelKey: 'nav.group.configuration',
+    id: 'settings',
+    labelKey: 'nav.group.settings',
     icon: Settings,
-    children: [settingsRoute],
+    children: [
+      settingsBasicRoute,
+      settingsUploadRoute,
+      settingsCacheRoute,
+      settingsSystemInfoRoute,
+      settingsIndexRoute,
+    ],
   },
 ]
 

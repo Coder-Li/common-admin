@@ -10,6 +10,7 @@ interface LocaleStorageLike {
 interface ResolveInitialLocaleOptions {
   storage?: LocaleStorageLike | null
   languages?: readonly string[]
+  defaultLocale?: Locale | null
 }
 
 function getBrowserStorage(): LocaleStorageLike | null {
@@ -47,11 +48,16 @@ function readSavedLocale(storage: LocaleStorageLike | null) {
 export function resolveInitialLocale({
   storage = getBrowserStorage(),
   languages = getBrowserLanguages(),
+  defaultLocale: backendDefaultLocale = null,
 }: ResolveInitialLocaleOptions = {}): Locale {
   const savedLocale = readSavedLocale(storage)
 
   if (isSupportedLocale(savedLocale)) {
     return savedLocale
+  }
+
+  if (backendDefaultLocale) {
+    return backendDefaultLocale
   }
 
   return resolveBrowserLocale(languages)

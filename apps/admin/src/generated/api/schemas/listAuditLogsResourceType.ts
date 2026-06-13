@@ -16,4 +16,5 @@ export const ListAuditLogsResourceType = {
   dictionary_type: "dictionary_type",
   dictionary_item: "dictionary_item",
   file: "file",
+  system_setting: "system_setting",
 } as const;

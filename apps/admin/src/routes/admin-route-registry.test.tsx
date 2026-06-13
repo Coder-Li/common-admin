@@ -19,6 +19,10 @@ describe('admin route registry', () => {
       '/dictionaries',
       '/files',
       '/audit-logs',
+      '/settings/basic',
+      '/settings/upload',
+      '/settings/cache',
+      '/settings/system-info',
       '/settings',
     ])
   })
@@ -33,9 +37,13 @@ describe('admin route registry', () => {
     expect(findAdminRouteByPath('/audit-logs')?.requiredPermissions).toEqual([
       'audit_log.read',
     ])
+    expect(findAdminRouteByPath('/settings/basic')?.requiredPermissions).toEqual([
+      'setting.read',
+    ])
     expect(findAdminRouteByPath('/settings')?.requiredPermissions).toEqual([
       'setting.read',
     ])
+    expect(findAdminRouteByPath('/settings')?.hideInMenu).toBe(true)
   })
 
   it('defines the admin menu groups', () => {
@@ -44,8 +52,11 @@ describe('admin route registry', () => {
       'system',
       'resources',
       'observability',
-      'configuration',
+      'settings',
     ])
+    expect(adminMenuGroups.find((group) => group.id === 'settings')?.labelKey).toBe(
+      'nav.group.settings',
+    )
   })
 
   it('defines translations for every admin menu group label', () => {

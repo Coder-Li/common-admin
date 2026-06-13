@@ -4,7 +4,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { FileVisibility, ManagedFile, Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -19,10 +18,10 @@ import type {
   AuditRequestMeta,
 } from '../audit-log/audit-log.types';
 import { createListResponse } from '../common/dto/list-response.dto';
-import type { AppEnv } from '../config/env.config';
 import { AppException } from '../common/errors/app-exception';
 import { ERROR_CODES } from '../common/errors/error-codes';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from '../settings/settings.service';
 import {
   FileListQueryDto,
   UpdateFileDto,
@@ -55,9 +54,9 @@ const MIME_EXTENSION_MAP = new Map([
 export class FileService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService<AppEnv, true>,
     @Inject(FILE_STORAGE) private readonly storage: StorageService,
     private readonly auditLogService: AuditLogService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async listFiles(query: FileListQueryDto): Promise<FileListResponseDto> {
@@ -106,7 +105,7 @@ export class FileService {
       });
     }
 
-    this.assertAllowedMimeType(file.mimetype);
+    await this.assertUploadPolicy(file);
 
     const originalName = normalizeOriginalName(file.originalname);
     const extension = deriveExtension(originalName, file.mimetype);
@@ -339,17 +338,21 @@ export class FileService {
     return file;
   }
 
-  private assertAllowedMimeType(mimeType: string): void {
-    const allowedMimeTypes = this.config
-      .getOrThrow<string>('FILE_ALLOWED_MIME_TYPES')
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
+  private async assertUploadPolicy(file: Express.Multer.File): Promise<void> {
+    const policy = await this.settingsService.getEffectiveUploadPolicy();
 
-    if (!allowedMimeTypes.includes(mimeType)) {
+    if (file.size > policy.maxSizeBytes) {
+      throw new AppException({
+        code: ERROR_CODES.PAYLOAD_TOO_LARGE,
+        message: `File size exceeds configured limit of ${policy.maxSizeMb}MB`,
+        statusCode: 413,
+      });
+    }
+
+    if (!policy.allowedMimeTypeSet.has(file.mimetype)) {
       throw new AppException({
         code: ERROR_CODES.UNSUPPORTED_MEDIA_TYPE,
-        message: 'File type is not allowed',
+        message: `Unsupported MIME type: ${file.mimetype}`,
         statusCode: 415,
       });
     }

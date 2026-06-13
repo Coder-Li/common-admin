@@ -21,6 +21,8 @@ import {
   updateFile,
   uploadFile,
 } from '../../generated/api/endpoints/files/files'
+import { getUploadSettings } from '../../generated/api/endpoints/settings/settings'
+import type { UploadSettingsResponseDto } from '../../generated/api/schemas'
 import type {
   FileListQuery,
   FileListResponse,
@@ -36,6 +38,11 @@ vi.mock('../../generated/api/endpoints/files/files', () => ({
   listFiles: vi.fn(),
   updateFile: vi.fn(),
   uploadFile: vi.fn(),
+}))
+
+vi.mock('../../generated/api/endpoints/settings/settings', () => ({
+  getGetUploadSettingsQueryKey: vi.fn(() => ['/settings/upload']),
+  getUploadSettings: vi.fn(),
 }))
 
 vi.mock('sonner', () => ({
@@ -66,6 +73,14 @@ const apiError = {
   message: 'Internal server error',
   statusCode: 500,
   requestId: 'req_test123',
+}
+
+const uploadSettings: UploadSettingsResponseDto = {
+  maxSizeMb: 8,
+  allowedMimeTypes: ['image/png', 'application/pdf'],
+  environmentMaxSizeMb: 10,
+  environmentAllowedMimeTypes: ['image/png', 'application/pdf', 'text/plain'],
+  storageDriver: 'local',
 }
 
 function listResponse(items: FileRecord[]): FileListResponse {
@@ -133,7 +148,9 @@ describe('FilesPage', () => {
     vi.mocked(listFiles).mockReset()
     vi.mocked(updateFile).mockReset()
     vi.mocked(uploadFile).mockReset()
+    vi.mocked(getUploadSettings).mockReset()
     vi.mocked(getFile).mockResolvedValue(report)
+    vi.mocked(getUploadSettings).mockResolvedValue(uploadSettings)
     URL.createObjectURL = vi.fn(() => 'blob:download-url')
     URL.revokeObjectURL = vi.fn()
   })
@@ -231,6 +248,61 @@ describe('FilesPage', () => {
     })
     await waitFor(() => expect(listFiles).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows upload policy guidance and still submits FormData', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listFiles).mockResolvedValue(listResponse([]))
+    vi.mocked(uploadFile).mockResolvedValue(report)
+
+    renderFilesPage()
+    await screen.findByText('No files found')
+
+    await user.click(screen.getByRole('button', { name: 'Upload file' }))
+
+    expect(
+      await screen.findByText(
+        'Maximum size: 8 MB. Allowed MIME types: image/png, application/pdf.',
+      ),
+    ).toBeInTheDocument()
+
+    const file = new File(['hello'], 'hello.png', { type: 'image/png' })
+    await user.upload(screen.getByLabelText('File'), file)
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Upload file',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(uploadFile).toHaveBeenCalledWith(expect.any(FormData))
+    })
+  })
+
+  it('keeps upload working without policy guidance when upload settings fail', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listFiles).mockResolvedValue(listResponse([]))
+    vi.mocked(getUploadSettings).mockRejectedValue(new Error('settings failed'))
+    vi.mocked(uploadFile).mockResolvedValue(report)
+
+    renderFilesPage()
+    await screen.findByText('No files found')
+
+    await user.click(screen.getByRole('button', { name: 'Upload file' }))
+
+    expect(screen.queryByText(/Allowed MIME types:/)).not.toBeInTheDocument()
+
+    const file = new File(['hello'], 'hello.txt', { type: 'text/plain' })
+    await user.upload(screen.getByLabelText('File'), file)
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Upload file',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(uploadFile).toHaveBeenCalledWith(expect.any(FormData))
+    })
   })
 
   it('invalidates the file list after edit succeeds', async () => {

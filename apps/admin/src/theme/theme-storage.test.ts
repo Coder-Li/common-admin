@@ -32,6 +32,16 @@ describe('theme storage', () => {
     expect(resolveInitialTheme()).toBe('dark')
   })
 
+  it('uses a saved theme before a backend default theme', () => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, 'dark')
+
+    expect(resolveInitialTheme(window.localStorage, 'light')).toBe('dark')
+  })
+
+  it('uses a backend default theme when no saved theme exists', () => {
+    expect(resolveInitialTheme(window.localStorage, 'dark')).toBe('dark')
+  })
+
   it('ignores invalid saved values', () => {
     window.localStorage.setItem(THEME_STORAGE_KEY, 'blue')
     mockDarkPreference(true)

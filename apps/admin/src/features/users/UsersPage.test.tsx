@@ -594,7 +594,7 @@ describe('UsersPage', () => {
       })
     })
     await waitFor(() => {
-      expect(screen.getByText('Sign in to continue')).toBeInTheDocument()
+      expect(screen.getByText('Starter template')).toBeInTheDocument()
     })
     expect(router.state.location.pathname).toBe('/login')
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
