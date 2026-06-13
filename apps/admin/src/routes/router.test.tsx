@@ -11,7 +11,7 @@ import { I18nProvider } from '../i18n/I18nProvider'
 import { useAuthStore } from '../stores/auth-store'
 import { ThemeProvider } from '../theme/ThemeProvider'
 import type { AuthSession, AuthStatus } from '../types/auth'
-import { createAdminRouter } from './router-factory'
+import { createAdminRouter, createTestMemoryHistory } from './router-factory'
 import { AdminRouterProvider } from './router'
 
 vi.mock('../app/api-mutator', () => ({
@@ -195,6 +195,33 @@ describe('admin router guards', () => {
 
     expect(await screen.findByText('Page not found')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/missing')
+  })
+
+  it('redirects /settings to the basic settings page', async () => {
+    const router = createAdminRouter({
+      history: createTestMemoryHistory({
+        initialEntries: ['/settings'],
+      }),
+    })
+    useAuthStore.getState().setUser({
+      id: 'user-1',
+      email: 'admin@example.com',
+      username: 'admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      roles: [],
+      permissions: ['setting.read'],
+    })
+
+    render(
+      <TestProviders>
+        <AdminRouterProvider router={router} />
+      </TestProviders>,
+    )
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/settings/basic'),
+    )
   })
 
   it('invalidates the router when auth status or permissions change', async () => {
