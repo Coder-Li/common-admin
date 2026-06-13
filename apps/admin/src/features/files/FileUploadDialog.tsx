@@ -7,12 +7,17 @@ interface FileUploadDialogProps {
   isSubmitting: boolean
   onCancel: () => void
   onSubmit: (formData: FormData) => void
+  policy?: {
+    maxSizeMb: number
+    allowedMimeTypes: string[]
+  }
 }
 
 export function FileUploadDialog({
   isSubmitting,
   onCancel,
   onSubmit,
+  policy,
 }: FileUploadDialogProps) {
   const { t } = useI18n()
   const [file, setFile] = useState<File | null>(null)
@@ -44,7 +49,16 @@ export function FileUploadDialog({
     <form className="grid gap-4" onSubmit={submitForm}>
       <label className="grid min-w-0 gap-1.5 text-sm">
         <span className="font-medium text-slate-700">{t('files.form.file')}</span>
+        {policy ? (
+          <p className="text-xs text-[var(--color-text-muted)]">
+            {t('files.form.uploadPolicy', {
+              maxSizeMb: policy.maxSizeMb,
+              mimeTypes: policy.allowedMimeTypes.join(', '),
+            })}
+          </p>
+        ) : null}
         <input
+          aria-label={t('files.form.file')}
           className="block w-full text-sm text-slate-700 file:mr-3 file:h-9 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-medium file:text-slate-700"
           onChange={(event) => setFile(event.target.files?.[0] ?? null)}
           type="file"

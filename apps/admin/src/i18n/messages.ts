@@ -209,6 +209,8 @@ export const messages = {
     'files.form.displayName': 'Display name',
     'files.form.file': 'File',
     'files.form.noFile': 'No file selected',
+    'files.form.uploadPolicy':
+      'Maximum size: {maxSizeMb} MB. Allowed MIME types: {mimeTypes}.',
     'files.searchPlaceholder': 'Search files',
     'files.state.empty': 'No files found',
     'files.state.loading': 'Loading files',
@@ -589,6 +591,7 @@ export const messages = {
     'files.form.displayName': '显示名称',
     'files.form.file': '文件',
     'files.form.noFile': '未选择文件',
+    'files.form.uploadPolicy': '最大大小：{maxSizeMb} MB。允许的 MIME 类型：{mimeTypes}。',
     'files.searchPlaceholder': '搜索文件',
     'files.state.empty': '未找到文件',
     'files.state.loading': '正在加载文件',
