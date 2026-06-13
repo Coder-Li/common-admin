@@ -32,6 +32,26 @@ describe('locale storage', () => {
     ).toBe('zh-CN')
   })
 
+  it('uses a saved supported locale before a backend default locale', () => {
+    expect(
+      resolveInitialLocale({
+        storage: createStorage('en-US'),
+        defaultLocale: 'zh-CN',
+        languages: ['zh-CN'],
+      }),
+    ).toBe('en-US')
+  })
+
+  it('uses a backend default locale before browser language', () => {
+    expect(
+      resolveInitialLocale({
+        storage: createStorage(),
+        defaultLocale: 'en-US',
+        languages: ['zh-CN'],
+      }),
+    ).toBe('en-US')
+  })
+
   it('uses Chinese when the browser language starts with zh', () => {
     expect(
       resolveInitialLocale({
