@@ -1,5 +1,4 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
 import { FileStorageDriver, FileVisibility } from '@prisma/client';
 import { Readable } from 'node:stream';
 import {
@@ -11,9 +10,10 @@ import type {
   AuditRequestMeta,
   RecordAuditLogInput,
 } from '../audit-log/audit-log.types';
-import type { AppEnv } from '../config/env.config';
 import { ERROR_CODES } from '../common/errors/error-codes';
 import type { PrismaService } from '../prisma/prisma.service';
+import type { EffectiveUploadPolicy } from '../settings/settings.definitions';
+import type { SettingsService } from '../settings/settings.service';
 import {
   FileListQueryDto,
   UpdateFileDto,
@@ -166,6 +166,9 @@ describe('FileService', () => {
     read: jest.Mock;
     delete: jest.Mock;
   };
+  type MockSettingsService = {
+    getEffectiveUploadPolicy: jest.Mock<Promise<EffectiveUploadPolicy>, []>;
+  };
 
   const makeFile = (overrides: Record<string, unknown> = {}) => ({
     id: 'file-1',
@@ -227,33 +230,33 @@ describe('FileService', () => {
     delete: jest.fn(),
   });
 
-  const createConfigMock = (overrides: Partial<AppEnv> = {}) => {
-    const values = {
-      FILE_ALLOWED_MIME_TYPES: 'application/pdf,text/plain,image/png',
-      ...overrides,
-    };
+  const defaultUploadPolicy = (): EffectiveUploadPolicy => ({
+    maxSizeMb: 10,
+    maxSizeBytes: 10 * 1024 * 1024,
+    allowedMimeTypes: ['application/pdf', 'text/plain', 'image/png'],
+    allowedMimeTypeSet: new Set(['application/pdf', 'text/plain', 'image/png']),
+  });
 
-    return {
-      getOrThrow: jest.fn((key: keyof AppEnv) => values[key]),
-    } as unknown as ConfigService<AppEnv, true>;
-  };
+  const createSettingsServiceMock = (): MockSettingsService => ({
+    getEffectiveUploadPolicy: jest.fn().mockResolvedValue(defaultUploadPolicy()),
+  });
 
-  const createService = (configOverrides: Partial<AppEnv> = {}) => {
+  const createService = () => {
     const prisma = createPrismaMock();
     const tx = createPrismaMock();
     prisma.$transaction.mockImplementation(
       <T>(callback: TransactionCallback<T>) => callback(tx),
     );
     const storage = createStorageMock();
-    const config = createConfigMock(configOverrides);
+    const settingsService = createSettingsServiceMock();
     const auditLogService = {
       record: jest.fn(),
     };
     const service = new FileService(
       prisma as unknown as PrismaService,
-      config,
       storage,
       auditLogService as never,
+      settingsService as unknown as SettingsService,
     );
 
     storage.save.mockResolvedValue({
@@ -266,7 +269,14 @@ describe('FileService', () => {
     });
     storage.delete.mockResolvedValue(undefined);
 
-    return { auditLogService, config, prisma, service, storage, tx };
+    return {
+      auditLogService,
+      prisma,
+      service,
+      settingsService,
+      storage,
+      tx,
+    };
   };
 
   const auditActor: AuditActor = {
@@ -405,21 +415,96 @@ describe('FileService', () => {
       });
     });
 
-    it('rejects MIME types outside FILE_ALLOWED_MIME_TYPES', async () => {
-      const { service } = createService();
+    it('rejects MIME types outside the effective upload policy', async () => {
+      const { service, settingsService } = createService();
+      settingsService.getEffectiveUploadPolicy.mockResolvedValue({
+        maxSizeMb: 5,
+        maxSizeBytes: 5 * 1024 * 1024,
+        allowedMimeTypes: ['image/png'],
+        allowedMimeTypeSet: new Set(['image/png']),
+      });
 
       await expect(
-        service.createFile(makeUpload({ mimetype: 'application/zip' }), {}),
+        service.createFile(makeUpload({ mimetype: 'application/pdf' }), {}),
       ).rejects.toMatchObject({
         code: ERROR_CODES.UNSUPPORTED_MEDIA_TYPE,
-        message: 'File type is not allowed',
+        message: 'Unsupported MIME type: application/pdf',
         status: 415,
       });
     });
 
+    it('rejects files above the effective upload policy size limit', async () => {
+      const { service, settingsService } = createService();
+      settingsService.getEffectiveUploadPolicy.mockResolvedValue({
+        maxSizeMb: 5,
+        maxSizeBytes: 5 * 1024 * 1024,
+        allowedMimeTypes: ['image/png'],
+        allowedMimeTypeSet: new Set(['image/png']),
+      });
+
+      await expect(
+        service.createFile(
+          makeUpload({
+            mimetype: 'image/png',
+            size: 5 * 1024 * 1024 + 1,
+          }),
+          {},
+          'user-1',
+        ),
+      ).rejects.toMatchObject({
+        code: ERROR_CODES.PAYLOAD_TOO_LARGE,
+        message: 'File size exceeds configured limit of 5MB',
+        status: 413,
+      });
+    });
+
+    it('accepts uploads using the effective upload policy MIME and size limits', async () => {
+      const { service, settingsService, storage, tx } = createService();
+      settingsService.getEffectiveUploadPolicy.mockResolvedValue({
+        maxSizeMb: 5,
+        maxSizeBytes: 5 * 1024 * 1024,
+        allowedMimeTypes: ['image/png'],
+        allowedMimeTypeSet: new Set(['image/png']),
+      });
+      tx.managedFile.create.mockResolvedValue(
+        makeFile({
+          originalName: 'avatar.png',
+          displayName: 'avatar.png',
+          mimeType: 'image/png',
+          extension: 'png',
+          size: BigInt(5 * 1024 * 1024),
+        }),
+      );
+
+      await expect(
+        service.createFile(
+          makeUpload({
+            originalname: 'avatar.png',
+            mimetype: 'image/png',
+            size: 5 * 1024 * 1024,
+          }),
+          {},
+          'user-1',
+        ),
+      ).resolves.toMatchObject({
+        originalName: 'avatar.png',
+        mimeType: 'image/png',
+        size: String(5 * 1024 * 1024),
+      });
+
+      expect(settingsService.getEffectiveUploadPolicy).toHaveBeenCalledTimes(1);
+      expect(storage.save).toHaveBeenCalledWith(
+        expect.objectContaining({ mimeType: 'image/png' }),
+      );
+    });
+
     it('normalizes original name and falls back to uploaded-file', async () => {
-      const { prisma, service, tx } = createService({
-        FILE_ALLOWED_MIME_TYPES: 'text/plain',
+      const { prisma, service, settingsService, tx } = createService();
+      settingsService.getEffectiveUploadPolicy.mockResolvedValue({
+        maxSizeMb: 10,
+        maxSizeBytes: 10 * 1024 * 1024,
+        allowedMimeTypes: ['text/plain'],
+        allowedMimeTypeSet: new Set(['text/plain']),
       });
       tx.managedFile.create.mockResolvedValue(
         makeFile({
