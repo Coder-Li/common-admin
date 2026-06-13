@@ -550,7 +550,9 @@
                 "delete",
                 "reset_password",
                 "replace_roles",
-                "replace_permissions"
+                "replace_permissions",
+                "system_setting.update",
+                "system_setting.cache_refresh"
               ]
             }
           },
@@ -566,7 +568,8 @@
                 "permission",
                 "dictionary_type",
                 "dictionary_item",
-                "file"
+                "file",
+                "system_setting"
               ]
             }
           },
@@ -2013,6 +2016,202 @@
         ]
       }
     },
+    "/settings/basic": {
+      "get": {
+        "operationId": "getBasicSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasicSettingsResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission required"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "Settings"
+        ]
+      },
+      "patch": {
+        "operationId": "updateBasicSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBasicSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasicSettingsResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission required"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/settings/upload": {
+      "get": {
+        "operationId": "getUploadSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSettingsResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission required"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "Settings"
+        ]
+      },
+      "patch": {
+        "operationId": "updateUploadSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUploadSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSettingsResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission required"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/settings/cache/dictionaries/refresh": {
+      "post": {
+        "operationId": "refreshDictionaryCache",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryCacheRefreshResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission required"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/settings/system-info": {
+      "get": {
+        "operationId": "getSystemInfo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemInfoResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission required"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "operationId": "checkHealth",
@@ -3223,6 +3422,190 @@
             "nullable": true
           }
         }
+      },
+      "BasicSettingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "siteName": {
+            "type": "string"
+          },
+          "siteSubtitle": {
+            "type": "string"
+          },
+          "defaultLocale": {
+            "type": "string",
+            "enum": [
+              "zh-CN",
+              "en-US"
+            ]
+          },
+          "defaultTheme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark"
+            ]
+          }
+        },
+        "required": [
+          "siteName",
+          "siteSubtitle",
+          "defaultLocale",
+          "defaultTheme"
+        ]
+      },
+      "UpdateBasicSettingsDto": {
+        "type": "object",
+        "properties": {
+          "siteName": {
+            "type": "string",
+            "example": "Common Admin",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "siteSubtitle": {
+            "type": "string",
+            "example": "Starter template",
+            "maxLength": 160
+          },
+          "defaultLocale": {
+            "type": "string",
+            "enum": [
+              "zh-CN",
+              "en-US"
+            ],
+            "example": "zh-CN"
+          },
+          "defaultTheme": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark"
+            ],
+            "example": "light"
+          }
+        },
+        "required": [
+          "siteName",
+          "siteSubtitle",
+          "defaultLocale",
+          "defaultTheme"
+        ]
+      },
+      "UploadSettingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "maxSizeMb": {
+            "type": "number"
+          },
+          "allowedMimeTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environmentMaxSizeMb": {
+            "type": "number"
+          },
+          "environmentAllowedMimeTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "storageDriver": {
+            "type": "string",
+            "enum": [
+              "local"
+            ]
+          }
+        },
+        "required": [
+          "maxSizeMb",
+          "allowedMimeTypes",
+          "environmentMaxSizeMb",
+          "environmentAllowedMimeTypes",
+          "storageDriver"
+        ]
+      },
+      "UpdateUploadSettingsDto": {
+        "type": "object",
+        "properties": {
+          "maxSizeMb": {
+            "type": "number",
+            "example": 20,
+            "minimum": 1
+          },
+          "allowedMimeTypes": {
+            "example": [
+              "image/png",
+              "application/pdf",
+              "text/plain"
+            ],
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "maxSizeMb",
+          "allowedMimeTypes"
+        ]
+      },
+      "DictionaryCacheRefreshResponseDto": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "refreshedAt"
+        ]
+      },
+      "SystemInfoResponseDto": {
+        "type": "object",
+        "properties": {
+          "serviceName": {
+            "type": "string"
+          },
+          "appEnv": {
+            "type": "string"
+          },
+          "nodeEnv": {
+            "type": "string"
+          },
+          "logLevel": {
+            "type": "string"
+          },
+          "storageDriver": {
+            "type": "string",
+            "enum": [
+              "local"
+            ]
+          },
+          "uploadMaxSizeMb": {
+            "type": "number"
+          },
+          "uploadAllowedMimeTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "serviceName",
+          "appEnv",
+          "nodeEnv",
+          "logLevel",
+          "storageDriver",
+          "uploadMaxSizeMb",
+          "uploadAllowedMimeTypes"
+        ]
       }
     }
   }
