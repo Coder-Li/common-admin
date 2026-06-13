@@ -93,7 +93,7 @@ export class SettingsService {
     requestMeta?: AuditRequestMeta,
     metadata?: AuditMetadata,
   ): Promise<BasicSettingsResponseDto> {
-    const after = validateBasicSettingsInput(dto);
+    const after = this.validateBasicSettingsForRequest(dto);
 
     await this.prisma.$transaction(async (tx: SettingsTransactionClient) => {
       const before = await this.readBasicSettings(tx, metadata);
@@ -309,6 +309,17 @@ export class SettingsService {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Invalid upload settings';
+
+      throw new BadRequestException(message);
+    }
+  }
+
+  private validateBasicSettingsForRequest(input: unknown): BasicSettings {
+    try {
+      return validateBasicSettingsInput(input);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Invalid basic settings';
 
       throw new BadRequestException(message);
     }

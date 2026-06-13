@@ -314,6 +314,21 @@ describe('SettingsService', () => {
     );
   });
 
+  it('rejects blank basic settings after trimming with BadRequestException', async () => {
+    const { prisma, service } = await createService();
+
+    await expect(
+      service.updateBasicSettings({
+        siteName: '   ',
+        siteSubtitle: 'Starter template',
+        defaultLocale: 'zh-CN',
+        defaultTheme: 'light',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it('returns upload settings constrained by environment values', async () => {
     const { prisma, service } = await createService();
     prisma.systemSetting.findMany.mockResolvedValue([
