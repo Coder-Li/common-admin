@@ -16,6 +16,7 @@ export const ListAuditLogsAction = {
   reset_password: "reset_password",
   replace_roles: "replace_roles",
   replace_permissions: "replace_permissions",
+  revoke: "revoke",
   system_settingupdate: "system_setting.update",
   system_settingcache_refresh: "system_setting.cache_refresh",
 } as const;

@@ -6,6 +6,7 @@ import {
   Folder,
   Info,
   Lock,
+  MonitorCog,
   RefreshCcw,
   Shield,
   Settings,
@@ -17,6 +18,7 @@ import { AuditLogsPage } from '../features/audit-logs/AuditLogsPage'
 import { DictionariesPage } from '../features/dictionaries/DictionariesPage'
 import { FilesPage } from '../features/files/FilesPage'
 import { RolesPage } from '../features/roles/RolesPage'
+import { SessionManagementPage } from '../features/session-management/SessionManagementPage'
 import { BasicSettingsPage } from '../features/settings/BasicSettingsPage'
 import { CacheSettingsPage } from '../features/settings/CacheSettingsPage'
 import { SystemInfoPage } from '../features/settings/SystemInfoPage'
@@ -70,6 +72,15 @@ export const permissionsRoute: AdminRouteMeta = {
   requiredPermissions: ['permission.read'],
   component: PermissionsPage,
   icon: Lock,
+}
+
+export const sessionManagementRoute: AdminRouteMeta = {
+  id: 'session-management',
+  path: '/session-management',
+  labelKey: 'nav.sessionManagement',
+  requiredPermissions: ['user_session.read'],
+  component: SessionManagementPage,
+  icon: MonitorCog,
 }
 
 export const dictionariesRoute: AdminRouteMeta = {
@@ -156,7 +167,7 @@ export const adminMenuGroups: AdminMenuGroup[] = [
     id: 'system',
     labelKey: 'nav.group.system',
     icon: Users,
-    children: [usersRoute, rolesRoute, permissionsRoute],
+    children: [usersRoute, rolesRoute, permissionsRoute, sessionManagementRoute],
   },
   {
     id: 'resources',

@@ -20,6 +20,8 @@ const expectedOperationIds = [
   'deleteUser',
   'replaceUserRoles',
   'resetUserPassword',
+  'listUserSessions',
+  'revokeUserSession',
   'listRoles',
   'getRole',
   'createRole',

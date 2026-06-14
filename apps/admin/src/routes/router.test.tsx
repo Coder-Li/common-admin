@@ -39,6 +39,7 @@ const session: AuthSession = {
       'user.read',
       'role.read',
       'permission.read',
+      'user_session.read',
       'dictionary.read',
       'file.read',
       'audit_log.read',
@@ -170,6 +171,21 @@ describe('admin router guards', () => {
   it('redirects authenticated users without route permission to /403', async () => {
     const router = renderRouter({
       path: '/dashboard',
+      status: 'authenticated',
+      permissions: ['user.read'],
+      activeSession: {
+        ...session,
+        user: { ...session.user, permissions: ['user.read'] },
+      },
+    })
+
+    expect(await screen.findByText('No permission')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/403')
+  })
+
+  it('redirects direct session management access to /403 without user session read permission', async () => {
+    const router = renderRouter({
+      path: '/session-management',
       status: 'authenticated',
       permissions: ['user.read'],
       activeSession: {
