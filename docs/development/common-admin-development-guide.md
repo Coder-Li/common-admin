@@ -138,6 +138,12 @@ For new API-backed CRUD modules, also follow the minimum test checklist in
 
 ## Documentation Map
 
+- `docs/architecture/common-admin-architecture-overview.md`: human-facing
+  architecture overview for maintainers who need to understand the whole
+  template before guiding implementation work.
+- `docs/ai/README.md`: AI-first working protocols for repeatable template
+  tasks such as adding resources, changing contracts, and bootstrapping new
+  projects.
 - `docs/patterns/admin-api-contract-generation-guide.md`: generated API
   contract workflow, frontend usage, auth/mutator boundaries, upload/download,
   and troubleshooting.
@@ -145,7 +151,6 @@ For new API-backed CRUD modules, also follow the minimum test checklist in
   structure.
 - `docs/patterns/admin-rbac-crud-permission-pattern-guide.md`: permission code,
   seed, backend guard, route/menu, and page action conventions.
-- `docs/common-admin-next-steps.md`: roadmap and follow-up topics.
 
 Planning documents under `docs/superpowers/` explain how major features were
 designed and implemented. Use them for background context, not as the primary
