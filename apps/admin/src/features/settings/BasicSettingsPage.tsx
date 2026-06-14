@@ -175,7 +175,7 @@ export function BasicSettingsPage() {
       ) : null}
 
       <form
-        className="grid max-w-3xl gap-4 rounded-lg border border-slate-200 bg-white p-5"
+        className="grid w-full min-w-0 gap-4 rounded-lg border border-slate-200 bg-white p-5"
         onSubmit={handleSubmit(submitForm)}
       >
         <Field

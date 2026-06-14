@@ -194,7 +194,7 @@ export function UploadSettingsPage() {
         </div>
       ) : null}
 
-      <div className="grid max-w-3xl gap-3 sm:grid-cols-3">
+      <div className="grid w-full min-w-0 gap-3 sm:grid-cols-3">
         <ReadOnlyBadge
           label={t('settings.upload.environmentMaxSize')}
           value={t('settings.upload.megabytes', {
@@ -212,7 +212,7 @@ export function UploadSettingsPage() {
       </div>
 
       <form
-        className="grid max-w-3xl gap-4 rounded-lg border border-slate-200 bg-white p-5"
+        className="grid w-full min-w-0 gap-4 rounded-lg border border-slate-200 bg-white p-5"
         noValidate
         onSubmit={handleSubmit(submitForm)}
       >

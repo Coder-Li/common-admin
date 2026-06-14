@@ -90,6 +90,21 @@ describe('UploadSettingsPage', () => {
     expect(screen.getByText('local')).toBeInTheDocument()
   })
 
+  it('renders the policy summary and form across the full content width', async () => {
+    renderUploadSettingsPage()
+
+    const form = (await screen.findByLabelText('Maximum size (MB)')).closest(
+      'form',
+    )
+    const summary = screen.getByText('Environment max size').parentElement
+      ?.parentElement
+
+    expect(summary).toHaveClass('w-full')
+    expect(summary).not.toHaveClass('max-w-3xl')
+    expect(form).toHaveClass('w-full')
+    expect(form).not.toHaveClass('max-w-3xl')
+  })
+
   it('does not submit a max size above the environment maximum', async () => {
     const user = userEvent.setup()
 

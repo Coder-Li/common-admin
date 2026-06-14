@@ -82,6 +82,17 @@ describe('CacheSettingsPage', () => {
     ).toBeInTheDocument()
   })
 
+  it('renders the maintenance panel across the full content width', () => {
+    renderCacheSettingsPage()
+
+    const panel = screen
+      .getByRole('button', { name: 'Refresh dictionary cache' })
+      .closest('div.grid')
+
+    expect(panel).toHaveClass('w-full')
+    expect(panel).not.toHaveClass('max-w-3xl')
+  })
+
   it('calls refreshDictionaryCache for users with setting.update', async () => {
     const user = userEvent.setup()
 

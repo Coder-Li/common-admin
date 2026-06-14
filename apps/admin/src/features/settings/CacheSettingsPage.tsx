@@ -41,7 +41,7 @@ export function CacheSettingsPage() {
         </div>
       ) : null}
 
-      <div className="grid max-w-3xl gap-4 rounded-lg border border-slate-200 bg-white p-5">
+      <div className="grid w-full min-w-0 gap-4 rounded-lg border border-slate-200 bg-white p-5">
         <div className="grid gap-1">
           <h3 className="text-sm font-semibold text-slate-950">
             {t('settings.cache.dictionaryTitle')}

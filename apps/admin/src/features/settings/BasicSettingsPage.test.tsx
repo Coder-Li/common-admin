@@ -107,6 +107,15 @@ describe('BasicSettingsPage', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('renders the settings form across the full content width', async () => {
+    renderBasicSettingsPage()
+
+    const form = (await screen.findByLabelText('Site name')).closest('form')
+
+    expect(form).toHaveClass('w-full')
+    expect(form).not.toHaveClass('max-w-3xl')
+  })
+
   it('allows editing and calls updateBasicSettings when setting.update is granted', async () => {
     const user = userEvent.setup()
 

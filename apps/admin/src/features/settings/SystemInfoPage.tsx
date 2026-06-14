@@ -60,7 +60,7 @@ export function SystemInfoPage() {
         </p>
       </div>
 
-      <div className="grid max-w-3xl gap-3 rounded-lg border border-slate-200 bg-white p-5">
+      <div className="grid w-full min-w-0 gap-3 rounded-lg border border-slate-200 bg-white p-5">
         <ReadOnlyRow
           label={t('settings.systemInfo.serviceName')}
           value={systemInfo?.serviceName ?? ''}

@@ -99,6 +99,16 @@ describe('SystemInfoPage', () => {
     expect(screen.getByText('image/png, application/pdf')).toBeInTheDocument()
   })
 
+  it('renders the system information panel across the full content width', async () => {
+    renderSystemInfoPage()
+
+    const panel = (await screen.findByText('Service name')).parentElement
+      ?.parentElement
+
+    expect(panel).toHaveClass('w-full')
+    expect(panel).not.toHaveClass('max-w-3xl')
+  })
+
   it('does not render secret-like fields', async () => {
     renderSystemInfoPage()
 
