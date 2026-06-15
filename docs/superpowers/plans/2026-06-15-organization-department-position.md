@@ -956,7 +956,7 @@ Expected: mapper-related tests PASS or fail only on service assignment logic.
 - Modify: `apps/api/src/user/user.service.ts`
 - Modify: `apps/api/src/user/user.service.spec.ts`
 
-- [ ] **Step 1: Write failing assignment tests**
+- [x] **Step 1: Write failing assignment tests**
 
 Add tests for:
 
@@ -985,7 +985,7 @@ pnpm --filter api test -- user.service.spec.ts
 
 Expected: FAIL because service does not implement assignments.
 
-- [ ] **Step 2: Include organization relations in reads**
+- [x] **Step 2: Include organization relations in reads**
 
 Update `listUsers`, `findById`, create, and update includes:
 
@@ -1004,7 +1004,7 @@ departments: { some: { departmentId: query.departmentId } }
 positions: { some: { positionId: query.positionId } }
 ```
 
-- [ ] **Step 3: Add assignment validation helpers**
+- [x] **Step 3: Add assignment validation helpers**
 
 Add focused private helpers in `UserService`:
 
@@ -1026,7 +1026,7 @@ Rules:
 - `primaryDepartmentId` without `departmentIds` on update is rejected because it
   is an ambiguous partial assignment payload.
 
-- [ ] **Step 4: Write assignment mutations in transactions**
+- [x] **Step 4: Write assignment mutations in transactions**
 
 During create:
 
@@ -1041,7 +1041,7 @@ During update:
 - if `positionIds` is omitted, do not delete or create position assignments;
 - if `positionIds` is provided, delete existing and recreate submitted rows.
 
-- [ ] **Step 5: Run user service tests**
+- [x] **Step 5: Run user service tests**
 
 Run:
 

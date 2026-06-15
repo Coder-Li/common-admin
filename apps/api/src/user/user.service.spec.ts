@@ -264,6 +264,24 @@ describe('UserService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    department: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    position: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    userDepartment: {
+      createMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    userPosition: {
+      createMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
     role: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -451,6 +469,206 @@ describe('UserService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('create assigns organization relations and defaults a single department as primary', async () => {
+    const { prisma, service, tx } = createService();
+    prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
+    tx.user.create.mockResolvedValue(makeUser());
+    tx.user.findUnique.mockResolvedValue(
+      makeUser({
+        departments: [
+          {
+            isPrimary: true,
+            department: {
+              id: 'dept-1',
+              code: 'engineering',
+              name: 'Engineering',
+              status: 'ACTIVE',
+              sortOrder: 1,
+            },
+          },
+        ],
+        positions: [
+          {
+            position: {
+              id: 'pos-1',
+              code: 'developer',
+              name: 'Developer',
+              status: 'ACTIVE',
+              sortOrder: 1,
+            },
+          },
+        ],
+      }),
+    );
+    tx.department.findMany.mockResolvedValue([
+      {
+        id: 'dept-1',
+        code: 'engineering',
+        name: 'Engineering',
+        status: 'ACTIVE',
+        sortOrder: 1,
+      },
+    ]);
+    tx.position.findMany.mockResolvedValue([
+      {
+        id: 'pos-1',
+        code: 'developer',
+        name: 'Developer',
+        status: 'ACTIVE',
+        sortOrder: 1,
+      },
+    ]);
+
+    await service.createUser({
+      email: 'ada@example.com',
+      username: 'ada',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      password: 'CorrectHorse123',
+      departmentIds: ['dept-1'],
+      positionIds: ['pos-1'],
+    });
+
+    expect(tx.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({
+          departmentIds: expect.anything(),
+          primaryDepartmentId: expect.anything(),
+          positionIds: expect.anything(),
+        }),
+      }),
+    );
+    expect(tx.userDepartment.createMany).toHaveBeenCalledWith({
+      data: [{ userId: 'user-1', departmentId: 'dept-1', isPrimary: true }],
+    });
+    expect(tx.userPosition.createMany).toHaveBeenCalledWith({
+      data: [{ userId: 'user-1', positionId: 'pos-1' }],
+    });
+  });
+
+  it('create rejects multiple departments without a primary department', async () => {
+    const { prisma, service } = createService();
+    prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
+
+    await expect(
+      service.createUser({
+        email: 'ada@example.com',
+        username: 'ada',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        password: 'CorrectHorse123',
+        departmentIds: ['dept-1', 'dept-2'],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('create rejects a primary department outside the submitted departments', async () => {
+    const { prisma, service } = createService();
+    prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
+
+    await expect(
+      service.createUser({
+        email: 'ada@example.com',
+        username: 'ada',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        password: 'CorrectHorse123',
+        departmentIds: ['dept-1'],
+        primaryDepartmentId: 'dept-2',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('create rejects blank primaryDepartmentId with a single department', async () => {
+    const { prisma, service } = createService();
+    prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
+
+    await expect(
+      service.createUser({
+        email: 'ada@example.com',
+        username: 'ada',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        password: 'CorrectHorse123',
+        departmentIds: ['dept-1'],
+        primaryDepartmentId: '',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('create rejects primaryDepartmentId when departmentIds is omitted', async () => {
+    const { prisma, service } = createService();
+    prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
+
+    await expect(
+      service.createUser({
+        email: 'ada@example.com',
+        username: 'ada',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        password: 'CorrectHorse123',
+        primaryDepartmentId: 'dept-1',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('create rejects blank primaryDepartmentId when departmentIds is omitted', async () => {
+    const { prisma, service } = createService();
+    prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
+
+    await expect(
+      service.createUser({
+        email: 'ada@example.com',
+        username: 'ada',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        password: 'CorrectHorse123',
+        primaryDepartmentId: '',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it.each([
+    ['departmentIds', ['dept-1', 'dept-1']],
+    ['departmentIds', ['missing-dept']],
+    ['departmentIds', ['disabled-dept']],
+    ['positionIds', ['pos-1', 'pos-1']],
+    ['positionIds', ['missing-pos']],
+    ['positionIds', ['disabled-pos']],
+  ])('create rejects invalid %s payloads', async (field, ids) => {
+    const { prisma, service, tx } = createService();
+    prisma.role.findFirst.mockResolvedValue({ id: 'role-standard' });
+    tx.department.findMany.mockResolvedValue([]);
+    tx.position.findMany.mockResolvedValue([]);
+
+    await expect(
+      service.createUser({
+        email: 'ada@example.com',
+        username: 'ada',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        password: 'CorrectHorse123',
+        [field]: ids,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it.each([
+    ['departmentIds', ['disabled-dept']],
+    ['positionIds', ['disabled-pos']],
+  ])('update rejects disabled submitted %s payloads', async (field, ids) => {
+    const { service, tx } = createService();
+    tx.user.findUnique.mockResolvedValue(makeUser());
+    tx.department.findMany.mockResolvedValue([]);
+    tx.position.findMany.mockResolvedValue([]);
+
+    await expect(
+      service.updateUser('user-1', {
+        [field]: ids,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('update does not mutate roles', async () => {
     const { service, tx } = createService();
     tx.user.findUnique.mockResolvedValue(makeUser());
@@ -462,6 +680,296 @@ describe('UserService', () => {
       where: { id: 'user-1' },
       data: { firstName: 'Augusta' },
       include: expect.any(Object),
+    });
+  });
+
+  it('update replaces departments when departmentIds are provided', async () => {
+    const { service, tx } = createService();
+    tx.user.findUnique
+      .mockResolvedValueOnce(
+        makeUser({
+          departments: [
+            {
+              isPrimary: true,
+              department: {
+                id: 'dept-old',
+                code: 'old',
+                name: 'Old',
+                status: 'ACTIVE',
+                sortOrder: 1,
+              },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeUser({
+          departments: [
+            {
+              isPrimary: true,
+              department: {
+                id: 'dept-new',
+                code: 'new',
+                name: 'New',
+                status: 'ACTIVE',
+                sortOrder: 1,
+              },
+            },
+          ],
+        }),
+      );
+    tx.department.findMany.mockResolvedValue([
+      {
+        id: 'dept-new',
+        code: 'new',
+        name: 'New',
+        status: 'ACTIVE',
+        sortOrder: 1,
+      },
+    ]);
+    tx.user.update.mockResolvedValue(makeUser());
+
+    await service.updateUser('user-1', {
+      departmentIds: ['dept-new'],
+    });
+
+    expect(tx.userDepartment.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+    });
+    expect(tx.userDepartment.createMany).toHaveBeenCalledWith({
+      data: [{ userId: 'user-1', departmentId: 'dept-new', isPrimary: true }],
+    });
+  });
+
+  it('update clears departments when departmentIds is an empty array', async () => {
+    const { service, tx } = createService();
+    tx.user.findUnique
+      .mockResolvedValueOnce(makeUser())
+      .mockResolvedValueOnce(makeUser({ departments: [] }));
+    tx.user.update.mockResolvedValue(makeUser());
+
+    await service.updateUser('user-1', {
+      departmentIds: [],
+    });
+
+    expect(tx.userDepartment.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+    });
+    expect(tx.userDepartment.createMany).not.toHaveBeenCalled();
+  });
+
+  it('update rejects blank primaryDepartmentId when clearing departments', async () => {
+    const { service, tx } = createService();
+    tx.user.findUnique.mockResolvedValue(makeUser());
+
+    await expect(
+      service.updateUser('user-1', {
+        departmentIds: [],
+        primaryDepartmentId: '',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('update leaves departments unchanged when departmentIds is omitted', async () => {
+    const { service, tx } = createService();
+    tx.user.findUnique.mockResolvedValue(
+      makeUser({
+        departments: [
+          {
+            isPrimary: false,
+            department: {
+              id: 'dept-disabled',
+              code: 'disabled',
+              name: 'Disabled',
+              status: 'DISABLED',
+              sortOrder: 5,
+            },
+          },
+        ],
+      }),
+    );
+    tx.user.update.mockResolvedValue(makeUser());
+
+    await service.updateUser('user-1', {
+      firstName: 'Augusta',
+    });
+
+    expect(tx.userDepartment.deleteMany).not.toHaveBeenCalled();
+    expect(tx.userDepartment.createMany).not.toHaveBeenCalled();
+  });
+
+  it('update rejects primaryDepartmentId when departmentIds is omitted', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.updateUser('user-1', {
+        primaryDepartmentId: 'dept-1',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('update rejects blank primaryDepartmentId when departmentIds is omitted', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.updateUser('user-1', {
+        primaryDepartmentId: '',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('update preserves existing disabled departments when departmentIds is omitted', async () => {
+    const { service, tx } = createService();
+    const before = makeUser({
+      departments: [
+        {
+          isPrimary: false,
+          department: {
+            id: 'dept-disabled',
+            code: 'disabled',
+            name: 'Disabled',
+            status: 'DISABLED',
+            sortOrder: 5,
+          },
+        },
+      ],
+    });
+    tx.user.findUnique.mockResolvedValue(before);
+    tx.user.update.mockResolvedValue(before);
+
+    const response = await service.updateUser('user-1', {
+      firstName: 'Augusta',
+    });
+
+    expect(response.departments).toEqual([
+      expect.objectContaining({ id: 'dept-disabled', status: 'DISABLED' }),
+    ]);
+  });
+
+  it('update replaces positions when positionIds are provided', async () => {
+    const { service, tx } = createService();
+    tx.user.findUnique
+      .mockResolvedValueOnce(makeUser())
+      .mockResolvedValueOnce(makeUser({ positions: [] }));
+    tx.position.findMany.mockResolvedValue([
+      {
+        id: 'pos-new',
+        code: 'new',
+        name: 'New',
+        status: 'ACTIVE',
+        sortOrder: 1,
+      },
+    ]);
+    tx.user.update.mockResolvedValue(makeUser());
+
+    await service.updateUser('user-1', {
+      positionIds: ['pos-new'],
+    });
+
+    expect(tx.userPosition.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+    });
+    expect(tx.userPosition.createMany).toHaveBeenCalledWith({
+      data: [{ userId: 'user-1', positionId: 'pos-new' }],
+    });
+  });
+
+  it('update clears positions when positionIds is an empty array', async () => {
+    const { service, tx } = createService();
+    tx.user.findUnique
+      .mockResolvedValueOnce(makeUser())
+      .mockResolvedValueOnce(makeUser({ positions: [] }));
+    tx.user.update.mockResolvedValue(makeUser());
+
+    await service.updateUser('user-1', {
+      positionIds: [],
+    });
+
+    expect(tx.userPosition.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+    });
+    expect(tx.userPosition.createMany).not.toHaveBeenCalled();
+  });
+
+  it('update leaves positions unchanged when positionIds is omitted', async () => {
+    const { service, tx } = createService();
+    tx.user.findUnique.mockResolvedValue(
+      makeUser({
+        positions: [
+          {
+            position: {
+              id: 'pos-disabled',
+              code: 'disabled',
+              name: 'Disabled',
+              status: 'DISABLED',
+              sortOrder: 5,
+            },
+          },
+        ],
+      }),
+    );
+    tx.user.update.mockResolvedValue(makeUser());
+
+    await service.updateUser('user-1', {
+      firstName: 'Augusta',
+    });
+
+    expect(tx.userPosition.deleteMany).not.toHaveBeenCalled();
+    expect(tx.userPosition.createMany).not.toHaveBeenCalled();
+  });
+
+  it('update preserves existing disabled positions when positionIds is omitted', async () => {
+    const { service, tx } = createService();
+    const before = makeUser({
+      positions: [
+        {
+          position: {
+            id: 'pos-disabled',
+            code: 'disabled',
+            name: 'Disabled',
+            status: 'DISABLED',
+            sortOrder: 5,
+          },
+        },
+      ],
+    });
+    tx.user.findUnique.mockResolvedValue(before);
+    tx.user.update.mockResolvedValue(before);
+
+    const response = await service.updateUser('user-1', {
+      firstName: 'Augusta',
+    });
+
+    expect(response.positions).toEqual([
+      expect.objectContaining({ id: 'pos-disabled', status: 'DISABLED' }),
+    ]);
+  });
+
+  it('list filters by departmentId and positionId', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findMany.mockResolvedValue([]);
+    prisma.user.count.mockResolvedValue(0);
+
+    await service.listUsers({
+      page: 1,
+      pageSize: 20,
+      departmentId: 'dept-1',
+      positionId: 'pos-1',
+    });
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          departments: { some: { departmentId: 'dept-1' } },
+          positions: { some: { positionId: 'pos-1' } },
+        }),
+      }),
+    );
+    expect(prisma.user.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        departments: { some: { departmentId: 'dept-1' } },
+        positions: { some: { positionId: 'pos-1' } },
+      }),
     });
   });
 

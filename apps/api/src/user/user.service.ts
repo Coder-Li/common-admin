@@ -5,7 +5,12 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { Prisma, RoleStatus } from '@prisma/client';
+import {
+  DepartmentStatus,
+  PositionStatus,
+  Prisma,
+  RoleStatus,
+} from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import {
   ListResponse,
@@ -42,6 +47,12 @@ const USER_SORT_FIELDS = new Set([
   'lastName',
 ]);
 
+const USER_ORGANIZATION_INCLUDE = {
+  roles: { include: { role: true } },
+  departments: { include: { department: true } },
+  positions: { include: { position: true } },
+} as const;
+
 @Injectable()
 export class UserService {
   constructor(
@@ -64,7 +75,7 @@ export class UserService {
         take: pageSize,
         orderBy: { [field]: direction },
         where,
-        include: { roles: { include: { role: true } } },
+        include: USER_ORGANIZATION_INCLUDE,
       }),
       this.prisma.user.count({ where }),
     ]);
@@ -80,7 +91,7 @@ export class UserService {
   async findById(id: string): Promise<UserResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { roles: { include: { role: true } } },
+      include: USER_ORGANIZATION_INCLUDE,
     });
 
     if (!user) {
@@ -96,12 +107,48 @@ export class UserService {
     requestMeta?: AuditRequestMeta,
     auditMetadata?: Record<string, unknown>,
   ): Promise<UserResponseDto> {
-    const { password, roleCodes, ...data } = dto;
+    if (
+      Object.prototype.hasOwnProperty.call(dto, 'primaryDepartmentId') &&
+      dto.departmentIds === undefined
+    ) {
+      throw new BadRequestException(
+        'primaryDepartmentId requires departmentIds',
+      );
+    }
+
+    const {
+      password,
+      roleCodes,
+      departmentIds,
+      primaryDepartmentId,
+      positionIds,
+      ...data
+    } = dto;
     const passwordHash = await bcrypt.hash(password, 10);
     const roles = await this.resolveCreateRoles(roleCodes);
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        const departmentAssignment =
+          departmentIds !== undefined
+            ? await this.normalizeDepartmentAssignment({
+                departmentIds,
+                primaryDepartmentId,
+                hasPrimaryDepartmentId: Object.prototype.hasOwnProperty.call(
+                  dto,
+                  'primaryDepartmentId',
+                ),
+                tx,
+              })
+            : undefined;
+        const positionAssignment =
+          positionIds !== undefined
+            ? await this.normalizePositionAssignment({
+                positionIds,
+                tx,
+              })
+            : undefined;
+
         const user = await tx.user.create({
           data: {
             ...data,
@@ -110,9 +157,41 @@ export class UserService {
               create: roles.map((role) => ({ roleId: role.id })),
             },
           },
-          include: { roles: { include: { role: true } } },
+          include: USER_ORGANIZATION_INCLUDE,
         });
-        const response = toUserResponse(user);
+
+        if (departmentAssignment?.departmentIds.length) {
+          await tx.userDepartment.createMany({
+            data: departmentAssignment.departmentIds.map((departmentId) => ({
+              userId: user.id,
+              departmentId,
+              isPrimary:
+                departmentId === departmentAssignment.primaryDepartmentId,
+            })),
+          });
+        }
+
+        if (positionAssignment?.length) {
+          await tx.userPosition.createMany({
+            data: positionAssignment.map((positionId) => ({
+              userId: user.id,
+              positionId,
+            })),
+          });
+        }
+
+        const nextUser =
+          departmentIds !== undefined || positionIds !== undefined
+            ? await tx.user.findUnique({
+                where: { id: user.id },
+                include: USER_ORGANIZATION_INCLUDE,
+              })
+            : user;
+
+        if (!nextUser) {
+          throw new NotFoundException('User not found');
+        }
+        const response = toUserResponse(nextUser);
 
         await this.auditLogService.record(
           {
@@ -141,23 +220,95 @@ export class UserService {
     requestMeta?: AuditRequestMeta,
     auditMetadata?: Record<string, unknown>,
   ): Promise<UserResponseDto> {
+    if (
+      Object.prototype.hasOwnProperty.call(dto, 'primaryDepartmentId') &&
+      dto.departmentIds === undefined
+    ) {
+      throw new BadRequestException(
+        'primaryDepartmentId requires departmentIds',
+      );
+    }
+
     try {
       return await this.prisma.$transaction(async (tx) => {
         const before = await tx.user.findUnique({
           where: { id },
-          include: { roles: { include: { role: true } } },
+          include: USER_ORGANIZATION_INCLUDE,
         });
 
         if (!before) {
           throw new NotFoundException('User not found');
         }
 
+        const { departmentIds, primaryDepartmentId, positionIds, ...data } =
+          dto;
+        const departmentAssignment =
+          departmentIds !== undefined
+            ? await this.normalizeDepartmentAssignment({
+                departmentIds,
+                primaryDepartmentId,
+                hasPrimaryDepartmentId: Object.prototype.hasOwnProperty.call(
+                  dto,
+                  'primaryDepartmentId',
+                ),
+                tx,
+              })
+            : undefined;
+        const positionAssignment =
+          positionIds !== undefined
+            ? await this.normalizePositionAssignment({
+                positionIds,
+                tx,
+              })
+            : undefined;
+
         const user = await tx.user.update({
           where: { id },
-          data: dto,
-          include: { roles: { include: { role: true } } },
+          data,
+          include: USER_ORGANIZATION_INCLUDE,
         });
-        const response = toUserResponse(user);
+
+        if (departmentIds !== undefined) {
+          await tx.userDepartment.deleteMany({ where: { userId: id } });
+
+          if (departmentAssignment?.departmentIds.length) {
+            await tx.userDepartment.createMany({
+              data: departmentAssignment.departmentIds.map((departmentId) => ({
+                userId: id,
+                departmentId,
+                isPrimary:
+                  departmentId === departmentAssignment.primaryDepartmentId,
+              })),
+            });
+          }
+        }
+
+        if (positionIds !== undefined) {
+          await tx.userPosition.deleteMany({ where: { userId: id } });
+
+          if (positionAssignment?.length) {
+            await tx.userPosition.createMany({
+              data: positionAssignment.map((positionId) => ({
+                userId: id,
+                positionId,
+              })),
+            });
+          }
+        }
+
+        const nextUser =
+          departmentIds !== undefined || positionIds !== undefined
+            ? await tx.user.findUnique({
+                where: { id },
+                include: USER_ORGANIZATION_INCLUDE,
+              })
+            : user;
+
+        if (!nextUser) {
+          throw new NotFoundException('User not found');
+        }
+
+        const response = toUserResponse(nextUser);
 
         await this.auditLogService.record(
           {
@@ -388,7 +539,154 @@ export class UserService {
       ];
     }
 
+    if (query.departmentId) {
+      where.departments = {
+        some: { departmentId: query.departmentId },
+      };
+    }
+
+    if (query.positionId) {
+      where.positions = {
+        some: { positionId: query.positionId },
+      };
+    }
+
     return where;
+  }
+
+  private async normalizeDepartmentAssignment(input: {
+    departmentIds: string[];
+    primaryDepartmentId?: string;
+    hasPrimaryDepartmentId: boolean;
+    tx: {
+      department: {
+        findMany: (args: {
+          where: { id: { in: string[] }; status: DepartmentStatus };
+          select: { id: boolean };
+        }) => Promise<Array<{ id: string }>>;
+      };
+    };
+  }): Promise<{
+    departmentIds: string[];
+    primaryDepartmentId: string | null;
+  }> {
+    const departmentIds = [...new Set(input.departmentIds)];
+
+    if (departmentIds.length !== input.departmentIds.length) {
+      throw new BadRequestException('Duplicate department id');
+    }
+
+    if (departmentIds.length === 0) {
+      if (input.hasPrimaryDepartmentId) {
+        throw new BadRequestException(
+          'primaryDepartmentId requires departmentIds',
+        );
+      }
+
+      return { departmentIds: [], primaryDepartmentId: null };
+    }
+
+    if (
+      input.primaryDepartmentId &&
+      !departmentIds.includes(input.primaryDepartmentId)
+    ) {
+      throw new BadRequestException(
+        'primaryDepartmentId must be one of departmentIds',
+      );
+    }
+
+    if (input.hasPrimaryDepartmentId && !input.primaryDepartmentId) {
+      throw new BadRequestException('primaryDepartmentId must not be blank');
+    }
+
+    if (!input.primaryDepartmentId) {
+      if (departmentIds.length === 1) {
+        input.primaryDepartmentId = departmentIds[0];
+      } else {
+        throw new BadRequestException(
+          'primaryDepartmentId is required when assigning multiple departments',
+        );
+      }
+    }
+
+    await this.resolveActiveDepartments(input.tx, departmentIds);
+
+    return {
+      departmentIds,
+      primaryDepartmentId: input.primaryDepartmentId,
+    };
+  }
+
+  private async normalizePositionAssignment(input: {
+    positionIds: string[];
+    tx: {
+      position: {
+        findMany: (args: {
+          where: { id: { in: string[] }; status: PositionStatus };
+          select: { id: boolean };
+        }) => Promise<Array<{ id: string }>>;
+      };
+    };
+  }): Promise<string[]> {
+    const positionIds = [...new Set(input.positionIds)];
+
+    if (positionIds.length !== input.positionIds.length) {
+      throw new BadRequestException('Duplicate position id');
+    }
+
+    if (positionIds.length === 0) {
+      return [];
+    }
+
+    await this.resolveActivePositions(input.tx, positionIds);
+
+    return positionIds;
+  }
+
+  private async resolveActiveDepartments(
+    tx: {
+      department: {
+        findMany: (args: {
+          where: { id: { in: string[] }; status: DepartmentStatus };
+          select: { id: boolean };
+        }) => Promise<Array<{ id: string }>>;
+      };
+    },
+    ids: string[],
+  ): Promise<Array<{ id: string }>> {
+    const departments = await tx.department.findMany({
+      where: { id: { in: ids }, status: DepartmentStatus.ACTIVE },
+      select: { id: true },
+    });
+
+    if (departments.length !== ids.length) {
+      throw new BadRequestException('Department not found or disabled');
+    }
+
+    return departments;
+  }
+
+  private async resolveActivePositions(
+    tx: {
+      position: {
+        findMany: (args: {
+          where: { id: { in: string[] }; status: PositionStatus };
+          select: { id: boolean };
+        }) => Promise<Array<{ id: string }>>;
+      };
+    },
+    ids: string[],
+  ): Promise<Array<{ id: string }>> {
+    const positions = await tx.position.findMany({
+      where: { id: { in: ids }, status: PositionStatus.ACTIVE },
+      select: { id: true },
+    });
+
+    if (positions.length !== ids.length) {
+      throw new BadRequestException('Position not found or disabled');
+    }
+
+    return positions;
   }
 
   private handlePrismaWriteError(error: unknown): never {
