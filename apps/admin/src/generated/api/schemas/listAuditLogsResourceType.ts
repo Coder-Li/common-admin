@@ -18,4 +18,6 @@ export const ListAuditLogsResourceType = {
   file: "file",
   system_setting: "system_setting",
   user_session: "user_session",
+  department: "department",
+  position: "position",
 } as const;

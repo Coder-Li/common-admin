@@ -1058,7 +1058,7 @@ Expected: PASS.
 - Modify: `apps/api/openapi.json`
 - Modify generated: `apps/admin/src/generated/api/`
 
-- [ ] **Step 1: Write failing OpenAPI assertions**
+- [x] **Step 1: Write failing OpenAPI assertions**
 
 Update `apps/api/src/openapi.spec.ts` to assert operation ids:
 
@@ -1108,7 +1108,7 @@ pnpm --filter api test -- openapi.spec.ts
 Expected: PASS if controllers are correctly decorated; otherwise FAIL and fix
 Swagger metadata.
 
-- [ ] **Step 2: Generate API client**
+- [x] **Step 2: Generate API client**
 
 Run:
 
@@ -1119,7 +1119,7 @@ pnpm api:generate
 Expected: `apps/api/openapi.json` and files under
 `apps/admin/src/generated/api/` update.
 
-- [ ] **Step 3: Commit backend user and generated contract files before diff check**
+- [x] **Step 3: Commit backend user and generated contract files before diff check**
 
 Run:
 
@@ -1130,7 +1130,7 @@ git commit -m "feat(api): add user organization assignments"
 
 Expected: commit succeeds with backend user changes and generated contract files.
 
-- [ ] **Step 4: Check generated contract**
+- [x] **Step 4: Check generated contract**
 
 Run:
 
@@ -1141,7 +1141,7 @@ pnpm api:check
 Expected: PASS after generated files are committed or no diff remains beyond
 expected generated output.
 
-- [ ] **Step 5: Run backend test slice**
+- [x] **Step 5: Run backend test slice**
 
 Run:
 
@@ -1151,7 +1151,7 @@ pnpm --filter api test -- department position user.service.spec.ts openapi.spec.
 
 Expected: PASS.
 
-- [ ] **Step 6: Confirm no unexpected backend contract diff**
+- [x] **Step 6: Confirm no unexpected backend contract diff**
 
 Run:
 

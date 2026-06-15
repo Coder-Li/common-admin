@@ -27,4 +27,7 @@ export interface CreateUserDto {
   /** @minLength 8 */
   password: string;
   roleCodes?: string[];
+  departmentIds?: string[];
+  primaryDepartmentId?: string;
+  positionIds?: string[];
 }

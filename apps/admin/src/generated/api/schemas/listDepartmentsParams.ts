@@ -5,9 +5,10 @@
  * API for the common admin starter template
  * OpenAPI spec version: 0.1.0
  */
+import type { ListDepartmentsStatus } from "./listDepartmentsStatus";
 import type { Object } from "./object";
 
-export type ListUsersParams = {
+export type ListDepartmentsParams = {
   /**
    * @minimum 1
    */
@@ -19,10 +20,9 @@ export type ListUsersParams = {
   pageSize?: Object;
   search?: string;
   /**
-   * Sort by one of: email, username, firstName, lastName, createdAt, updatedAt
+   * Sort by one of: name, code, sortOrder, createdAt, updatedAt
    */
   sort?: string;
-  roleCode?: string;
-  departmentId?: string;
-  positionId?: string;
+  status?: ListDepartmentsStatus;
+  parentId?: string;
 };

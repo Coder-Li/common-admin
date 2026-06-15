@@ -5,6 +5,7 @@
  * API for the common admin starter template
  * OpenAPI spec version: 0.1.0
  */
+import type { UserOrganizationSummaryDto } from "./userOrganizationSummaryDto";
 import type { UserRoleResponseDto } from "./userRoleResponseDto";
 
 export interface UserResponseDto {
@@ -14,6 +15,10 @@ export interface UserResponseDto {
   firstName: string;
   lastName: string;
   roles: UserRoleResponseDto[];
+  departments: UserOrganizationSummaryDto[];
+  /** @nullable */
+  primaryDepartment: UserOrganizationSummaryDto | null;
+  positions: UserOrganizationSummaryDto[];
   createdAt: string;
   updatedAt: string;
 }

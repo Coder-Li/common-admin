@@ -24,4 +24,7 @@ export interface UpdateUserDto {
    * @maxLength 80
    */
   lastName?: string;
+  departmentIds?: string[];
+  primaryDepartmentId?: string;
+  positionIds?: string[];
 }

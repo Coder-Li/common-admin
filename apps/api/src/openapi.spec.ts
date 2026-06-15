@@ -22,6 +22,19 @@ const expectedOperationIds = [
   'resetUserPassword',
   'listUserSessions',
   'revokeUserSession',
+  'listDepartments',
+  'getDepartmentTree',
+  'getDepartmentOptions',
+  'getDepartment',
+  'createDepartment',
+  'updateDepartment',
+  'deleteDepartment',
+  'listPositions',
+  'getPositionOptions',
+  'getPosition',
+  'createPosition',
+  'updatePosition',
+  'deletePosition',
   'listRoles',
   'getRole',
   'createRole',
@@ -412,6 +425,41 @@ describe('OpenAPI operation ids', () => {
           type: 'string',
           nullable: true,
         }),
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('documents user organization fields', async () => {
+    const { app, document } = await createTestOpenApiDocument();
+
+    try {
+      for (const propertyName of ['departments', 'positions']) {
+        expect(
+          getSchemaProperty(document, 'UserResponseDto', propertyName),
+        ).toEqual({
+          type: 'array',
+          items: { $ref: '#/components/schemas/UserOrganizationSummaryDto' },
+        });
+      }
+
+      expect(
+        getSchemaProperty(document, 'UserResponseDto', 'primaryDepartment'),
+      ).toEqual({
+        nullable: true,
+        type: 'object',
+        allOf: [{ $ref: '#/components/schemas/UserOrganizationSummaryDto' }],
+      });
+
+      expect(
+        document.components?.schemas?.UserResponseDto.required,
+      ).toEqual(
+        expect.arrayContaining([
+          'departments',
+          'primaryDepartment',
+          'positions',
+        ]),
       );
     } finally {
       await app.close();
