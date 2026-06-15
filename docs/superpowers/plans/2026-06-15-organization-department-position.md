@@ -122,7 +122,7 @@
 - Modify: `apps/api/prisma/schema.prisma`
 - Create: `apps/api/prisma/migrations/<timestamp>_add_organization/migration.sql`
 
-- [ ] **Step 1: Add schema models**
+- [x] **Step 1: Add schema models**
 
 Update `apps/api/prisma/schema.prisma` with:
 
@@ -206,7 +206,7 @@ departments UserDepartment[]
 positions   UserPosition[]
 ```
 
-- [ ] **Step 2: Generate migration without applying it**
+- [x] **Step 2: Generate migration without applying it**
 
 Run:
 
@@ -217,7 +217,7 @@ pnpm --filter api prisma migrate dev --create-only --name add_organization
 Expected: Prisma creates a new migration file but does not apply it to the
 local database yet.
 
-- [ ] **Step 3: Add partial unique index**
+- [x] **Step 3: Add partial unique index**
 
 Edit the generated migration SQL and add:
 
@@ -229,7 +229,7 @@ WHERE "isPrimary" = true;
 
 Expected: migration explicitly enforces one primary department per user.
 
-- [ ] **Step 4: Apply edited migration and verify Prisma client generation**
+- [x] **Step 4: Apply edited migration and verify Prisma client generation**
 
 Run:
 
@@ -241,7 +241,7 @@ pnpm --filter api db:generate
 Expected: migration applies with the partial unique index included, and Prisma
 Client is generated.
 
-- [ ] **Step 5: Commit schema work**
+- [x] **Step 5: Commit schema work**
 
 Run:
 
@@ -260,7 +260,7 @@ Expected: commit succeeds.
 - Modify: `apps/api/src/audit-log/audit-log.constants.ts`
 - Create: `apps/api/src/audit-log/audit-log.constants.spec.ts`
 
-- [ ] **Step 1: Write failing permission and audit constant assertions**
+- [x] **Step 1: Write failing permission and audit constant assertions**
 
 Update `apps/api/src/permission/permission.registry.spec.ts` to assert:
 
@@ -334,7 +334,7 @@ pnpm --filter api test -- permission.registry.spec.ts audit-log
 
 Expected: FAIL because permissions and audit resource types are not registered.
 
-- [ ] **Step 2: Add permission registry entries**
+- [x] **Step 2: Add permission registry entries**
 
 Add entries to `PERMISSION_REGISTRY` after user/session or before resource
 permissions:
@@ -406,7 +406,7 @@ permissions:
 },
 ```
 
-- [ ] **Step 3: Add audit resource constants**
+- [x] **Step 3: Add audit resource constants**
 
 Add to `AUDIT_RESOURCE_TYPES` in `apps/api/src/audit-log/audit-log.constants.ts`:
 
@@ -415,7 +415,7 @@ DEPARTMENT: 'department',
 POSITION: 'position',
 ```
 
-- [ ] **Step 4: Run shared contract tests**
+- [x] **Step 4: Run shared contract tests**
 
 Run:
 
@@ -425,7 +425,7 @@ pnpm --filter api test -- permission.registry.spec.ts audit-log
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit shared backend contract work**
+- [x] **Step 5: Commit shared backend contract work**
 
 Run:
 
@@ -447,7 +447,7 @@ Expected: commit succeeds.
 - Create: `apps/api/src/department/department.mapper.ts`
 - Create: `apps/api/src/department/department.mapper.spec.ts`
 
-- [ ] **Step 1: Write failing mapper tests**
+- [x] **Step 1: Write failing mapper tests**
 
 Create `apps/api/src/department/department.mapper.spec.ts` with tests for:
 
@@ -481,7 +481,7 @@ pnpm --filter api test -- department.mapper.spec.ts
 
 Expected: FAIL because department mapper does not exist.
 
-- [ ] **Step 2: Add department constants**
+- [x] **Step 2: Add department constants**
 
 Create constants:
 
@@ -497,7 +497,7 @@ export const DEPARTMENT_SORT_FIELDS = [
 export const DEPARTMENT_DEFAULT_SORT = 'sortOrder:asc';
 ```
 
-- [ ] **Step 3: Add department request DTOs**
+- [x] **Step 3: Add department request DTOs**
 
 Create DTOs:
 
@@ -510,7 +510,7 @@ Use `@ApiProperty`, `@ApiPropertyOptional`, `@IsString`, `@MaxLength`,
 `@IsOptional`, `@IsEnum`, `@IsInt`, `@Min`, and sort `@Matches` following
 existing DTO style.
 
-- [ ] **Step 4: Add department response DTOs**
+- [x] **Step 4: Add department response DTOs**
 
 Create:
 
@@ -521,7 +521,7 @@ Create:
 
 Ensure dates are strings and list response implements `ListResponse<DepartmentResponseDto>`.
 
-- [ ] **Step 5: Add mapper implementation**
+- [x] **Step 5: Add mapper implementation**
 
 Implement:
 
@@ -533,7 +533,7 @@ export function toDepartmentTree(records: DepartmentTreeRecord[]): DepartmentTre
 
 Sort tree siblings by `sortOrder` then `name`.
 
-- [ ] **Step 6: Run mapper tests**
+- [x] **Step 6: Run mapper tests**
 
 Run:
 
@@ -549,7 +549,7 @@ Expected: PASS.
 - Create: `apps/api/src/department/department.service.ts`
 - Create/modify: `apps/api/src/department/department.service.spec.ts`
 
-- [ ] **Step 1: Write failing list and tree service tests**
+- [x] **Step 1: Write failing list and tree service tests**
 
 Create `apps/api/src/department/department.service.spec.ts` with mocked
 `PrismaService` and `AuditLogService`. Cover:
@@ -573,7 +573,7 @@ pnpm --filter api test -- department.service.spec.ts
 
 Expected: FAIL because service does not exist.
 
-- [ ] **Step 2: Implement read methods**
+- [x] **Step 2: Implement read methods**
 
 Implement:
 
@@ -587,7 +587,7 @@ findById(id: string): Promise<DepartmentResponseDto>
 Use existing `createListResponse`, allowed sort parsing, shared `where`, and
 mapper functions.
 
-- [ ] **Step 3: Run read tests**
+- [x] **Step 3: Run read tests**
 
 Run:
 
@@ -597,7 +597,7 @@ pnpm --filter api test -- department.service.spec.ts
 
 Expected: read tests PASS; mutation tests still absent.
 
-- [ ] **Step 4: Write failing mutation/domain tests**
+- [x] **Step 4: Write failing mutation/domain tests**
 
 Add tests for:
 
@@ -614,7 +614,7 @@ Add tests for:
 - delete rejected with assigned users;
 - delete succeeds and records audit data.
 
-- [ ] **Step 5: Implement mutations and validation**
+- [x] **Step 5: Implement mutations and validation**
 
 Implement:
 
@@ -632,7 +632,7 @@ Validation rules:
 - before delete, count child departments and `UserDepartment` rows;
 - audit writes use `AUDIT_RESOURCE_TYPES.DEPARTMENT`.
 
-- [ ] **Step 6: Run department service tests**
+- [x] **Step 6: Run department service tests**
 
 Run:
 
