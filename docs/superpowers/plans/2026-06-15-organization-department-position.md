@@ -1286,7 +1286,7 @@ Expected: PASS.
 - Create: `apps/admin/src/features/positions/PositionsPage.test.tsx`
 - Modify: `apps/admin/src/i18n/messages.ts`
 
-- [ ] **Step 1: Write failing page tests**
+- [x] **Step 1: Write failing page tests**
 
 Mock generated position endpoints and assert:
 
@@ -1308,7 +1308,7 @@ pnpm --filter admin test -- PositionsPage.test.tsx
 
 Expected: FAIL because page does not exist.
 
-- [ ] **Step 2: Add types, columns, and form**
+- [x] **Step 2: Add types, columns, and form**
 
 Use generated schema aliases and a `PositionFormValue` with:
 
@@ -1322,7 +1322,7 @@ description
 
 Validation mirrors backend DTOs.
 
-- [ ] **Step 3: Add PositionsPage**
+- [x] **Step 3: Add PositionsPage**
 
 Use shared `DataTable`, `DataTableToolbar`, and generated endpoints:
 
@@ -1338,12 +1338,12 @@ Keep synthetic action columns unsortable.
 Use the existing normalized API error helper/toast pattern used by other admin
 feature pages.
 
-- [ ] **Step 4: Add i18n messages**
+- [x] **Step 4: Add i18n messages**
 
 Add position nav, table, form, confirmation, toast, empty-state, and validation
 copy.
 
-- [ ] **Step 5: Run position page tests**
+- [x] **Step 5: Run position page tests**
 
 Run:
 
