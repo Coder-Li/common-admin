@@ -22,6 +22,16 @@ enum DictionaryStatus {
   DISABLED
 }
 
+enum DepartmentStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum PositionStatus {
+  ACTIVE
+  DISABLED
+}
+
 enum DictionaryBadgeVariant {
   DEFAULT
   SUCCESS
@@ -50,6 +60,8 @@ model User {
   uploadedFiles ManagedFile[]
   roles         UserRole[]
   sessions      UserSession[]
+  departments   UserDepartment[]
+  positions     UserPosition[]
 
   @@index([email])
   @@index([username])
@@ -122,6 +134,67 @@ model UserSession {
   @@index([userId])
   @@index([expiresAt])
   @@index([revokedAt])
+}
+
+model Department {
+  id          String           @id @default(uuid())
+  code        String           @unique @db.VarChar(80)
+  name        String           @db.VarChar(120)
+  parentId    String?
+  status      DepartmentStatus @default(ACTIVE)
+  sortOrder   Int              @default(0)
+  description String?          @db.VarChar(500)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  parent      Department?      @relation("DepartmentTree", fields: [parentId], references: [id])
+  children    Department[]     @relation("DepartmentTree")
+  users       UserDepartment[]
+
+  @@index([parentId, sortOrder])
+  @@index([status])
+  @@index([name])
+}
+
+model Position {
+  id          String         @id @default(uuid())
+  code        String         @unique @db.VarChar(80)
+  name        String         @db.VarChar(120)
+  status      PositionStatus @default(ACTIVE)
+  sortOrder   Int            @default(0)
+  description String?        @db.VarChar(500)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  users       UserPosition[]
+
+  @@index([status, sortOrder])
+  @@index([name])
+}
+
+model UserDepartment {
+  userId       String
+  departmentId String
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id])
+
+  @@id([userId, departmentId])
+  @@index([departmentId])
+}
+
+model UserPosition {
+  userId     String
+  positionId String
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position   Position @relation(fields: [positionId], references: [id])
+
+  @@id([userId, positionId])
+  @@index([positionId])
 }
 
 model RolePermission {
