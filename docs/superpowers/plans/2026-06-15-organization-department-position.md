@@ -1173,7 +1173,7 @@ Expected: no unexpected uncommitted backend contract files remain.
 - Create: `apps/admin/src/features/departments/DepartmentsPage.test.tsx`
 - Modify: `apps/admin/src/i18n/messages.ts`
 
-- [ ] **Step 1: Write failing page tests**
+- [x] **Step 1: Write failing page tests**
 
 Mock generated department endpoints and assert:
 
@@ -1200,7 +1200,7 @@ pnpm --filter admin test -- DepartmentsPage.test.tsx
 
 Expected: FAIL because page does not exist.
 
-- [ ] **Step 2: Add types and columns**
+- [x] **Step 2: Add types and columns**
 
 Use generated schema aliases from `apps/admin/src/generated/api/schemas`.
 Keep UI-only types local:
@@ -1218,7 +1218,7 @@ export interface DepartmentFormValue {
 }
 ```
 
-- [ ] **Step 3: Add DepartmentForm**
+- [x] **Step 3: Add DepartmentForm**
 
 Use `react-hook-form` and `zod`. Validate:
 
@@ -1240,7 +1240,7 @@ Parent selector behavior:
 - omit unchanged `parentId` from update payloads;
 - never submit a disabled changed `parentId`.
 
-- [ ] **Step 4: Add DepartmentsPage**
+- [x] **Step 4: Add DepartmentsPage**
 
 Use generated functions and query key helpers:
 
@@ -1261,12 +1261,12 @@ API error helper/toast pattern used by other admin feature pages.
 When invalidating options, use the generated options query key helper if Orval
 creates one, following the existing `getGet...QueryKey` naming style.
 
-- [ ] **Step 5: Add i18n messages**
+- [x] **Step 5: Add i18n messages**
 
 Add nav, table, form, filter, confirmation, toast, empty-state, and validation
 copy in `apps/admin/src/i18n/messages.ts`.
 
-- [ ] **Step 6: Run department page tests**
+- [x] **Step 6: Run department page tests**
 
 Run:
 
