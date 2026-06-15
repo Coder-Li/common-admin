@@ -5,6 +5,8 @@ export interface UserColumnLabels {
   username: string
   email: string
   fullName: string
+  positions: string
+  primaryDepartment: string
   role: string
   createdAt: string
   actions: string
@@ -24,6 +26,18 @@ export interface UserRowActions {
 
 function formatFullName(user: UserRecord) {
   return `${user.firstName} ${user.lastName}`.trim()
+}
+
+function formatPrimaryDepartment(user: UserRecord) {
+  return user.primaryDepartment?.name ?? '-'
+}
+
+function formatPositions(user: UserRecord) {
+  const summary = (user.positions ?? [])
+    .map((position) => position.name)
+    .join(', ')
+
+  return summary || '-'
 }
 
 function formatDateTime(value: string) {
@@ -69,6 +83,20 @@ export function createUserColumns(
       cell: ({ row }) =>
         row.original.roles.map((role) => role.name).join(', '),
       size: 120,
+    },
+    {
+      id: 'primaryDepartment',
+      header: labels.primaryDepartment,
+      enableSorting: false,
+      cell: ({ row }) => formatPrimaryDepartment(row.original),
+      size: 160,
+    },
+    {
+      id: 'positions',
+      header: labels.positions,
+      enableSorting: false,
+      cell: ({ row }) => formatPositions(row.original),
+      size: 160,
     },
     {
       accessorKey: 'createdAt',

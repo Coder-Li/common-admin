@@ -1,12 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMemo } from 'react'
-import type { ReactNode } from 'react'
+import {
+  useEffect,
+  useMemo,
+} from 'react'
+import type {
+  ChangeEvent,
+  ReactNode,
+} from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { useI18n } from '../../i18n/useI18n'
 import type {
   CreateUserRequest,
   UpdateUserRequest,
+  UserDepartmentOption,
+  UserPositionOption,
   UserRecord,
   UserRoleSummary,
 } from './users.types'
@@ -20,6 +28,8 @@ interface UserFormProps {
   initialValue?: UserRecord
   isSubmitting: boolean
   canAssignRoles: boolean
+  departmentOptions: UserDepartmentOption[]
+  positionOptions: UserPositionOption[]
   roleOptions: UserRoleSummary[]
   onSubmit: (value: UserFormSubmitValue) => void
   onCancel: () => void
@@ -32,6 +42,52 @@ type UserFormValues = {
   lastName: string
   password?: string
   roleCodes: string[]
+  departmentIds: string[]
+  primaryDepartmentId: string
+  positionIds: string[]
+}
+
+function equalSets(left: string[], right: string[]) {
+  if (left.length !== right.length) {
+    return false
+  }
+
+  const rightSet = new Set(right)
+
+  return left.every((value) => rightSet.has(value))
+}
+
+function selectedValues(event: ChangeEvent<HTMLSelectElement>) {
+  return Array.from(event.target.selectedOptions).map((option) => option.value)
+}
+
+function assignedDepartmentIds(initialValue?: UserRecord) {
+  return initialValue?.departments?.map((department) => department.id) ?? []
+}
+
+function assignedPositionIds(initialValue?: UserRecord) {
+  return initialValue?.positions?.map((position) => position.id) ?? []
+}
+
+function selectedOptions<TOption extends { id: string }>(
+  options: TOption[],
+  selectedIds: string[],
+) {
+  const selectedIdSet = new Set(selectedIds)
+
+  return options.filter((option) => selectedIdSet.has(option.id))
+}
+
+function activeOptionIds(options: Array<{ id: string; status: string }>) {
+  return new Set(
+    options
+      .filter((option) => option.status === 'ACTIVE')
+      .map((option) => option.id),
+  )
+}
+
+function activeSelectedIds(selectedIds: string[], activeIds: Set<string>) {
+  return selectedIds.filter((id) => activeIds.has(id))
 }
 
 export function UserForm({
@@ -39,12 +95,23 @@ export function UserForm({
   initialValue,
   isSubmitting,
   canAssignRoles,
+  departmentOptions,
+  positionOptions,
   roleOptions,
   onSubmit,
   onCancel,
 }: UserFormProps) {
   const { t } = useI18n()
   const isCreate = mode === 'create'
+  const initialDepartmentIds = useMemo(
+    () => assignedDepartmentIds(initialValue),
+    [initialValue],
+  )
+  const initialPositionIds = useMemo(
+    () => assignedPositionIds(initialValue),
+    [initialValue],
+  )
+  const initialPrimaryDepartmentId = initialValue?.primaryDepartment?.id ?? ''
 
   const schema = useMemo(() => {
     const baseSchema = z.object({
@@ -53,9 +120,12 @@ export function UserForm({
       firstName: z.string().trim().min(1, t('users.validation.firstName')),
       lastName: z.string().trim().min(1, t('users.validation.lastName')),
       roleCodes: z.array(z.string()),
+      departmentIds: z.array(z.string()),
+      primaryDepartmentId: z.string(),
+      positionIds: z.array(z.string()),
     })
 
-    return isCreate
+    const schemaWithMode = isCreate
       ? baseSchema.extend({
           password: z
             .string()
@@ -64,12 +134,24 @@ export function UserForm({
       : baseSchema.extend({
           password: z.string().optional(),
         })
+
+    return schemaWithMode.superRefine((value, context) => {
+      if (value.departmentIds.length > 1 && !value.primaryDepartmentId) {
+        context.addIssue({
+          code: 'custom',
+          message: t('users.validation.primaryDepartment'),
+          path: ['primaryDepartmentId'],
+        })
+      }
+    })
   }, [isCreate, t])
 
   const {
     formState: { errors },
     handleSubmit,
     register,
+    setValue,
+    watch,
   } = useForm<UserFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -79,8 +161,45 @@ export function UserForm({
       lastName: initialValue?.lastName ?? '',
       password: '',
       roleCodes: initialValue?.roles.map((role) => role.code) ?? [],
+      departmentIds: initialDepartmentIds,
+      primaryDepartmentId: initialPrimaryDepartmentId,
+      positionIds: initialPositionIds,
     },
   })
+
+  const departmentIds = watch('departmentIds')
+  const primaryDepartmentId = watch('primaryDepartmentId')
+  const primaryDepartmentOptions = useMemo(
+    () => selectedOptions(departmentOptions, departmentIds),
+    [departmentIds, departmentOptions],
+  )
+  const activeDepartmentIds = useMemo(
+    () => activeOptionIds(departmentOptions),
+    [departmentOptions],
+  )
+  const activePositionIds = useMemo(
+    () => activeOptionIds(positionOptions),
+    [positionOptions],
+  )
+
+  useEffect(() => {
+    if (departmentIds.length === 0 && primaryDepartmentId) {
+      setValue('primaryDepartmentId', '')
+      return
+    }
+
+    if (departmentIds.length === 1 && primaryDepartmentId !== departmentIds[0]) {
+      setValue('primaryDepartmentId', departmentIds[0])
+      return
+    }
+
+    if (
+      primaryDepartmentId &&
+      !departmentIds.includes(primaryDepartmentId)
+    ) {
+      setValue('primaryDepartmentId', '')
+    }
+  }, [departmentIds, primaryDepartmentId, setValue])
 
   function submitForm(value: UserFormValues) {
     const updateValue = {
@@ -89,19 +208,51 @@ export function UserForm({
       firstName: value.firstName,
       lastName: value.lastName,
     }
+    const submittedDepartmentIds = isCreate
+      ? value.departmentIds
+      : activeSelectedIds(value.departmentIds, activeDepartmentIds)
+    const submittedPrimaryDepartmentId = submittedDepartmentIds.includes(
+      value.primaryDepartmentId,
+    )
+      ? value.primaryDepartmentId
+      : ''
+    const submittedPositionIds = isCreate
+      ? value.positionIds
+      : activeSelectedIds(value.positionIds, activePositionIds)
+    const organizationValue = {
+      departmentIds: submittedDepartmentIds,
+      ...(submittedPrimaryDepartmentId
+        ? { primaryDepartmentId: submittedPrimaryDepartmentId }
+        : {}),
+      positionIds: submittedPositionIds,
+    }
 
     if (isCreate) {
       onSubmit({
         ...updateValue,
         password: value.password ?? '',
         roleCodes: canAssignRoles ? value.roleCodes : undefined,
+        ...organizationValue,
       })
       return
     }
 
+    const changedDepartmentIds = !equalSets(
+      initialDepartmentIds,
+      value.departmentIds,
+    )
+    const changedPrimaryDepartmentId =
+      initialPrimaryDepartmentId !== value.primaryDepartmentId
+    const changedPositionIds = !equalSets(initialPositionIds, value.positionIds)
+
     onSubmit({
       ...updateValue,
       roleCodes: canAssignRoles ? value.roleCodes : undefined,
+      ...(changedDepartmentIds ? { departmentIds: submittedDepartmentIds } : {}),
+      ...(changedPrimaryDepartmentId && submittedPrimaryDepartmentId
+        ? { primaryDepartmentId: submittedPrimaryDepartmentId }
+        : {}),
+      ...(changedPositionIds ? { positionIds: submittedPositionIds } : {}),
     })
   }
 
@@ -191,6 +342,73 @@ export function UserForm({
             </select>
           </Field>
         ) : null}
+
+        <Field label={t('users.form.departments')}>
+          <select
+            aria-label={t('users.form.departments')}
+            className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+            multiple
+            {...register('departmentIds', {
+              onChange: (event) => {
+                setValue('departmentIds', selectedValues(event))
+              },
+            })}
+          >
+            {departmentOptions.map((option) => (
+              <option
+                disabled={option.status === 'DISABLED'}
+                key={option.id}
+                value={option.id}
+              >
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field
+          error={errors.primaryDepartmentId?.message}
+          label={t('users.form.primaryDepartment')}
+        >
+          <select
+            aria-invalid={Boolean(errors.primaryDepartmentId)}
+            aria-label={t('users.form.primaryDepartment')}
+            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+            {...register('primaryDepartmentId')}
+          >
+            <option value="">
+              {t('users.form.primaryDepartmentPlaceholder')}
+            </option>
+            {primaryDepartmentOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label={t('users.form.positions')}>
+          <select
+            aria-label={t('users.form.positions')}
+            className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+            multiple
+            {...register('positionIds', {
+              onChange: (event) => {
+                setValue('positionIds', selectedValues(event))
+              },
+            })}
+          >
+            {positionOptions.map((option) => (
+              <option
+                disabled={option.status === 'DISABLED'}
+                key={option.id}
+                value={option.id}
+              >
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </Field>
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

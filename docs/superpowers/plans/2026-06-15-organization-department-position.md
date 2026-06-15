@@ -1432,7 +1432,7 @@ Expected: PASS.
 - Modify: `apps/admin/src/features/users/UsersPage.test.tsx`
 - Modify: `apps/admin/src/i18n/messages.ts`
 
-- [ ] **Step 1: Write failing user page tests**
+- [x] **Step 1: Write failing user page tests**
 
 Add tests for:
 
@@ -1458,7 +1458,7 @@ pnpm --filter admin test -- UsersPage.test.tsx
 
 Expected: FAIL because UI does not include organization fields.
 
-- [ ] **Step 2: Update user types and columns**
+- [x] **Step 2: Update user types and columns**
 
 Use generated user response fields. Add columns for:
 
@@ -1467,7 +1467,7 @@ Use generated user response fields. Add columns for:
 
 Keep these columns unsortable unless backend supports their sort fields.
 
-- [ ] **Step 3: Update UserForm**
+- [x] **Step 3: Update UserForm**
 
 Load department and position options in `UsersPage` and pass them into
 `UserForm`.
@@ -1498,7 +1498,7 @@ Implement form behavior:
 - update compares loaded organization ids to current form values and omits
   unchanged assignment fields from PATCH payload.
 
-- [ ] **Step 4: Update UsersPage filters**
+- [x] **Step 4: Update UsersPage filters**
 
 Add department and position filters using generated options endpoints:
 
@@ -1510,12 +1510,12 @@ getPositionOptions
 Pass selected filter values to `listUsers` as `departmentId` and `positionId`.
 Filters use active options by default and do not need `includeIds`.
 
-- [ ] **Step 5: Add i18n messages**
+- [x] **Step 5: Add i18n messages**
 
 Add labels and validation copy for department assignments, primary department,
 position assignments, department filter, and position filter.
 
-- [ ] **Step 6: Run user page tests**
+- [x] **Step 6: Run user page tests**
 
 Run:
 

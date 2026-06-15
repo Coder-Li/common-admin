@@ -20,6 +20,14 @@ import { can } from '../../lib/permissions'
 import { useAuthStore } from '../../stores/auth-store'
 import { UserForm } from './UserForm'
 import {
+  getDepartmentOptions,
+  getGetDepartmentOptionsQueryKey,
+} from '../../generated/api/endpoints/departments/departments'
+import {
+  getGetPositionOptionsQueryKey,
+  getPositionOptions,
+} from '../../generated/api/endpoints/positions/positions'
+import {
   getListRolesQueryKey,
   listRoles,
 } from '../../generated/api/endpoints/roles/roles'
@@ -39,6 +47,8 @@ import type {
 import { createUserColumns } from './users.columns'
 import type {
   CreateUserRequest,
+  DepartmentOptionsParams,
+  PositionOptionsParams,
   ResetUserPasswordRequest,
   UpdateUserRequest,
   UserListQuery,
@@ -52,6 +62,8 @@ type FormState =
   | null
 
 const allRoleFilter = 'ALL'
+const allDepartmentFilter = 'ALL'
+const allPositionFilter = 'ALL'
 
 function toSortParam(sorting: SortingState) {
   const firstSort = sorting[0]
@@ -72,6 +84,12 @@ export function UsersPage() {
   const [search, setSearch] = useState('')
   const [roleCode, setRoleCode] = useState<string | typeof allRoleFilter>(
     allRoleFilter,
+  )
+  const [departmentId, setDepartmentId] = useState<
+    string | typeof allDepartmentFilter
+  >(allDepartmentFilter)
+  const [positionId, setPositionId] = useState<string | typeof allPositionFilter>(
+    allPositionFilter,
   )
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -106,16 +124,97 @@ export function UsersPage() {
   })
   const roleOptions = rolesQuery.data?.items ?? []
 
+  const assignedDepartmentIds =
+    formState?.mode === 'edit'
+      ? (formState.user.departments ?? []).map((department) => department.id)
+      : []
+  const assignedPositionIds =
+    formState?.mode === 'edit'
+      ? (formState.user.positions ?? []).map((position) => position.id)
+      : []
+
+  const departmentOptionParams = useMemo(
+    () =>
+      ({
+        status: 'ACTIVE',
+        includeIds: assignedDepartmentIds.join(',') || undefined,
+      }) as DepartmentOptionsParams,
+    [assignedDepartmentIds],
+  )
+
+  const positionOptionParams = useMemo(
+    () =>
+      ({
+        status: 'ACTIVE',
+        includeIds: assignedPositionIds.join(',') || undefined,
+      }) as PositionOptionsParams,
+    [assignedPositionIds],
+  )
+
+  const activeOptionParams = useMemo(
+    () => ({ status: 'ACTIVE' }) as DepartmentOptionsParams,
+    [],
+  )
+
+  const activePositionOptionParams = useMemo(
+    () => ({ status: 'ACTIVE' }) as PositionOptionsParams,
+    [],
+  )
+
+  const departmentOptionsQuery = useQuery({
+    queryKey: getGetDepartmentOptionsQueryKey(departmentOptionParams),
+    queryFn: () => getDepartmentOptions(departmentOptionParams),
+  })
+
+  const positionOptionsQuery = useQuery({
+    queryKey: getGetPositionOptionsQueryKey(positionOptionParams),
+    queryFn: () => getPositionOptions(positionOptionParams),
+  })
+
+  const activeDepartmentOptionsQuery = useQuery({
+    queryKey: getGetDepartmentOptionsQueryKey(activeOptionParams),
+    queryFn: () => getDepartmentOptions(activeOptionParams),
+  })
+
+  const activePositionOptionsQuery = useQuery({
+    queryKey: getGetPositionOptionsQueryKey(activePositionOptionParams),
+    queryFn: () => getPositionOptions(activePositionOptionParams),
+  })
+
+  const departmentOptions = departmentOptionsQuery.data ?? []
+  const positionOptions = positionOptionsQuery.data ?? []
+  const activeDepartmentOptions = activeDepartmentOptionsQuery.data ?? []
+  const activePositionOptions = activePositionOptionsQuery.data ?? []
+
   const usersQueryParams = useMemo(
     () =>
-      toApiListQuery<{ roleCode?: string }, UserListQuery>({
-        filters: roleCode === allRoleFilter ? {} : { roleCode },
+      toApiListQuery<
+        {
+          departmentId?: string
+          positionId?: string
+          roleCode?: string
+        },
+        UserListQuery
+      >({
+        filters: {
+          ...(roleCode === allRoleFilter ? {} : { roleCode }),
+          ...(departmentId === allDepartmentFilter ? {} : { departmentId }),
+          ...(positionId === allPositionFilter ? {} : { positionId }),
+        },
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
         search,
         sort: toSortParam(sorting),
       }),
-    [pagination.pageIndex, pagination.pageSize, roleCode, search, sorting],
+    [
+      departmentId,
+      pagination.pageIndex,
+      pagination.pageSize,
+      positionId,
+      roleCode,
+      search,
+      sorting,
+    ],
   )
 
   const usersQuery = useQuery({
@@ -210,6 +309,8 @@ export function UsersPage() {
           edit: t('users.action.edit'),
           email: t('users.column.email'),
           fullName: t('users.column.fullName'),
+          positions: t('users.column.positions'),
+          primaryDepartment: t('users.column.primaryDepartment'),
           resetPassword: t('users.action.resetPassword'),
           role: t('users.column.role'),
           username: t('users.column.username'),
@@ -255,6 +356,22 @@ export function UsersPage() {
 
   function handleRoleChange(value: string | typeof allRoleFilter) {
     setRoleCode(value)
+    setPagination((currentPagination) => ({
+      ...currentPagination,
+      pageIndex: 0,
+    }))
+  }
+
+  function handleDepartmentChange(value: string | typeof allDepartmentFilter) {
+    setDepartmentId(value)
+    setPagination((currentPagination) => ({
+      ...currentPagination,
+      pageIndex: 0,
+    }))
+  }
+
+  function handlePositionChange(value: string | typeof allPositionFilter) {
+    setPositionId(value)
     setPagination((currentPagination) => ({
       ...currentPagination,
       pageIndex: 0,
@@ -328,26 +445,70 @@ export function UsersPage() {
         toolbar={
           <DataTableToolbar
             filters={
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <span>{t('users.form.role')}</span>
-                <select
-                  aria-label={t('users.filter.role')}
-                  className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-                  onChange={(event) =>
-                    handleRoleChange(event.target.value)
-                  }
-                  value={roleCode}
-                >
-                  <option value={allRoleFilter}>
-                    {t('users.filter.allRoles')}
-                  </option>
-                  {roleOptions.map((option) => (
-                    <option key={option.code} value={option.code}>
-                      {option.name}
+              <>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <span>{t('users.form.role')}</span>
+                  <select
+                    aria-label={t('users.filter.role')}
+                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                    onChange={(event) =>
+                      handleRoleChange(event.target.value)
+                    }
+                    value={roleCode}
+                  >
+                    <option value={allRoleFilter}>
+                      {t('users.filter.allRoles')}
                     </option>
-                  ))}
-                </select>
-              </label>
+                    {roleOptions.map((option) => (
+                      <option key={option.code} value={option.code}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <span>{t('users.form.departmentFilter')}</span>
+                  <select
+                    aria-label={t('users.filter.department')}
+                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                    onChange={(event) =>
+                      handleDepartmentChange(event.target.value)
+                    }
+                    value={departmentId}
+                  >
+                    <option value={allDepartmentFilter}>
+                      {t('users.filter.allDepartments')}
+                    </option>
+                    {activeDepartmentOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <span>{t('users.form.positionFilter')}</span>
+                  <select
+                    aria-label={t('users.filter.position')}
+                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                    onChange={(event) =>
+                      handlePositionChange(event.target.value)
+                    }
+                    value={positionId}
+                  >
+                    <option value={allPositionFilter}>
+                      {t('users.filter.allPositions')}
+                    </option>
+                    {activePositionOptions.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
             }
             onSearchChange={handleSearchChange}
             searchLabel={t('users.searchPlaceholder')}
@@ -379,6 +540,8 @@ export function UsersPage() {
               }
               mode={formState.mode}
               canAssignRoles={canAssignRoles}
+              departmentOptions={departmentOptions}
+              positionOptions={positionOptions}
               roleOptions={roleOptions}
               onCancel={() => setFormState(null)}
               onSubmit={handleSubmit}

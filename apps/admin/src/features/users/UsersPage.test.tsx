@@ -23,6 +23,14 @@ import {
   listRoles,
 } from '../../generated/api/endpoints/roles/roles'
 import {
+  getDepartmentOptions,
+  getGetDepartmentOptionsQueryKey,
+} from '../../generated/api/endpoints/departments/departments'
+import {
+  getGetPositionOptionsQueryKey,
+  getPositionOptions,
+} from '../../generated/api/endpoints/positions/positions'
+import {
   createUser,
   deleteUser,
   getListUsersQueryKey,
@@ -39,7 +47,13 @@ import type {
   UserListResponse,
   UserRecord,
 } from './users.types'
-import type { ListRolesParams } from '../../generated/api/schemas'
+import type {
+  DepartmentOptionDto,
+  GetDepartmentOptionsParams,
+  GetPositionOptionsParams,
+  ListRolesParams,
+  PositionOptionDto,
+} from '../../generated/api/schemas'
 import { UsersPage } from './UsersPage'
 
 vi.mock('../../generated/api/endpoints/roles/roles', () => ({
@@ -59,6 +73,21 @@ vi.mock('../../generated/api/endpoints/users/users', () => ({
   replaceUserRoles: vi.fn(),
   resetUserPassword: vi.fn(),
   updateUser: vi.fn(),
+}))
+
+vi.mock('../../generated/api/endpoints/departments/departments', () => ({
+  getDepartmentOptions: vi.fn(),
+  getGetDepartmentOptionsQueryKey: vi.fn(
+    (params?: GetDepartmentOptionsParams) =>
+      params ? ['/departments/options', params] : ['/departments/options'],
+  ),
+}))
+
+vi.mock('../../generated/api/endpoints/positions/positions', () => ({
+  getGetPositionOptionsQueryKey: vi.fn((params?: GetPositionOptionsParams) =>
+    params ? ['/positions/options', params] : ['/positions/options'],
+  ),
+  getPositionOptions: vi.fn(),
 }))
 
 vi.mock('../../app/query-client', () => ({
@@ -92,6 +121,69 @@ const bruno: UserRecord = {
   roles: [{ code: 'standard', name: 'Team member' }],
   createdAt: '2026-01-03T03:04:05.000Z',
   updatedAt: '2026-01-03T03:04:05.000Z',
+}
+
+const engineering = {
+  id: 'dept-engineering',
+  code: 'ENG',
+  name: 'Engineering',
+  status: 'ACTIVE',
+}
+
+const platform = {
+  id: 'dept-platform',
+  code: 'PLAT',
+  name: 'Platform',
+  status: 'ACTIVE',
+}
+
+const support = {
+  id: 'dept-support',
+  code: 'SUP',
+  name: 'Support',
+  status: 'ACTIVE',
+}
+
+const disabledOps = {
+  id: 'dept-ops',
+  code: 'OPS',
+  name: 'Operations',
+  status: 'DISABLED',
+}
+
+const engineerPosition = {
+  id: 'position-engineer',
+  code: 'ENG',
+  name: 'Engineer',
+  status: 'ACTIVE',
+}
+
+const leadPosition = {
+  id: 'position-lead',
+  code: 'LEAD',
+  name: 'Lead',
+  status: 'ACTIVE',
+}
+
+const disabledAdvisorPosition = {
+  id: 'position-advisor',
+  code: 'ADV',
+  name: 'Advisor',
+  status: 'DISABLED',
+}
+
+const aliceWithOrganization: UserRecord = {
+  ...alice,
+  departments: [engineering, disabledOps],
+  primaryDepartment: engineering,
+  positions: [engineerPosition, disabledAdvisorPosition],
+}
+
+const brunoWithOrganization: UserRecord = {
+  ...bruno,
+  departments: [],
+  primaryDepartment: null,
+  positions: [leadPosition],
 }
 
 const apiError = {
@@ -146,6 +238,27 @@ const roleOptions = [
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   },
+]
+
+const departmentOptions: DepartmentOptionDto[] = [
+  engineering,
+  platform,
+  support,
+]
+
+const departmentOptionsWithDisabled: DepartmentOptionDto[] = [
+  ...departmentOptions,
+  disabledOps,
+]
+
+const positionOptions: PositionOptionDto[] = [
+  engineerPosition,
+  leadPosition,
+]
+
+const positionOptionsWithDisabled: PositionOptionDto[] = [
+  ...positionOptions,
+  disabledAdvisorPosition,
 ]
 
 function renderUsersPage(
@@ -259,6 +372,20 @@ describe('UsersPage', () => {
       pageSize: 100,
       total: roleOptions.length,
     })
+    vi.mocked(getDepartmentOptions).mockReset()
+    vi.mocked(getDepartmentOptions).mockResolvedValue(departmentOptions)
+    vi.mocked(getGetDepartmentOptionsQueryKey).mockClear()
+    vi.mocked(getGetDepartmentOptionsQueryKey).mockImplementation(
+      (params?: GetDepartmentOptionsParams) =>
+        params ? ['/departments/options', params] : ['/departments/options'],
+    )
+    vi.mocked(getPositionOptions).mockReset()
+    vi.mocked(getPositionOptions).mockResolvedValue(positionOptions)
+    vi.mocked(getGetPositionOptionsQueryKey).mockClear()
+    vi.mocked(getGetPositionOptionsQueryKey).mockImplementation(
+      (params?: GetPositionOptionsParams) =>
+        params ? ['/positions/options', params] : ['/positions/options'],
+    )
   })
 
   afterEach(() => {
@@ -339,6 +466,311 @@ describe('UsersPage', () => {
       { label: 'Administrator', value: 'admin' },
       { label: 'Team member', value: 'standard' },
     ])
+  })
+
+  it('renders organization fields in create and edit forms', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+
+    renderUsersPage()
+    await screen.findByText('alice')
+
+    await user.click(screen.getByRole('button', { name: 'Create user' }))
+    expect(screen.getByLabelText('Departments')).toBeInTheDocument()
+    expect(screen.getByLabelText('Primary department')).toBeInTheDocument()
+    expect(screen.getByLabelText('Positions')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(screen.getByLabelText('Departments')).toBeInTheDocument()
+    expect(screen.getByLabelText('Primary department')).toBeInTheDocument()
+    expect(screen.getByLabelText('Positions')).toBeInTheDocument()
+  })
+
+  it('derives primary department choices from selected departments', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([]))
+
+    renderUsersPage()
+    await screen.findByText('No users found')
+
+    await user.click(screen.getByRole('button', { name: 'Create user' }))
+    const dialog = screen.getByRole('dialog')
+    const departmentsSelect = within(dialog).getByLabelText('Departments')
+    const primarySelect = within(dialog).getByLabelText('Primary department')
+
+    expect(
+      Array.from(primarySelect.querySelectorAll('option')).map(
+        (option) => option.value,
+      ),
+    ).toEqual([''])
+
+    await user.selectOptions(departmentsSelect, [
+      'dept-engineering',
+      'dept-platform',
+    ])
+
+    expect(
+      Array.from(primarySelect.querySelectorAll('option')).map((option) => ({
+        label: option.textContent,
+        value: option.value,
+      })),
+    ).toEqual([
+      { label: 'Select primary department', value: '' },
+      { label: 'Engineering', value: 'dept-engineering' },
+      { label: 'Platform', value: 'dept-platform' },
+    ])
+  })
+
+  it('loads edit options with includeIds for disabled assigned departments and positions', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([aliceWithOrganization]))
+    vi.mocked(getDepartmentOptions).mockResolvedValue(
+      departmentOptionsWithDisabled,
+    )
+    vi.mocked(getPositionOptions).mockResolvedValue(positionOptionsWithDisabled)
+
+    renderUsersPage()
+    await screen.findByText('alice')
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+
+    await waitFor(() => {
+      expect(getDepartmentOptions).toHaveBeenCalledWith({
+        status: 'ACTIVE',
+        includeIds: 'dept-engineering,dept-ops',
+      })
+    })
+    await waitFor(() => {
+      expect(getPositionOptions).toHaveBeenCalledWith({
+        status: 'ACTIVE',
+        includeIds: 'position-engineer,position-advisor',
+      })
+    })
+
+    const dialog = screen.getByRole('dialog')
+    const departmentsSelect = within(dialog).getByLabelText('Departments')
+    const positionsSelect = within(dialog).getByLabelText('Positions')
+    expect(
+      within(departmentsSelect).getByRole('option', { name: 'Operations' }),
+    ).toBeDisabled()
+    expect(
+      within(positionsSelect).getByRole('option', { name: 'Advisor' }),
+    ).toBeDisabled()
+  })
+
+  it('defaults one selected department as primary and clears invalid primary selections', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([]))
+    vi.mocked(createUser).mockResolvedValue(alice)
+
+    renderUsersPage()
+    await screen.findByText('No users found')
+
+    await user.click(screen.getByRole('button', { name: 'Create user' }))
+    const dialog = screen.getByRole('dialog')
+    const departmentsSelect = within(dialog).getByLabelText('Departments')
+    const primarySelect = within(dialog).getByLabelText('Primary department')
+
+    await user.selectOptions(departmentsSelect, [
+      'dept-engineering',
+      'dept-platform',
+    ])
+    await user.selectOptions(primarySelect, 'dept-engineering')
+    expect(primarySelect).toHaveValue('dept-engineering')
+
+    await user.deselectOptions(departmentsSelect, 'dept-engineering')
+    expect(primarySelect).toHaveValue('dept-platform')
+
+    await user.selectOptions(departmentsSelect, [
+      'dept-engineering',
+      'dept-platform',
+    ])
+    await user.selectOptions(primarySelect, 'dept-engineering')
+    expect(primarySelect).toHaveValue('dept-engineering')
+
+    await user.deselectOptions(departmentsSelect, 'dept-engineering')
+    await user.selectOptions(departmentsSelect, [
+      'dept-engineering',
+      'dept-platform',
+      'dept-support',
+    ])
+    await user.selectOptions(primarySelect, 'dept-engineering')
+    await user.deselectOptions(departmentsSelect, 'dept-engineering')
+    expect(primarySelect).toHaveValue('')
+  })
+
+  it('creates users with department and position assignments', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([]))
+    vi.mocked(createUser).mockResolvedValue(alice)
+
+    renderUsersPage()
+    await screen.findByText('No users found')
+
+    await user.click(screen.getByRole('button', { name: 'Create user' }))
+    await user.type(screen.getByLabelText('Email'), 'alice@example.com')
+    await user.type(screen.getByLabelText('Username'), 'alice')
+    await user.type(screen.getByLabelText('First name'), 'Alice')
+    await user.type(screen.getByLabelText('Last name'), 'Admin')
+    await user.type(screen.getByLabelText('Password'), 'password-1')
+    const dialog = screen.getByRole('dialog')
+    await user.selectOptions(within(dialog).getByLabelText('Departments'), [
+      'dept-engineering',
+      'dept-platform',
+    ])
+    await user.selectOptions(
+      within(dialog).getByLabelText('Primary department'),
+      'dept-platform',
+    )
+    await user.selectOptions(within(dialog).getByLabelText('Positions'), [
+      'position-engineer',
+      'position-lead',
+    ])
+    await user.click(within(dialog).getByRole('button', { name: 'Create user' }))
+
+    await waitFor(() => {
+      expect(createUser).toHaveBeenCalledWith(
+        expect.objectContaining<CreateUserRequest>({
+          departmentIds: ['dept-engineering', 'dept-platform'],
+          primaryDepartmentId: 'dept-platform',
+          positionIds: ['position-engineer', 'position-lead'],
+        }),
+      )
+    })
+  })
+
+  it('omits unchanged assignment fields when updating a user', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([aliceWithOrganization]))
+    vi.mocked(getDepartmentOptions).mockResolvedValue(
+      departmentOptionsWithDisabled,
+    )
+    vi.mocked(getPositionOptions).mockResolvedValue(positionOptionsWithDisabled)
+    vi.mocked(updateUser).mockResolvedValue(aliceWithOrganization)
+    vi.mocked(replaceUserRoles).mockResolvedValue(aliceWithOrganization)
+
+    renderUsersPage()
+    await screen.findByText('alice')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.clear(screen.getByLabelText('First name'))
+    await user.type(screen.getByLabelText('First name'), 'Alicia')
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit' }),
+    )
+
+    await waitFor(() => {
+      expect(updateUser).toHaveBeenCalledWith(
+        'user-1',
+        expect.not.objectContaining({
+          departmentIds: expect.anything(),
+          primaryDepartmentId: expect.anything(),
+          positionIds: expect.anything(),
+        }),
+      )
+    })
+  })
+
+  it('preserves disabled assignments when editing unrelated fields', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([aliceWithOrganization]))
+    vi.mocked(getDepartmentOptions).mockResolvedValue(
+      departmentOptionsWithDisabled,
+    )
+    vi.mocked(getPositionOptions).mockResolvedValue(positionOptionsWithDisabled)
+    vi.mocked(updateUser).mockResolvedValue(aliceWithOrganization)
+    vi.mocked(replaceUserRoles).mockResolvedValue(aliceWithOrganization)
+
+    renderUsersPage()
+    await screen.findByText('alice')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog')
+    const departmentsSelect = within(dialog).getByLabelText('Departments')
+    const positionsSelect = within(dialog).getByLabelText('Positions')
+    expect(
+      within(departmentsSelect).getByRole('option', { name: 'Operations' }),
+    ).toBeDisabled()
+    expect(
+      within(positionsSelect).getByRole('option', { name: 'Advisor' }),
+    ).toBeDisabled()
+
+    await user.clear(screen.getByLabelText('Last name'))
+    await user.type(screen.getByLabelText('Last name'), 'Owner')
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Edit' }),
+    )
+
+    await waitFor(() => {
+      expect(updateUser).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining<UpdateUserRequest>({
+          email: 'alice@example.com',
+          firstName: 'Alice',
+          lastName: 'Owner',
+          username: 'alice',
+        }),
+      )
+    })
+    expect(updateUser).toHaveBeenCalledWith(
+      'user-1',
+      expect.not.objectContaining({
+        departmentIds: expect.anything(),
+        primaryDepartmentId: expect.anything(),
+        positionIds: expect.anything(),
+      }),
+    )
+  })
+
+  it('passes department and position filters to the users query', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+
+    renderUsersPage()
+    await screen.findByText('alice')
+
+    await user.selectOptions(
+      screen.getByLabelText('Filter by department'),
+      'dept-engineering',
+    )
+    await waitFor(() => {
+      expect(listUsers).toHaveBeenLastCalledWith(
+        expect.objectContaining<UserListQuery>({
+          departmentId: 'dept-engineering',
+          page: 1,
+          pageSize: 20,
+        }),
+      )
+    })
+
+    await user.selectOptions(
+      screen.getByLabelText('Filter by position'),
+      'position-engineer',
+    )
+    await waitFor(() => {
+      expect(listUsers).toHaveBeenLastCalledWith(
+        expect.objectContaining<UserListQuery>({
+          departmentId: 'dept-engineering',
+          positionId: 'position-engineer',
+          page: 1,
+          pageSize: 20,
+        }),
+      )
+    })
+  })
+
+  it('renders primary department and position summaries in the table', async () => {
+    vi.mocked(listUsers).mockResolvedValue(
+      listResponse([aliceWithOrganization, brunoWithOrganization]),
+    )
+
+    renderUsersPage()
+
+    await screen.findByText('alice')
+    const table = screen.getByRole('table')
+    expect(within(table).getByText('Engineering')).toBeInTheDocument()
+    expect(within(table).getByText('Engineer, Advisor')).toBeInTheDocument()
+    expect(within(table).getByText('Lead')).toBeInTheDocument()
   })
 
   it('keeps user creation usable with selected role codes', async () => {
