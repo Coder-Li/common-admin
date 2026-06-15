@@ -1,5 +1,8 @@
 import type { ColumnDef } from '../../components/data-table/DataTable'
-import type { DepartmentRecord } from './departments.types'
+import type {
+  DepartmentRecord,
+  DepartmentTableRecord,
+} from './departments.types'
 
 export interface DepartmentColumnLabels {
   actions: string
@@ -45,7 +48,7 @@ function statusLabel(department: DepartmentRecord, labels: DepartmentColumnLabel
 export function createDepartmentColumns(
   labels: DepartmentColumnLabels,
   actions: DepartmentRowActions,
-): ColumnDef<DepartmentRecord>[] {
+): ColumnDef<DepartmentTableRecord>[] {
   return [
     {
       accessorKey: 'name',
@@ -67,7 +70,7 @@ export function createDepartmentColumns(
       id: 'parentName',
       header: labels.parent,
       enableSorting: false,
-      cell: ({ row }) => row.original.parentName ?? '-',
+      cell: ({ row }) => row.original.parentDisplayName || '-',
     },
     {
       accessorKey: 'status',

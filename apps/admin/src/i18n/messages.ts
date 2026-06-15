@@ -261,6 +261,8 @@ export const messages = {
     'departments.validation.max120': 'Use 120 characters or fewer',
     'departments.validation.max500': 'Use 500 characters or fewer',
     'departments.validation.name': 'Name is required',
+    'departments.validation.sortOrderMinimum':
+      'Sort order must be 0 or greater',
     'departments.validation.sortOrderInteger': 'Use a whole number',
     'files.action.delete': 'Delete',
     'files.action.download': 'Download',
@@ -718,6 +720,7 @@ export const messages = {
     'departments.validation.max120': '请不要超过 120 个字符',
     'departments.validation.max500': '请不要超过 500 个字符',
     'departments.validation.name': '请输入名称',
+    'departments.validation.sortOrderMinimum': '排序必须大于或等于 0',
     'departments.validation.sortOrderInteger': '请使用整数',
     'files.action.delete': '删除',
     'files.action.download': '下载',

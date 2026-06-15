@@ -10,6 +10,7 @@ import type { DepartmentOptionDto } from '../../generated/api/schemas'
 import { useI18n } from '../../i18n/useI18n'
 import type {
   CreateDepartmentRequest,
+  DepartmentFormValue,
   DepartmentRecord,
   DepartmentTreeNode,
   UpdateDepartmentRequest,
@@ -27,15 +28,6 @@ interface DepartmentFormProps {
   tree: DepartmentTreeNode[]
   onCancel: () => void
   onSubmit: (value: DepartmentFormSubmitValue) => void
-}
-
-interface DepartmentFormValues {
-  code: string
-  name: string
-  parentId: string
-  status: 'ACTIVE' | 'DISABLED'
-  sortOrder: number
-  description: string
 }
 
 type ParentOptionState = DepartmentOptionDto & {
@@ -144,7 +136,8 @@ export function DepartmentForm({
         status: z.enum(['ACTIVE', 'DISABLED']),
         sortOrder: z.coerce
           .number()
-          .int(t('departments.validation.sortOrderInteger')),
+          .int(t('departments.validation.sortOrderInteger'))
+          .min(0, t('departments.validation.sortOrderMinimum')),
         description: z
           .string()
           .max(500, t('departments.validation.max500')),
@@ -157,7 +150,7 @@ export function DepartmentForm({
     handleSubmit,
     register,
     setValue,
-  } = useForm<DepartmentFormValues>({
+  } = useForm<DepartmentFormValue & { description: string }>({
     resolver: zodResolver(schema),
     defaultValues: {
       code: initialValue?.code ?? '',
@@ -178,7 +171,7 @@ export function DepartmentForm({
     }
   }, [initialParentId, parentOptions, setValue])
 
-  function submitForm(value: DepartmentFormValues) {
+  function submitForm(value: DepartmentFormValue & { description: string }) {
     const parentId = normalizeParentId(value.parentId)
     const unchangedParentId = parentId === (initialValue?.parentId ?? null)
     const changedParentIsSelectable =
@@ -211,7 +204,7 @@ export function DepartmentForm({
   }
 
   return (
-    <form className="grid gap-4" onSubmit={handleSubmit(submitForm)}>
+    <form className="grid gap-4" noValidate onSubmit={handleSubmit(submitForm)}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field error={errors.code?.message} label={t('departments.form.code')}>
           <input

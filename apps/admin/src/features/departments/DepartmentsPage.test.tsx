@@ -111,6 +111,19 @@ const disabledChild: DepartmentRecord = {
   updatedAt: '2026-06-04T01:00:00.000Z',
 }
 
+const apiTeam: DepartmentRecord = {
+  id: 'dept-api',
+  code: 'api',
+  name: 'API',
+  parentId: 'dept-platform',
+  parentName: 'Platform',
+  status: 'ACTIVE',
+  sortOrder: 21,
+  description: null,
+  createdAt: '2026-06-05T00:00:00.000Z',
+  updatedAt: '2026-06-05T01:00:00.000Z',
+}
+
 const departmentTree: DepartmentTreeNodeDto[] = [
   {
     id: 'dept-engineering',
@@ -299,14 +312,20 @@ describe('DepartmentsPage', () => {
 
   it('renders tree and list rows for returned departments', async () => {
     vi.mocked(listDepartments).mockResolvedValue(
-      listResponse([engineering, platform]),
+      listResponse([engineering, platform, apiTeam]),
     )
 
     renderDepartmentsPage()
 
     expect(await screen.findByText('engineering')).toBeInTheDocument()
     expect(screen.getByText('platform')).toBeInTheDocument()
-    expect(screen.getByText('Engineering / Platform')).toBeInTheDocument()
+    const platformRow = screen.getByText('platform').closest('tr')
+    const apiRow = screen.getByText('api').closest('tr')
+
+    expect(within(platformRow!).getByText('Engineering')).toBeInTheDocument()
+    expect(within(apiRow!).getByText('Engineering / Platform')).toBeInTheDocument()
+    expect(screen.queryByText('Engineering / Platform / API'))
+      .not.toBeInTheDocument()
     expect(screen.getByText('Builds product')).toBeInTheDocument()
   })
 
@@ -362,6 +381,30 @@ describe('DepartmentsPage', () => {
     expect(createDepartment).toHaveBeenCalledWith(
       expect.not.objectContaining({ parentId: expect.any(String) }),
     )
+  })
+
+  it('rejects negative sort order and prevents submit', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listDepartments).mockResolvedValue(listResponse([]))
+
+    renderDepartmentsPage()
+    await screen.findByText('No departments found')
+
+    await user.click(screen.getByRole('button', { name: 'Create department' }))
+    await user.type(screen.getByLabelText('Code'), 'engineering')
+    await user.type(screen.getByLabelText('Name'), 'Engineering')
+    await user.clear(screen.getByLabelText('Sort order'))
+    await user.type(screen.getByLabelText('Sort order'), '-1')
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Create department',
+      }),
+    )
+
+    expect(
+      await screen.findByText('Sort order must be 0 or greater'),
+    ).toBeInTheDocument()
+    expect(createDepartment).not.toHaveBeenCalled()
   })
 
   it('creates a child department with the selected parent id', async () => {

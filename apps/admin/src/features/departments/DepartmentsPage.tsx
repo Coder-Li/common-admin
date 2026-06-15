@@ -41,6 +41,7 @@ import type {
   CreateDepartmentRequest,
   DepartmentListQuery,
   DepartmentRecord,
+  DepartmentTableRecord,
   DepartmentTreeNode,
   UpdateDepartmentRequest,
 } from './departments.types'
@@ -94,16 +95,20 @@ function findPath(
   return null
 }
 
-function withTreePaths(
+function withParentDisplayNames(
   records: DepartmentRecord[],
   tree: DepartmentTreeNode[],
-): DepartmentRecord[] {
+): DepartmentTableRecord[] {
   return records.map((record) => {
     const path = findPath(tree, record.id)
+    const parentPath = path?.slice(0, -1) ?? []
 
-    return path && path.length > 1
-      ? { ...record, parentName: path.join(' / ') }
-      : record
+    return {
+      ...record,
+      parentDisplayName: parentPath.length
+        ? parentPath.join(' / ')
+        : record.parentName ?? '',
+    }
   })
 }
 
@@ -246,7 +251,11 @@ export function DepartmentsPage() {
   )
 
   const tableData = useMemo(
-    () => withTreePaths(departmentsQuery.data?.items ?? [], treeQuery.data ?? []),
+    () =>
+      withParentDisplayNames(
+        departmentsQuery.data?.items ?? [],
+        treeQuery.data ?? [],
+      ),
     [departmentsQuery.data?.items, treeQuery.data],
   )
 

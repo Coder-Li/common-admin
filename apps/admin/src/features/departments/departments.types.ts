@@ -16,6 +16,9 @@ export type DepartmentListQuery = ListDepartmentsParams & {
 }
 export type CreateDepartmentRequest = CreateDepartmentDto
 export type UpdateDepartmentRequest = UpdateDepartmentDto
+export type DepartmentTableRecord = DepartmentRecord & {
+  parentDisplayName: string
+}
 
 export interface DepartmentFormValue {
   code: string
