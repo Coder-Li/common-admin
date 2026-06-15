@@ -179,6 +179,13 @@ const aliceWithOrganization: UserRecord = {
   positions: [engineerPosition, disabledAdvisorPosition],
 }
 
+const aliceWithPrimaryDepartmentOnly: UserRecord = {
+  ...alice,
+  departments: [engineering],
+  primaryDepartment: engineering,
+  positions: [],
+}
+
 const brunoWithOrganization: UserRecord = {
   ...bruno,
   departments: [],
@@ -666,6 +673,42 @@ describe('UsersPage', () => {
           departmentIds: expect.anything(),
           primaryDepartmentId: expect.anything(),
           positionIds: expect.anything(),
+        }),
+      )
+    })
+  })
+
+  it('includes current primary department when adding a department during edit', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(
+      listResponse([aliceWithPrimaryDepartmentOnly]),
+    )
+    vi.mocked(updateUser).mockResolvedValue(aliceWithPrimaryDepartmentOnly)
+    vi.mocked(replaceUserRoles).mockResolvedValue(
+      aliceWithPrimaryDepartmentOnly,
+    )
+
+    renderUsersPage()
+    await screen.findByText('alice')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog')
+    await user.selectOptions(within(dialog).getByLabelText('Departments'), [
+      'dept-engineering',
+      'dept-platform',
+    ])
+    await user.selectOptions(
+      within(dialog).getByLabelText('Primary department'),
+      'dept-engineering',
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
+
+    await waitFor(() => {
+      expect(updateUser).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining<UpdateUserRequest>({
+          departmentIds: ['dept-engineering', 'dept-platform'],
+          primaryDepartmentId: 'dept-engineering',
         }),
       )
     })

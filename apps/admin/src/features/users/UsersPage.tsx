@@ -124,31 +124,45 @@ export function UsersPage() {
   })
   const roleOptions = rolesQuery.data?.items ?? []
 
-  const assignedDepartmentIds =
-    formState?.mode === 'edit'
-      ? (formState.user.departments ?? []).map((department) => department.id)
-      : []
-  const assignedPositionIds =
-    formState?.mode === 'edit'
-      ? (formState.user.positions ?? []).map((position) => position.id)
-      : []
+  const assignedDepartmentIds = useMemo(
+    () =>
+      formState?.mode === 'edit'
+        ? (formState.user.departments ?? []).map((department) => department.id)
+        : [],
+    [formState],
+  )
+  const assignedPositionIds = useMemo(
+    () =>
+      formState?.mode === 'edit'
+        ? (formState.user.positions ?? []).map((position) => position.id)
+        : [],
+    [formState],
+  )
+  const assignedDepartmentIncludeIds = useMemo(
+    () => assignedDepartmentIds.join(',') || undefined,
+    [assignedDepartmentIds],
+  )
+  const assignedPositionIncludeIds = useMemo(
+    () => assignedPositionIds.join(',') || undefined,
+    [assignedPositionIds],
+  )
 
   const departmentOptionParams = useMemo(
     () =>
       ({
         status: 'ACTIVE',
-        includeIds: assignedDepartmentIds.join(',') || undefined,
+        includeIds: assignedDepartmentIncludeIds,
       }) as DepartmentOptionsParams,
-    [assignedDepartmentIds],
+    [assignedDepartmentIncludeIds],
   )
 
   const positionOptionParams = useMemo(
     () =>
       ({
         status: 'ACTIVE',
-        includeIds: assignedPositionIds.join(',') || undefined,
+        includeIds: assignedPositionIncludeIds,
       }) as PositionOptionsParams,
-    [assignedPositionIds],
+    [assignedPositionIncludeIds],
   )
 
   const activeOptionParams = useMemo(

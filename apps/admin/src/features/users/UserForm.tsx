@@ -244,12 +244,15 @@ export function UserForm({
     const changedPrimaryDepartmentId =
       initialPrimaryDepartmentId !== value.primaryDepartmentId
     const changedPositionIds = !equalSets(initialPositionIds, value.positionIds)
+    const shouldSubmitPrimaryDepartmentId =
+      Boolean(submittedPrimaryDepartmentId) &&
+      (changedDepartmentIds || changedPrimaryDepartmentId)
 
     onSubmit({
       ...updateValue,
       roleCodes: canAssignRoles ? value.roleCodes : undefined,
       ...(changedDepartmentIds ? { departmentIds: submittedDepartmentIds } : {}),
-      ...(changedPrimaryDepartmentId && submittedPrimaryDepartmentId
+      ...(shouldSubmitPrimaryDepartmentId
         ? { primaryDepartmentId: submittedPrimaryDepartmentId }
         : {}),
       ...(changedPositionIds ? { positionIds: submittedPositionIds } : {}),
