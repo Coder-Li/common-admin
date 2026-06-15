@@ -108,6 +108,9 @@ const alice: UserRecord = {
   firstName: 'Alice',
   lastName: 'Admin',
   roles: [{ code: 'admin', name: 'Administrator' }],
+  departments: [],
+  primaryDepartment: null,
+  positions: [],
   createdAt: '2026-01-02T03:04:05.000Z',
   updatedAt: '2026-01-02T03:04:05.000Z',
 }
@@ -119,53 +122,56 @@ const bruno: UserRecord = {
   firstName: 'Bruno',
   lastName: 'Builder',
   roles: [{ code: 'standard', name: 'Team member' }],
+  departments: [],
+  primaryDepartment: null,
+  positions: [],
   createdAt: '2026-01-03T03:04:05.000Z',
   updatedAt: '2026-01-03T03:04:05.000Z',
 }
 
-const engineering = {
+const engineering: DepartmentOptionDto = {
   id: 'dept-engineering',
   code: 'ENG',
   name: 'Engineering',
   status: 'ACTIVE',
 }
 
-const platform = {
+const platform: DepartmentOptionDto = {
   id: 'dept-platform',
   code: 'PLAT',
   name: 'Platform',
   status: 'ACTIVE',
 }
 
-const support = {
+const support: DepartmentOptionDto = {
   id: 'dept-support',
   code: 'SUP',
   name: 'Support',
   status: 'ACTIVE',
 }
 
-const disabledOps = {
+const disabledOps: DepartmentOptionDto = {
   id: 'dept-ops',
   code: 'OPS',
   name: 'Operations',
   status: 'DISABLED',
 }
 
-const engineerPosition = {
+const engineerPosition: PositionOptionDto = {
   id: 'position-engineer',
   code: 'ENG',
   name: 'Engineer',
   status: 'ACTIVE',
 }
 
-const leadPosition = {
+const leadPosition: PositionOptionDto = {
   id: 'position-lead',
   code: 'LEAD',
   name: 'Lead',
   status: 'ACTIVE',
 }
 
-const disabledAdvisorPosition = {
+const disabledAdvisorPosition: PositionOptionDto = {
   id: 'position-advisor',
   code: 'ADV',
   name: 'Advisor',
@@ -638,6 +644,11 @@ describe('UsersPage', () => {
     await waitFor(() => {
       expect(createUser).toHaveBeenCalledWith(
         expect.objectContaining<CreateUserRequest>({
+          email: 'alice@example.com',
+          firstName: 'Alice',
+          lastName: 'Admin',
+          password: 'password-1',
+          username: 'alice',
           departmentIds: ['dept-engineering', 'dept-platform'],
           primaryDepartmentId: 'dept-platform',
           positionIds: ['position-engineer', 'position-lead'],

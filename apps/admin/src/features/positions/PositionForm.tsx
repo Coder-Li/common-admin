@@ -6,7 +6,6 @@ import { z } from 'zod'
 import { useI18n } from '../../i18n/useI18n'
 import type {
   CreatePositionRequest,
-  PositionFormValue,
   PositionRecord,
   UpdatePositionRequest,
 } from './positions.types'
@@ -21,6 +20,14 @@ interface PositionFormProps {
   isSubmitting: boolean
   onCancel: () => void
   onSubmit: (value: PositionFormSubmitValue) => void
+}
+
+interface PositionFormValues {
+  code: string
+  name: string
+  status: 'ACTIVE' | 'DISABLED'
+  sortOrder: number
+  description: string
 }
 
 function descriptionToFormValue(
@@ -58,7 +65,7 @@ export function PositionForm({
           .min(1, t('positions.validation.name'))
           .max(120, t('positions.validation.max120')),
         status: z.enum(['ACTIVE', 'DISABLED']),
-        sortOrder: z.coerce
+        sortOrder: z
           .number()
           .int(t('positions.validation.sortOrderInteger'))
           .min(0, t('positions.validation.sortOrderMinimum')),
@@ -71,7 +78,7 @@ export function PositionForm({
     formState: { errors },
     handleSubmit,
     register,
-  } = useForm<PositionFormValue>({
+  } = useForm<PositionFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       code: initialValue?.code ?? '',
@@ -82,7 +89,7 @@ export function PositionForm({
     },
   })
 
-  function submitForm(value: PositionFormValue) {
+  function submitForm(value: PositionFormValues) {
     const description = normalizeDescription(value.description)
     const payload = {
       code: value.code.trim(),

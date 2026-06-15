@@ -10,7 +10,6 @@ import type { DepartmentOptionDto } from '../../generated/api/schemas'
 import { useI18n } from '../../i18n/useI18n'
 import type {
   CreateDepartmentRequest,
-  DepartmentFormValue,
   DepartmentRecord,
   DepartmentTreeNode,
   UpdateDepartmentRequest,
@@ -32,6 +31,15 @@ interface DepartmentFormProps {
 
 type ParentOptionState = DepartmentOptionDto & {
   disabledReason?: 'current' | 'descendant' | 'disabled'
+}
+
+interface DepartmentFormValues {
+  code: string
+  name: string
+  parentId: string
+  status: 'ACTIVE' | 'DISABLED'
+  sortOrder: number
+  description: string
 }
 
 function descriptionToFormValue(
@@ -134,7 +142,7 @@ export function DepartmentForm({
           .max(120, t('departments.validation.max120')),
         parentId: z.string(),
         status: z.enum(['ACTIVE', 'DISABLED']),
-        sortOrder: z.coerce
+        sortOrder: z
           .number()
           .int(t('departments.validation.sortOrderInteger'))
           .min(0, t('departments.validation.sortOrderMinimum')),
@@ -150,7 +158,7 @@ export function DepartmentForm({
     handleSubmit,
     register,
     setValue,
-  } = useForm<DepartmentFormValue & { description: string }>({
+  } = useForm<DepartmentFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       code: initialValue?.code ?? '',
@@ -171,7 +179,7 @@ export function DepartmentForm({
     }
   }, [initialParentId, parentOptions, setValue])
 
-  function submitForm(value: DepartmentFormValue & { description: string }) {
+  function submitForm(value: DepartmentFormValues) {
     const parentId = normalizeParentId(value.parentId)
     const unchangedParentId = parentId === (initialValue?.parentId ?? null)
     const changedParentIsSelectable =

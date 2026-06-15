@@ -28,7 +28,6 @@ import type {
   DepartmentListResponseDto,
   DepartmentOptionDto,
   DepartmentTreeNodeDto,
-  ListDepartmentsParams,
   UpdateDepartmentDto,
 } from '../../generated/api/schemas'
 import type { DepartmentRecord } from './departments.types'
@@ -83,19 +82,6 @@ const platform: DepartmentRecord = {
   description: null,
   createdAt: '2026-06-02T00:00:00.000Z',
   updatedAt: '2026-06-02T01:00:00.000Z',
-}
-
-const legacyOps: DepartmentRecord = {
-  id: 'dept-legacy-ops',
-  code: 'legacy_ops',
-  name: 'Legacy Ops',
-  parentId: null,
-  parentName: null,
-  status: 'DISABLED',
-  sortOrder: 30,
-  description: null,
-  createdAt: '2026-06-03T00:00:00.000Z',
-  updatedAt: '2026-06-03T01:00:00.000Z',
 }
 
 const disabledChild: DepartmentRecord = {
@@ -341,7 +327,7 @@ describe('DepartmentsPage', () => {
 
     await waitFor(() => {
       expect(listDepartments).toHaveBeenLastCalledWith(
-        expect.objectContaining<ListDepartmentsParams>({
+        expect.objectContaining({
           page: 1,
           pageSize: 20,
           search: 'eng',

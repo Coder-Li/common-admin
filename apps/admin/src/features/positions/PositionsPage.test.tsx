@@ -21,7 +21,6 @@ import {
   updatePosition,
 } from '../../generated/api/endpoints/positions/positions'
 import type {
-  ListPositionsParams,
   PositionListResponseDto,
   UpdatePositionDto,
 } from '../../generated/api/schemas'
@@ -195,7 +194,7 @@ describe('PositionsPage', () => {
 
     await waitFor(() => {
       expect(listPositions).toHaveBeenLastCalledWith(
-        expect.objectContaining<ListPositionsParams>({
+        expect.objectContaining({
           page: 1,
           pageSize: 50,
           search: 'eng',

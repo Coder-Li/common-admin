@@ -140,6 +140,9 @@ const usersOnlyCurrentUser = {
   firstName: usersOnlySession.user.firstName,
   lastName: usersOnlySession.user.lastName,
   roles: usersOnlySession.user.roles,
+  departments: [],
+  primaryDepartment: null,
+  positions: [],
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
