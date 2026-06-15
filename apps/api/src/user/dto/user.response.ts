@@ -10,6 +10,20 @@ class UserRoleResponseDto {
   name!: string;
 }
 
+class UserOrganizationSummaryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  code!: string;
+
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty()
+  status!: string;
+}
+
 export class UserResponseDto implements PublicUser {
   @ApiProperty()
   id!: string;
@@ -28,6 +42,15 @@ export class UserResponseDto implements PublicUser {
 
   @ApiProperty({ type: [UserRoleResponseDto] })
   roles!: UserRoleResponseDto[];
+
+  @ApiProperty({ type: [UserOrganizationSummaryDto] })
+  departments!: UserOrganizationSummaryDto[];
+
+  @ApiProperty({ type: UserOrganizationSummaryDto, nullable: true })
+  primaryDepartment!: UserOrganizationSummaryDto | null;
+
+  @ApiProperty({ type: [UserOrganizationSummaryDto] })
+  positions!: UserOrganizationSummaryDto[];
 
   @ApiProperty()
   createdAt!: string;

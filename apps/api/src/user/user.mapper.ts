@@ -1,4 +1,17 @@
-import { PublicUser, UserProfile, UserRoleSummary } from './user.types';
+import {
+  PublicUser,
+  UserOrganizationSummary,
+  UserProfile,
+  UserRoleSummary,
+} from './user.types';
+
+interface OrganizationRecord {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  sortOrder?: number | null;
+}
 
 interface PersistedUser {
   id: string;
@@ -13,6 +26,13 @@ interface PersistedUser {
       code: string;
       name: string;
     };
+  }>;
+  departments?: Array<{
+    isPrimary: boolean;
+    department: OrganizationRecord;
+  }>;
+  positions?: Array<{
+    position: OrganizationRecord;
   }>;
 }
 
@@ -38,6 +58,8 @@ function toIsoString(value: Date | string): string {
 export function toUserResponse(
   user: PersistedUser & { createdAt: Date | string; updatedAt: Date | string },
 ): PublicUser {
+  const departments = toDepartmentSummaries(user);
+
   return {
     id: user.id,
     email: user.email,
@@ -45,6 +67,16 @@ export function toUserResponse(
     firstName: user.firstName,
     lastName: user.lastName,
     roles: toRoleSummaries(user),
+    departments,
+    primaryDepartment:
+      departments.find((department) =>
+        user.departments?.some(
+          (userDepartment) =>
+            userDepartment.isPrimary &&
+            userDepartment.department.id === department.id,
+        ),
+      ) ?? null,
+    positions: toPositionSummaries(user),
     createdAt: toIsoString(user.createdAt),
     updatedAt: toIsoString(user.updatedAt),
   };
@@ -57,4 +89,46 @@ function toRoleSummaries(user: PersistedUser): UserRoleSummary[] {
       name: userRole.role.name,
     }))
     .sort((a, b) => a.code.localeCompare(b.code));
+}
+
+function toDepartmentSummaries(user: PersistedUser): UserOrganizationSummary[] {
+  return [...(user.departments ?? [])]
+    .sort((a, b) => {
+      if (a.isPrimary !== b.isPrimary) {
+        return a.isPrimary ? -1 : 1;
+      }
+
+      return compareOrganizationRecords(a.department, b.department);
+    })
+    .map((userDepartment) => toOrganizationSummary(userDepartment.department));
+}
+
+function toPositionSummaries(user: PersistedUser): UserOrganizationSummary[] {
+  return [...(user.positions ?? [])]
+    .sort((a, b) => compareOrganizationRecords(a.position, b.position))
+    .map((userPosition) => toOrganizationSummary(userPosition.position));
+}
+
+function compareOrganizationRecords(
+  a: OrganizationRecord,
+  b: OrganizationRecord,
+): number {
+  const sortOrderDelta = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+
+  if (sortOrderDelta !== 0) {
+    return sortOrderDelta;
+  }
+
+  return a.name.localeCompare(b.name);
+}
+
+function toOrganizationSummary(
+  organization: OrganizationRecord,
+): UserOrganizationSummary {
+  return {
+    id: organization.id,
+    code: organization.code,
+    name: organization.name,
+    status: organization.status,
+  };
 }

@@ -17,7 +17,11 @@ import type {
   AuditRequestMeta,
 } from '../audit-log/audit-log.types';
 import { ListQueryDto } from '../common/dto/list-query.dto';
-import { UserListQueryDto } from './dto/user.request';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  UserListQueryDto,
+} from './dto/user.request';
 import { toUserResponse } from './user.mapper';
 import { UserService } from './user.service';
 
@@ -66,11 +70,19 @@ describe('UserListQueryDto', () => {
       metatype: UserListQueryDto,
     });
 
-  it('inherits list defaults and validates roleCode filters', async () => {
-    await expect(transformQuery({ roleCode: 'admin' })).resolves.toMatchObject({
+  it('inherits list defaults and validates organization filters', async () => {
+    await expect(
+      transformQuery({
+        roleCode: 'admin',
+        departmentId: 'dept-1',
+        positionId: 'pos-1',
+      }),
+    ).resolves.toMatchObject({
       page: 1,
       pageSize: 20,
       roleCode: 'admin',
+      departmentId: 'dept-1',
+      positionId: 'pos-1',
     });
   });
 
@@ -78,6 +90,54 @@ describe('UserListQueryDto', () => {
     await expect(transformQuery({ sort: 'role:asc' })).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+});
+
+describe('user organization assignment DTOs', () => {
+  const pipe = new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  });
+
+  const transformBody = (
+    dto: typeof CreateUserDto | typeof UpdateUserDto,
+    body: Record<string, unknown>,
+  ) =>
+    pipe.transform(body, {
+      type: 'body',
+      metatype: dto,
+    });
+
+  it('accepts optional organization assignment fields on create', async () => {
+    await expect(
+      transformBody(CreateUserDto, {
+        email: 'admin@example.com',
+        username: 'admin',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        password: 'CorrectHorse123',
+        departmentIds: ['dept-1'],
+        primaryDepartmentId: 'dept-1',
+        positionIds: ['pos-1'],
+      }),
+    ).resolves.toMatchObject({
+      departmentIds: ['dept-1'],
+      primaryDepartmentId: 'dept-1',
+      positionIds: ['pos-1'],
+    });
+  });
+
+  it('accepts optional organization assignment fields on update', async () => {
+    await expect(
+      transformBody(UpdateUserDto, {
+        departmentIds: [],
+        positionIds: [],
+      }),
+    ).resolves.toMatchObject({
+      departmentIds: [],
+      positionIds: [],
+    });
   });
 });
 
@@ -102,6 +162,9 @@ describe('user mapper', () => {
       firstName: 'Ada',
       lastName: 'Lovelace',
       roles: [{ code: 'admin', name: 'Admin' }],
+      departments: [],
+      primaryDepartment: null,
+      positions: [],
       createdAt: '2026-06-07T01:02:03.000Z',
       updatedAt: '2026-06-07T04:05:06.000Z',
     });
@@ -109,6 +172,72 @@ describe('user mapper', () => {
 
   it('excludes passwordHash from public response output', () => {
     expect(toUserResponse(persistedUser)).not.toHaveProperty('passwordHash');
+  });
+
+  it('maps organization assignments to ordered public summaries', () => {
+    const response = toUserResponse({
+      ...persistedUser,
+      departments: [
+        {
+          isPrimary: false,
+          department: {
+            id: 'dept-2',
+            code: 'operations',
+            name: 'Operations',
+            status: 'ACTIVE',
+            sortOrder: 1,
+          },
+        },
+        {
+          isPrimary: true,
+          department: {
+            id: 'dept-1',
+            code: 'engineering',
+            name: 'Engineering',
+            status: 'ACTIVE',
+            sortOrder: 99,
+          },
+        },
+      ],
+      positions: [
+        {
+          position: {
+            id: 'pos-2',
+            code: 'architect',
+            name: 'Architect',
+            status: 'ACTIVE',
+            sortOrder: 2,
+          },
+        },
+        {
+          position: {
+            id: 'pos-1',
+            code: 'developer',
+            name: 'Developer',
+            status: 'ACTIVE',
+            sortOrder: 1,
+          },
+        },
+      ],
+    });
+
+    expect(response.departments).toEqual([
+      expect.objectContaining({
+        id: 'dept-1',
+        code: 'engineering',
+        name: 'Engineering',
+        status: 'ACTIVE',
+      }),
+      expect.objectContaining({
+        id: 'dept-2',
+        code: 'operations',
+      }),
+    ]);
+    expect(response.primaryDepartment).toMatchObject({ id: 'dept-1' });
+    expect(response.positions).toEqual([
+      expect.objectContaining({ id: 'pos-1', code: 'developer' }),
+      expect.objectContaining({ id: 'pos-2', code: 'architect' }),
+    ]);
   });
 });
 
@@ -424,6 +553,9 @@ describe('UserService', () => {
       firstName: 'Ada',
       lastName: 'Lovelace',
       roles: [{ code: 'admin', name: 'Admin' }],
+      departments: [],
+      primaryDepartment: null,
+      positions: [],
       createdAt: '2026-06-07T01:02:03.000Z',
       updatedAt: '2026-06-07T04:05:06.000Z',
     });

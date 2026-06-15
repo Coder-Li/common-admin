@@ -869,7 +869,7 @@ Expected: commit succeeds.
 - Modify: `apps/api/src/user/user.types.ts`
 - Modify: `apps/api/src/user/user.service.spec.ts`
 
-- [ ] **Step 1: Write failing mapper tests**
+- [x] **Step 1: Write failing mapper tests**
 
 Add tests to `apps/api/src/user/user.service.spec.ts` or a focused mapper test
 if one already exists. Assert `toUserResponse` includes:
@@ -897,7 +897,7 @@ pnpm --filter api test -- user.service.spec.ts
 
 Expected: FAIL because response shape does not include organization summaries.
 
-- [ ] **Step 2: Add DTO fields**
+- [x] **Step 2: Add DTO fields**
 
 Update create/update request DTOs:
 
@@ -932,7 +932,7 @@ primaryDepartment!: UserOrganizationSummaryDto | null;
 positions!: UserOrganizationSummaryDto[];
 ```
 
-- [ ] **Step 3: Update mapper**
+- [x] **Step 3: Update mapper**
 
 Map included relations:
 
@@ -940,7 +940,7 @@ Map included relations:
 - positions ordered by `sortOrder`, then `name`;
 - `primaryDepartment` from the relation with `isPrimary`.
 
-- [ ] **Step 4: Run mapper/user tests**
+- [x] **Step 4: Run mapper/user tests**
 
 Run:
 

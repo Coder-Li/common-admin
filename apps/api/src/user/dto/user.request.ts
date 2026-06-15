@@ -26,6 +26,16 @@ export class UserListQueryDto extends ListQueryDto {
   @IsString()
   roleCode?: string;
 
+  @ApiPropertyOptional({ example: 'dept-1' })
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @ApiPropertyOptional({ example: 'pos-1' })
+  @IsOptional()
+  @IsString()
+  positionId?: string;
+
   @ApiPropertyOptional({
     example: 'createdAt:desc',
     description: `Sort by one of: ${USER_SORT_FIELDS.join(', ')}`,
@@ -72,6 +82,23 @@ export class CreateUserDto {
   @IsArray()
   @IsString({ each: true })
   roleCodes?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  departmentIds?: string[];
+
+  @ApiPropertyOptional({ example: 'dept-1' })
+  @IsOptional()
+  @IsString()
+  primaryDepartmentId?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  positionIds?: string[];
 }
 
 export class UpdateUserDto {
@@ -101,6 +128,23 @@ export class UpdateUserDto {
   @MinLength(1)
   @MaxLength(80)
   lastName?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  departmentIds?: string[];
+
+  @ApiPropertyOptional({ example: 'dept-1' })
+  @IsOptional()
+  @IsString()
+  primaryDepartmentId?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  positionIds?: string[];
 }
 
 export class ReplaceUserRolesDto {
