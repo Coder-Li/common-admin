@@ -5,6 +5,7 @@ export const AUDIT_ACTIONS = {
   RESET_PASSWORD: 'reset_password',
   REPLACE_ROLES: 'replace_roles',
   REPLACE_PERMISSIONS: 'replace_permissions',
+  REVOKE: 'revoke',
   SYSTEM_SETTING_UPDATE: 'system_setting.update',
   SYSTEM_SETTING_CACHE_REFRESH: 'system_setting.cache_refresh',
 } as const;
@@ -17,6 +18,7 @@ export const AUDIT_RESOURCE_TYPES = {
   DICTIONARY_ITEM: 'dictionary_item',
   FILE: 'file',
   SYSTEM_SETTING: 'system_setting',
+  USER_SESSION: 'user_session',
 } as const;
 
 export const AUDIT_LOG_SORT_FIELDS = new Set([

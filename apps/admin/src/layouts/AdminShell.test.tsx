@@ -101,6 +101,10 @@ vi.mock('../features/audit-logs/AuditLogsPage', () => ({
   AuditLogsPage: () => <div>Audit logs page content</div>,
 }))
 
+vi.mock('../features/session-management/SessionManagementPage', () => ({
+  SessionManagementPage: () => <div>Session management page content</div>,
+}))
+
 function mockBrowserLanguages(languages: readonly string[]) {
   Object.defineProperty(window.navigator, 'languages', {
     configurable: true,
@@ -256,6 +260,17 @@ describe('AdminShell i18n', () => {
     )
   })
 
+  it('renders the Online Sessions nav item when user session read permission is present', async () => {
+    renderAdminShell('/session-management', ['user_session.read'])
+
+    expect(
+      await screen.findByTestId('nav-session-management'),
+    ).toHaveTextContent('Online Sessions')
+    expect(screen.getByTestId('mobile-nav-session-management')).toHaveTextContent(
+      'Online Sessions',
+    )
+  })
+
   it('renders FilesPage for the files route', async () => {
     renderAdminShell('/files')
 
@@ -276,6 +291,16 @@ describe('AdminShell i18n', () => {
       screen.getByRole('heading', { level: 1, name: 'Audit Logs' }),
     ).toBeInTheDocument()
     expect(screen.getByText('Audit logs page content')).toBeInTheDocument()
+  })
+
+  it('renders SessionManagementPage for the session management route', async () => {
+    renderAdminShell('/session-management', ['user_session.read'])
+
+    expect(await screen.findByText('System / Online Sessions')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Online Sessions' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Session management page content')).toBeInTheDocument()
   })
 
   it('hides Users nav without user read permission', async () => {

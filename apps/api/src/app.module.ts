@@ -20,6 +20,7 @@ import { RedisModule } from './redis/redis.module';
 import { RoleModule } from './role/role.module';
 import { SettingsModule } from './settings/settings.module';
 import { UserModule } from './user/user.module';
+import { UserSessionModule } from './user-session/user-session.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { UserModule } from './user/user.module';
     PermissionModule,
     RoleModule,
     UserModule,
+    UserSessionModule,
     AuditLogModule,
     DictionaryModule,
     FileModule,

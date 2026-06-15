@@ -16,6 +16,7 @@ describe('admin route registry', () => {
       '/users',
       '/roles',
       '/permissions',
+      '/session-management',
       '/dictionaries',
       '/files',
       '/audit-logs',
@@ -34,6 +35,11 @@ describe('admin route registry', () => {
     expect(findAdminRouteByPath('/permissions')?.requiredPermissions).toEqual([
       'permission.read',
     ])
+    expect(findAdminRouteByPath('/session-management')).toMatchObject({
+      id: 'session-management',
+      labelKey: 'nav.sessionManagement',
+      requiredPermissions: ['user_session.read'],
+    })
     expect(findAdminRouteByPath('/audit-logs')?.requiredPermissions).toEqual([
       'audit_log.read',
     ])
@@ -64,6 +70,11 @@ describe('admin route registry', () => {
       expect(messages['en-US']).toHaveProperty(group.labelKey)
       expect(messages['zh-CN']).toHaveProperty(group.labelKey)
     }
+  })
+
+  it('defines translations for the session management nav label', () => {
+    expect(messages['en-US']).toHaveProperty('nav.sessionManagement')
+    expect(messages['zh-CN']).toHaveProperty('nav.sessionManagement')
   })
 
   it('returns the first accessible route from grouped menu order', () => {

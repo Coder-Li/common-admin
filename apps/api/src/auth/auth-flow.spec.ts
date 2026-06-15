@@ -247,7 +247,11 @@ describe('Auth flow', () => {
     );
     prisma.userSession.create.mockImplementation(
       async ({ data }: { data: SessionRecord }) => {
-        sessions.set(data.id, { ...data, revokedAt: null });
+        sessions.set(data.id, {
+          ...data,
+          createdAt: new Date(),
+          revokedAt: null,
+        });
         return sessions.get(data.id);
       },
     );
@@ -713,6 +717,53 @@ describe('Auth flow', () => {
     await request(httpServer)
       .get('/api/users/me')
       .set('Authorization', `Bearer ${accessToken}`)
+      .expect(401);
+  });
+
+  it('admin revoke session endpoint blocks the old access token', async () => {
+    const adminUser = persistedUser({
+      id: 'admin-1',
+      email: 'admin@example.com',
+      username: 'admin',
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+      roles: [{ role: { code: 'admin', name: 'Admin' } }],
+    });
+    const targetUser = persistedUser({
+      id: 'target-1',
+      email: 'target@example.com',
+      username: 'target',
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+      roles: [{ role: { code: 'standard', name: 'Standard' } }],
+    });
+    permissionContexts.set('admin-1', {
+      roleCodes: ['admin'],
+      permissionCodes: ['user_session.revoke'],
+      isSuperAdmin: false,
+    });
+    permissionContexts.set('target-1', {
+      roleCodes: ['standard'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+    });
+    const targetAccessToken = await signIn(targetUser);
+    const adminAccessToken = await signIn(adminUser);
+    const { sid: targetSessionId } = decodeAccessToken(targetAccessToken);
+
+    await request(httpServer)
+      .post(`/api/user-sessions/${targetSessionId}/revoke`)
+      .set('Authorization', `Bearer ${adminAccessToken}`)
+      .expect(204);
+
+    expect(sessions.get(targetSessionId)).toEqual(
+      expect.objectContaining({
+        revokedAt: expect.any(Date),
+        revokedReason: 'admin_revoked',
+      }),
+    );
+
+    await request(httpServer)
+      .get('/api/users/me')
+      .set('Authorization', `Bearer ${targetAccessToken}`)
       .expect(401);
   });
 

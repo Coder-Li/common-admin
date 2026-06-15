@@ -551,6 +551,7 @@
                 "reset_password",
                 "replace_roles",
                 "replace_permissions",
+                "revoke",
                 "system_setting.update",
                 "system_setting.cache_refresh"
               ]
@@ -569,7 +570,8 @@
                 "dictionary_type",
                 "dictionary_item",
                 "file",
-                "system_setting"
+                "system_setting",
+                "user_session"
               ]
             }
           },
@@ -1049,6 +1051,172 @@
         "summary": "",
         "tags": [
           "Users"
+        ]
+      }
+    },
+    "/user-sessions": {
+      "get": {
+        "operationId": "listUserSessions",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "Sort by one of: createdAt, lastUsedAt, expiresAt",
+            "schema": {
+              "example": "createdAt:desc",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "expired",
+                "revoked"
+              ]
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ipAddress",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-06-01T00:00:00.000Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-06-30T23:59:59.999Z",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSessionListResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Query validation failed"
+          },
+          "403": {
+            "description": "Permission required"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "User Sessions"
+        ]
+      }
+    },
+    "/user-sessions/{id}/revoke": {
+      "post": {
+        "operationId": "revokeUserSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "User session revoked"
+          },
+          "400": {
+            "description": "Session cannot be revoked or query validation failed"
+          },
+          "403": {
+            "description": "Permission required"
+          },
+          "404": {
+            "description": "User session not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "User Sessions"
         ]
       }
     },
@@ -2920,6 +3088,133 @@
         },
         "required": [
           "roleCodes"
+        ]
+      },
+      "UserSessionUserSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "email",
+          "firstName",
+          "lastName"
+        ]
+      },
+      "UserSessionDeviceSummaryDto": {
+        "type": "object",
+        "properties": {
+          "browser": {
+            "type": "string"
+          },
+          "os": {
+            "type": "string"
+          },
+          "deviceType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "browser",
+          "os",
+          "deviceType"
+        ]
+      },
+      "UserSessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserSessionUserSummaryDto"
+          },
+          "ipAddress": {
+            "type": "string"
+          },
+          "userAgent": {
+            "type": "string"
+          },
+          "deviceSummary": {
+            "$ref": "#/components/schemas/UserSessionDeviceSummaryDto"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "lastUsedAt": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "revokedAt": {
+            "type": "string"
+          },
+          "revokedReason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "expired",
+              "revoked"
+            ]
+          },
+          "isCurrentSession": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "user",
+          "deviceSummary",
+          "createdAt",
+          "expiresAt",
+          "status",
+          "isCurrentSession"
+        ]
+      },
+      "UserSessionListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSessionResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "pageSize": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
         ]
       },
       "DictionaryTypeResponseDto": {

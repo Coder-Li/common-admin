@@ -193,4 +193,20 @@ export const PERMISSION_REGISTRY = [
     defaultRoles: [],
     sortOrder: 700,
   },
+  {
+    code: 'user_session.read',
+    module: 'user_session',
+    action: 'read',
+    name: 'View user sessions',
+    defaultRoles: ['admin'],
+    sortOrder: 750,
+  },
+  {
+    code: 'user_session.revoke',
+    module: 'user_session',
+    action: 'revoke',
+    name: 'Revoke user sessions',
+    defaultRoles: ['admin'],
+    sortOrder: 760,
+  },
 ] as const satisfies readonly PermissionRegistryEntry[];

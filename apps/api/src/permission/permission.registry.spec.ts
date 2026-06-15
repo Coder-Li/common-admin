@@ -11,4 +11,23 @@ describe('PERMISSION_REGISTRY', () => {
       }),
     );
   });
+
+  it('includes user session permissions for admins', () => {
+    expect(PERMISSION_REGISTRY).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'user_session.read',
+          module: 'user_session',
+          action: 'read',
+          defaultRoles: ['admin'],
+        }),
+        expect.objectContaining({
+          code: 'user_session.revoke',
+          module: 'user_session',
+          action: 'revoke',
+          defaultRoles: ['admin'],
+        }),
+      ]),
+    );
+  });
 });
