@@ -280,6 +280,7 @@ function renderUsersPage(
     'user.update',
     'user.delete',
     'user.assign_roles',
+    'role.read',
     'department.read',
     'position.read',
   ],
@@ -321,6 +322,7 @@ function renderUsersRoute(
     'user.update',
     'user.delete',
     'user.assign_roles',
+    'role.read',
     'department.read',
     'position.read',
   ],
@@ -483,6 +485,22 @@ describe('UsersPage', () => {
       { label: 'Administrator', value: 'admin' },
       { label: 'Team member', value: 'standard' },
     ])
+  })
+
+  it('does not fetch or show role option controls without role read permission', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+
+    renderUsersPage(['user.read', 'user.create', 'user.update'])
+    await screen.findByText('alice')
+
+    expect(listRoles).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Filter by role')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Create user' }))
+    expect(
+      within(screen.getByRole('dialog')).queryByLabelText('Role'),
+    ).not.toBeInTheDocument()
   })
 
   it('renders organization fields in create and edit forms', async () => {
@@ -1168,7 +1186,7 @@ describe('UsersPage', () => {
     })
   })
 
-  it('replaces roles without updating profile fields when only role assignment is allowed', async () => {
+  it('replaces roles without updating profile fields when only role assignment and role read are allowed', async () => {
     const user = userEvent.setup()
     vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
     vi.mocked(replaceUserRoles).mockResolvedValue({
@@ -1176,7 +1194,7 @@ describe('UsersPage', () => {
       roles: [{ code: 'standard', name: 'Team member' }],
     })
 
-    renderUsersPage(['user.assign_roles'])
+    renderUsersPage(['user.assign_roles', 'role.read'])
     await screen.findByText('alice')
 
     await user.click(screen.getByRole('button', { name: 'Edit' }))
@@ -1201,6 +1219,17 @@ describe('UsersPage', () => {
       })
     })
     expect(updateUser).not.toHaveBeenCalled()
+  })
+
+  it('hides role-only editing when role assignment is allowed without role read', async () => {
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+
+    renderUsersPage(['user.assign_roles'])
+    await screen.findByText('alice')
+
+    expect(listRoles).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Filter by role')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
   })
 
   it('resets a user password and refetches users', async () => {

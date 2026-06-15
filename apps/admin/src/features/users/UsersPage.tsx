@@ -106,6 +106,7 @@ export function UsersPage() {
   const canUpdate = can(permissions, 'user.update')
   const canDelete = can(permissions, 'user.delete')
   const canAssignRoles = can(permissions, 'user.assign_roles')
+  const canReadRoles = can(permissions, 'role.read')
   const canReadDepartments = can(permissions, 'department.read')
   const canReadPositions = can(permissions, 'position.read')
   const canResetPassword = canUpdate
@@ -123,8 +124,11 @@ export function UsersPage() {
   const rolesQuery = useQuery({
     queryKey: getListRolesQueryKey(rolesQueryParams),
     queryFn: () => listRoles(rolesQueryParams),
+    enabled: canReadRoles,
   })
   const roleOptions = rolesQuery.data?.items ?? []
+  const hasRoleOptions = canReadRoles && rolesQuery.isSuccess
+  const canAssignRolesWithOptions = canAssignRoles && hasRoleOptions
 
   const assignedDepartmentIds = useMemo(
     () =>
@@ -217,7 +221,7 @@ export function UsersPage() {
         UserListQuery
       >({
         filters: {
-          ...(roleCode === allRoleFilter ? {} : { roleCode }),
+          ...(!canReadRoles || roleCode === allRoleFilter ? {} : { roleCode }),
           ...(!canReadDepartments || departmentId === allDepartmentFilter
             ? {}
             : { departmentId }),
@@ -238,6 +242,7 @@ export function UsersPage() {
       roleCode,
       search,
       sorting,
+      canReadRoles,
       canReadDepartments,
       canReadPositions,
     ],
@@ -277,7 +282,7 @@ export function UsersPage() {
         updatedUser = await updateUser(payload.id, payload.value)
       }
 
-      if (canAssignRoles) {
+      if (canAssignRolesWithOptions) {
         return replaceUserRoles(payload.id, { roleCodes: payload.roleCodes })
       }
 
@@ -344,7 +349,7 @@ export function UsersPage() {
         {
           canDelete,
           canResetPassword,
-          canUpdate: canUpdate || canAssignRoles,
+          canUpdate: canUpdate || canAssignRolesWithOptions,
           onDelete: setDeleteTarget,
           onEdit: (user) => setFormState({ mode: 'edit', user }),
           onResetPassword: (user) => {
@@ -353,7 +358,7 @@ export function UsersPage() {
           },
         },
       ),
-    [canAssignRoles, canDelete, canResetPassword, canUpdate, t],
+    [canAssignRolesWithOptions, canDelete, canResetPassword, canUpdate, t],
   )
 
   const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {
@@ -481,26 +486,28 @@ export function UsersPage() {
           <DataTableToolbar
             filters={
               <>
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <span>{t('users.form.role')}</span>
-                  <select
-                    aria-label={t('users.filter.role')}
-                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-                    onChange={(event) =>
-                      handleRoleChange(event.target.value)
-                    }
-                    value={roleCode}
-                  >
-                    <option value={allRoleFilter}>
-                      {t('users.filter.allRoles')}
-                    </option>
-                    {roleOptions.map((option) => (
-                      <option key={option.code} value={option.code}>
-                        {option.name}
+                {canReadRoles ? (
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <span>{t('users.form.role')}</span>
+                    <select
+                      aria-label={t('users.filter.role')}
+                      className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                      onChange={(event) =>
+                        handleRoleChange(event.target.value)
+                      }
+                      value={roleCode}
+                    >
+                      <option value={allRoleFilter}>
+                        {t('users.filter.allRoles')}
                       </option>
-                    ))}
-                  </select>
-                </label>
+                      {roleOptions.map((option) => (
+                        <option key={option.code} value={option.code}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
 
                 {canReadDepartments ? (
                   <label className="flex items-center gap-2 text-sm text-slate-600">
@@ -579,7 +586,7 @@ export function UsersPage() {
               }
               mode={formState.mode}
               canEditProfile={canEditProfileInForm}
-              canAssignRoles={canAssignRoles}
+              canAssignRoles={canAssignRolesWithOptions}
               canEditDepartments={canEditDepartmentsInForm}
               canEditPositions={canEditPositionsInForm}
               departmentOptions={departmentOptions}
