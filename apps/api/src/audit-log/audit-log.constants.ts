@@ -19,6 +19,8 @@ export const AUDIT_RESOURCE_TYPES = {
   FILE: 'file',
   SYSTEM_SETTING: 'system_setting',
   USER_SESSION: 'user_session',
+  DEPARTMENT: 'department',
+  POSITION: 'position',
 } as const;
 
 export const AUDIT_LOG_SORT_FIELDS = new Set([

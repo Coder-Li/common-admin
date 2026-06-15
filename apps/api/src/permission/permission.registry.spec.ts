@@ -30,4 +30,59 @@ describe('PERMISSION_REGISTRY', () => {
       ]),
     );
   });
+
+  it('includes department and position permissions', () => {
+    expect(PERMISSION_REGISTRY).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'department.read',
+          module: 'department',
+          action: 'read',
+          defaultRoles: ['admin'],
+        }),
+        expect.objectContaining({
+          code: 'department.create',
+          module: 'department',
+          action: 'create',
+          defaultRoles: ['admin'],
+        }),
+        expect.objectContaining({
+          code: 'department.update',
+          module: 'department',
+          action: 'update',
+          defaultRoles: ['admin'],
+        }),
+        expect.objectContaining({
+          code: 'department.delete',
+          module: 'department',
+          action: 'delete',
+          defaultRoles: [],
+        }),
+        expect.objectContaining({
+          code: 'position.read',
+          module: 'position',
+          action: 'read',
+          defaultRoles: ['admin'],
+        }),
+        expect.objectContaining({
+          code: 'position.create',
+          module: 'position',
+          action: 'create',
+          defaultRoles: ['admin'],
+        }),
+        expect.objectContaining({
+          code: 'position.update',
+          module: 'position',
+          action: 'update',
+          defaultRoles: ['admin'],
+        }),
+        expect.objectContaining({
+          code: 'position.delete',
+          module: 'position',
+          action: 'delete',
+          defaultRoles: [],
+        }),
+      ]),
+    );
+  });
 });
