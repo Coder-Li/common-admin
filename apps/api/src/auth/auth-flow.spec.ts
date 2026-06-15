@@ -1077,6 +1077,9 @@ describe('Auth flow', () => {
               firstName: 'Admin',
               lastName: 'User',
               roles: [{ code: 'admin', name: 'Admin' }],
+              departments: [],
+              primaryDepartment: null,
+              positions: [],
               createdAt: '2026-01-01T00:00:00.000Z',
               updatedAt: '2026-01-01T00:00:00.000Z',
             },
@@ -1092,7 +1095,11 @@ describe('Auth flow', () => {
       take: 5,
       orderBy: { email: 'asc' },
       where: {},
-      include: { roles: { include: { role: true } } },
+      include: {
+        roles: { include: { role: true } },
+        departments: { include: { department: true } },
+        positions: { include: { position: true } },
+      },
     });
   });
 
