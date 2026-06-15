@@ -30,6 +30,8 @@ const user: UserProfile = {
     'dashboard.view',
     'user.read',
     'role.read',
+    'department.read',
+    'position.read',
     'dictionary.read',
     'file.read',
     'audit_log.read',
@@ -103,6 +105,14 @@ vi.mock('../features/audit-logs/AuditLogsPage', () => ({
 
 vi.mock('../features/session-management/SessionManagementPage', () => ({
   SessionManagementPage: () => <div>Session management page content</div>,
+}))
+
+vi.mock('../features/departments/DepartmentsPage', () => ({
+  DepartmentsPage: () => <div>Departments page content</div>,
+}))
+
+vi.mock('../features/positions/PositionsPage', () => ({
+  PositionsPage: () => <div>Positions page content</div>,
 }))
 
 function mockBrowserLanguages(languages: readonly string[]) {
@@ -271,6 +281,21 @@ describe('AdminShell i18n', () => {
     )
   })
 
+  it('renders organization nav items when read permissions are present', async () => {
+    renderAdminShell('/departments', ['department.read', 'position.read'])
+
+    expect(await screen.findByTestId('nav-departments')).toHaveTextContent(
+      'Departments',
+    )
+    expect(screen.getByTestId('mobile-nav-departments')).toHaveTextContent(
+      'Departments',
+    )
+    expect(screen.getByTestId('nav-positions')).toHaveTextContent('Positions')
+    expect(screen.getByTestId('mobile-nav-positions')).toHaveTextContent(
+      'Positions',
+    )
+  })
+
   it('renders FilesPage for the files route', async () => {
     renderAdminShell('/files')
 
@@ -301,6 +326,26 @@ describe('AdminShell i18n', () => {
       screen.getByRole('heading', { level: 1, name: 'Online Sessions' }),
     ).toBeInTheDocument()
     expect(screen.getByText('Session management page content')).toBeInTheDocument()
+  })
+
+  it('renders DepartmentsPage for the departments route', async () => {
+    renderAdminShell('/departments', ['department.read'])
+
+    expect(await screen.findByText('System / Departments')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Departments' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Departments page content')).toBeInTheDocument()
+  })
+
+  it('renders PositionsPage for the positions route', async () => {
+    renderAdminShell('/positions', ['position.read'])
+
+    expect(await screen.findByText('System / Positions')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Positions' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Positions page content')).toBeInTheDocument()
   })
 
   it('hides Users nav without user read permission', async () => {
@@ -387,6 +432,8 @@ describe('AdminShell i18n', () => {
     renderAdminShell('/dashboard', ['dashboard.view', 'file.read'])
 
     expect(await screen.findByTestId('nav-files')).toBeInTheDocument()
+    expect(screen.queryByTestId('nav-departments')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('nav-positions')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-audit-logs')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-dictionaries')).not.toBeInTheDocument()
     expect(screen.queryByTestId('nav-settings')).not.toBeInTheDocument()

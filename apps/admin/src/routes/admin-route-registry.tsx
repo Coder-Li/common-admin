@@ -1,5 +1,7 @@
 import {
   BarChart3,
+  BriefcaseBusiness,
+  Building2,
   ClipboardList,
   Database,
   FileArchive,
@@ -15,8 +17,10 @@ import {
 } from 'lucide-react'
 import { PermissionsPage } from '../features/permissions/PermissionsPage'
 import { AuditLogsPage } from '../features/audit-logs/AuditLogsPage'
+import { DepartmentsPage } from '../features/departments/DepartmentsPage'
 import { DictionariesPage } from '../features/dictionaries/DictionariesPage'
 import { FilesPage } from '../features/files/FilesPage'
+import { PositionsPage } from '../features/positions/PositionsPage'
 import { RolesPage } from '../features/roles/RolesPage'
 import { SessionManagementPage } from '../features/session-management/SessionManagementPage'
 import { BasicSettingsPage } from '../features/settings/BasicSettingsPage'
@@ -81,6 +85,24 @@ export const sessionManagementRoute: AdminRouteMeta = {
   requiredPermissions: ['user_session.read'],
   component: SessionManagementPage,
   icon: MonitorCog,
+}
+
+export const departmentsRoute: AdminRouteMeta = {
+  id: 'departments',
+  path: '/departments',
+  labelKey: 'nav.departments',
+  requiredPermissions: ['department.read'],
+  component: DepartmentsPage,
+  icon: Building2,
+}
+
+export const positionsRoute: AdminRouteMeta = {
+  id: 'positions',
+  path: '/positions',
+  labelKey: 'nav.positions',
+  requiredPermissions: ['position.read'],
+  component: PositionsPage,
+  icon: BriefcaseBusiness,
 }
 
 export const dictionariesRoute: AdminRouteMeta = {
@@ -167,7 +189,14 @@ export const adminMenuGroups: AdminMenuGroup[] = [
     id: 'system',
     labelKey: 'nav.group.system',
     icon: Users,
-    children: [usersRoute, rolesRoute, permissionsRoute, sessionManagementRoute],
+    children: [
+      usersRoute,
+      rolesRoute,
+      permissionsRoute,
+      sessionManagementRoute,
+      departmentsRoute,
+      positionsRoute,
+    ],
   },
   {
     id: 'resources',

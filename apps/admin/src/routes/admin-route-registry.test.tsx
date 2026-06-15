@@ -7,6 +7,7 @@ import {
   adminRoutes,
   findAdminRouteByPath,
   getFirstAccessibleRoute,
+  getVisibleAdminRoutes,
 } from './admin-route-registry'
 
 describe('admin route registry', () => {
@@ -17,6 +18,8 @@ describe('admin route registry', () => {
       '/roles',
       '/permissions',
       '/session-management',
+      '/departments',
+      '/positions',
       '/dictionaries',
       '/files',
       '/audit-logs',
@@ -39,6 +42,12 @@ describe('admin route registry', () => {
       id: 'session-management',
       labelKey: 'nav.sessionManagement',
       requiredPermissions: ['user_session.read'],
+    })
+    expect(findAdminRouteByPath('/departments')).toMatchObject({
+      requiredPermissions: ['department.read'],
+    })
+    expect(findAdminRouteByPath('/positions')).toMatchObject({
+      requiredPermissions: ['position.read'],
     })
     expect(findAdminRouteByPath('/audit-logs')?.requiredPermissions).toEqual([
       'audit_log.read',
@@ -75,6 +84,30 @@ describe('admin route registry', () => {
   it('defines translations for the session management nav label', () => {
     expect(messages['en-US']).toHaveProperty('nav.sessionManagement')
     expect(messages['zh-CN']).toHaveProperty('nav.sessionManagement')
+  })
+
+  it('defines translations for the organization nav labels', () => {
+    expect(messages['en-US']).toHaveProperty('nav.departments')
+    expect(messages['zh-CN']).toHaveProperty('nav.departments')
+    expect(messages['en-US']).toHaveProperty('nav.positions')
+    expect(messages['zh-CN']).toHaveProperty('nav.positions')
+  })
+
+  it('shows organization routes only with their read permissions', () => {
+    expect(
+      getVisibleAdminRoutes(['department.read', 'position.read']).map(
+        (route) => route.path,
+      ),
+    ).toEqual(['/departments', '/positions'])
+    expect(
+      getVisibleAdminRoutes(['department.read']).map((route) => route.path),
+    ).toEqual(['/departments'])
+    expect(
+      getVisibleAdminRoutes(['position.read']).map((route) => route.path),
+    ).toEqual(['/positions'])
+    expect(getVisibleAdminRoutes(['user.read']).map((route) => route.path)).not.toEqual(
+      expect.arrayContaining(['/departments', '/positions']),
+    )
   })
 
   it('returns the first accessible route from grouped menu order', () => {

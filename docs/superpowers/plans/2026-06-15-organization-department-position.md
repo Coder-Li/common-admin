@@ -1361,7 +1361,7 @@ Expected: PASS.
 - Modify: `apps/admin/src/layouts/AdminShell.test.tsx`
 - Modify: `apps/admin/src/routes/router.test.tsx`
 
-- [ ] **Step 1: Write failing route tests**
+- [x] **Step 1: Write failing route tests**
 
 Assert:
 
@@ -1386,7 +1386,7 @@ pnpm --filter admin test -- admin-route-registry.test.tsx router.test.tsx AdminS
 
 Expected: FAIL because routes are not registered.
 
-- [ ] **Step 2: Add route metadata**
+- [x] **Step 2: Add route metadata**
 
 Import pages and icons. Add route entries:
 
@@ -1412,7 +1412,7 @@ export const positionsRoute: AdminRouteMeta = {
 
 Add both to the existing system group.
 
-- [ ] **Step 3: Run route tests**
+- [x] **Step 3: Run route tests**
 
 Run:
 
