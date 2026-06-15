@@ -11,6 +11,7 @@ import { LoggingModule } from './common/logging/logging.module';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { validateEnv } from './config/env.config';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module';
+import { DepartmentModule } from './department/department.module';
 import { DictionaryModule } from './dictionary/dictionary.module';
 import { FileModule } from './file/file.module';
 import { HealthModule } from './health/health.module';
@@ -43,6 +44,7 @@ import { UserSessionModule } from './user-session/user-session.module';
     UserModule,
     UserSessionModule,
     AuditLogModule,
+    DepartmentModule,
     DictionaryModule,
     FileModule,
     SettingsModule,
