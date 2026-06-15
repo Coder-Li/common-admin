@@ -452,9 +452,7 @@ describe('OpenAPI operation ids', () => {
         allOf: [{ $ref: '#/components/schemas/UserOrganizationSummaryDto' }],
       });
 
-      expect(
-        document.components?.schemas?.UserResponseDto.required,
-      ).toEqual(
+      expect(document.components?.schemas?.UserResponseDto.required).toEqual(
         expect.arrayContaining([
           'departments',
           'primaryDepartment',
