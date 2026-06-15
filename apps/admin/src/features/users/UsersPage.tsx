@@ -435,6 +435,15 @@ export function UsersPage() {
     })
   }
 
+  const isCreateForm = formState?.mode === 'create'
+  const canEditProfileInForm = isCreateForm ? canCreate : canUpdate
+  const canEditDepartmentsInForm = isCreateForm
+    ? canReadDepartments
+    : canUpdate && canReadDepartments
+  const canEditPositionsInForm = isCreateForm
+    ? canReadPositions
+    : canUpdate && canReadPositions
+
   return (
     <section className="grid gap-4 p-5">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -569,10 +578,10 @@ export function UsersPage() {
                 createMutation.isPending || updateMutation.isPending
               }
               mode={formState.mode}
-              canEditProfile={canUpdate}
+              canEditProfile={canEditProfileInForm}
               canAssignRoles={canAssignRoles}
-              canEditDepartments={canUpdate && canReadDepartments}
-              canEditPositions={canUpdate && canReadPositions}
+              canEditDepartments={canEditDepartmentsInForm}
+              canEditPositions={canEditPositionsInForm}
               departmentOptions={departmentOptions}
               positionOptions={positionOptions}
               roleOptions={roleOptions}

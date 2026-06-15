@@ -999,6 +999,33 @@ describe('UserService', () => {
     });
   });
 
+  it('findById uses organization include and returns organization assignments', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValue(makeUser(organizationAssignments));
+
+    const response = await service.findById('user-1');
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      include: expect.objectContaining({
+        roles: expect.any(Object),
+        departments: expect.objectContaining({
+          include: { department: true },
+        }),
+        positions: expect.objectContaining({
+          include: { position: true },
+        }),
+      }),
+    });
+    expect(response.departments).toEqual([
+      expect.objectContaining({ id: 'dept-1', code: 'engineering' }),
+    ]);
+    expect(response.primaryDepartment).toMatchObject({ id: 'dept-1' });
+    expect(response.positions).toEqual([
+      expect.objectContaining({ id: 'pos-1', code: 'developer' }),
+    ]);
+  });
+
   it('updateUser reads before, updates, and writes before and after audit in the same transaction', async () => {
     const { auditLogService, prisma, service, tx } = createService();
     const before = makeUser({ firstName: 'Ada' });

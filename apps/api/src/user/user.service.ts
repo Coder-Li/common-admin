@@ -91,7 +91,7 @@ export class UserService {
   async findById(id: string): Promise<UserResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { roles: { include: { role: true } } },
+      include: USER_ORGANIZATION_INCLUDE,
     });
 
     if (!user) {

@@ -661,6 +661,113 @@ describe('UsersPage', () => {
     })
   })
 
+  it('allows create-only users to submit profile and organization assignments when organization options are readable', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([]))
+    vi.mocked(createUser).mockResolvedValue(alice)
+
+    renderUsersPage([
+      'user.read',
+      'user.create',
+      'department.read',
+      'position.read',
+    ])
+    await screen.findByText('No users found')
+
+    await user.click(screen.getByRole('button', { name: 'Create user' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByLabelText('Email')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Departments')).toBeInTheDocument()
+    expect(
+      within(dialog).getByLabelText('Primary department'),
+    ).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Positions')).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Role')).not.toBeInTheDocument()
+
+    await user.type(within(dialog).getByLabelText('Email'), 'alice@example.com')
+    await user.type(within(dialog).getByLabelText('Username'), 'alice')
+    await user.type(within(dialog).getByLabelText('First name'), 'Alice')
+    await user.type(within(dialog).getByLabelText('Last name'), 'Admin')
+    await user.type(within(dialog).getByLabelText('Password'), 'password-1')
+    await user.selectOptions(within(dialog).getByLabelText('Departments'), [
+      'dept-engineering',
+      'dept-platform',
+    ])
+    await user.selectOptions(
+      within(dialog).getByLabelText('Primary department'),
+      'dept-platform',
+    )
+    await user.selectOptions(within(dialog).getByLabelText('Positions'), [
+      'position-engineer',
+      'position-lead',
+    ])
+    await user.click(within(dialog).getByRole('button', { name: 'Create user' }))
+
+    await waitFor(() => {
+      expect(createUser).toHaveBeenCalledWith(
+        expect.objectContaining<CreateUserRequest>({
+          email: 'alice@example.com',
+          firstName: 'Alice',
+          lastName: 'Admin',
+          password: 'password-1',
+          username: 'alice',
+          departmentIds: ['dept-engineering', 'dept-platform'],
+          primaryDepartmentId: 'dept-platform',
+          positionIds: ['position-engineer', 'position-lead'],
+        }),
+      )
+    })
+    expect(createUser).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        roleCodes: expect.anything(),
+      }),
+    )
+  })
+
+  it('keeps organization fields unavailable for create-only users without organization read permissions', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(listResponse([]))
+    vi.mocked(createUser).mockResolvedValue(alice)
+
+    renderUsersPage(['user.read', 'user.create'])
+    await screen.findByText('No users found')
+
+    await user.click(screen.getByRole('button', { name: 'Create user' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByLabelText('Email')).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Departments')).not.toBeInTheDocument()
+    expect(
+      within(dialog).queryByLabelText('Primary department'),
+    ).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Positions')).not.toBeInTheDocument()
+
+    await user.type(within(dialog).getByLabelText('Email'), 'alice@example.com')
+    await user.type(within(dialog).getByLabelText('Username'), 'alice')
+    await user.type(within(dialog).getByLabelText('First name'), 'Alice')
+    await user.type(within(dialog).getByLabelText('Last name'), 'Admin')
+    await user.type(within(dialog).getByLabelText('Password'), 'password-1')
+    await user.click(within(dialog).getByRole('button', { name: 'Create user' }))
+
+    await waitFor(() => {
+      expect(createUser).toHaveBeenCalledWith(
+        expect.objectContaining<CreateUserRequest>({
+          email: 'alice@example.com',
+          firstName: 'Alice',
+          lastName: 'Admin',
+          password: 'password-1',
+          username: 'alice',
+        }),
+      )
+    })
+    expect(createUser).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        departmentIds: expect.anything(),
+        primaryDepartmentId: expect.anything(),
+        positionIds: expect.anything(),
+      }),
+    )
+  })
+
   it('omits unchanged assignment fields when updating a user', async () => {
     const user = userEvent.setup()
     vi.mocked(listUsers).mockResolvedValue(listResponse([aliceWithOrganization]))
