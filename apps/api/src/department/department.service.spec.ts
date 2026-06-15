@@ -381,16 +381,17 @@ describe('DepartmentService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('rejects blank parentId before writing', async () => {
+    it('rejects whitespace-only parentId before writing', async () => {
       const { service, tx } = createService();
 
       await expect(
         service.createDepartment({
           code: 'platform',
           name: 'Platform',
-          parentId: '',
+          parentId: '   ',
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
+      expect(tx.department.findUnique).not.toHaveBeenCalled();
       expect(tx.department.create).not.toHaveBeenCalled();
     });
 
@@ -569,12 +570,12 @@ describe('DepartmentService', () => {
       expect(tx.department.update).not.toHaveBeenCalled();
     });
 
-    it('rejects blank parentId before writing', async () => {
+    it('rejects whitespace-only parentId before writing', async () => {
       const { service, tx } = createService();
       tx.department.findUnique.mockResolvedValue(makeDepartment());
 
       await expect(
-        service.updateDepartment('dept-1', { parentId: '' }),
+        service.updateDepartment('dept-1', { parentId: '   ' }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(tx.department.update).not.toHaveBeenCalled();
     });

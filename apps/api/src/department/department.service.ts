@@ -392,7 +392,7 @@ export class DepartmentService {
   }
 
   private validateParentIdValue(parentId: string | null | undefined): void {
-    if (parentId === '') {
+    if (typeof parentId === 'string' && parentId.trim() === '') {
       throw new BadRequestException('Parent department id cannot be blank');
     }
   }
