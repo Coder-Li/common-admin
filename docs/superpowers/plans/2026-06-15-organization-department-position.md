@@ -1530,7 +1530,7 @@ Expected: PASS.
 **Files:**
 - All files changed in chunks 1-4
 
-- [ ] **Step 1: Run API contract check**
+- [x] **Step 1: Run API contract check**
 
 Run:
 
@@ -1540,7 +1540,7 @@ pnpm api:check
 
 Expected: PASS with no generated API diff.
 
-- [ ] **Step 2: Run backend tests**
+- [x] **Step 2: Run backend tests**
 
 Run:
 
@@ -1550,7 +1550,7 @@ pnpm --filter api exec jest --runInBand
 
 Expected: PASS.
 
-- [ ] **Step 3: Run frontend tests**
+- [x] **Step 3: Run frontend tests**
 
 Run:
 
@@ -1560,7 +1560,7 @@ pnpm --filter admin test
 
 Expected: PASS.
 
-- [ ] **Step 4: Run builds**
+- [x] **Step 4: Run builds**
 
 Run:
 
@@ -1571,7 +1571,7 @@ pnpm --filter admin build
 
 Expected: both PASS.
 
-- [ ] **Step 5: Run lint**
+- [x] **Step 5: Run lint**
 
 Run:
 
@@ -1582,7 +1582,7 @@ pnpm --filter admin lint
 
 Expected: both PASS.
 
-- [ ] **Step 6: Browser smoke test**
+- [x] **Step 6: Browser smoke test**
 
 Start the app:
 
@@ -1601,7 +1601,7 @@ Open the admin app and smoke test:
 
 Expected: pages render without console errors and without overlapping UI.
 
-- [ ] **Step 7: Commit frontend and verification work**
+- [x] **Step 7: Commit frontend and verification work**
 
 Run:
 
@@ -1612,7 +1612,7 @@ git commit -m "feat(admin): add organization management UI"
 
 Expected: commit succeeds.
 
-- [ ] **Step 8: Capture final status**
+- [x] **Step 8: Capture final status**
 
 Run:
 
