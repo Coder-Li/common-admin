@@ -105,9 +105,10 @@ describe('admin route registry', () => {
     expect(
       getVisibleAdminRoutes(['position.read']).map((route) => route.path),
     ).toEqual(['/positions'])
-    expect(getVisibleAdminRoutes(['user.read']).map((route) => route.path)).not.toEqual(
-      expect.arrayContaining(['/departments', '/positions']),
-    )
+    const paths = getVisibleAdminRoutes(['user.read']).map((route) => route.path)
+
+    expect(paths).not.toContain('/departments')
+    expect(paths).not.toContain('/positions')
   })
 
   it('returns the first accessible route from grouped menu order', () => {
