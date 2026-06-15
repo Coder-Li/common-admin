@@ -650,7 +650,7 @@ Expected: PASS.
 - Create: `apps/api/src/department/department.controller.spec.ts`
 - Modify: `apps/api/src/app.module.ts`
 
-- [ ] **Step 1: Write failing controller tests**
+- [x] **Step 1: Write failing controller tests**
 
 Assert controller methods call service methods and carry permission metadata:
 
@@ -689,7 +689,7 @@ pnpm --filter api test -- department.controller.spec.ts
 
 Expected: FAIL because controller does not exist.
 
-- [ ] **Step 2: Add controller**
+- [x] **Step 2: Add controller**
 
 Add routes with operation ids:
 
@@ -705,12 +705,12 @@ DELETE /departments/:id      deleteDepartment
 
 Use `@HttpCode(204)` for delete.
 
-- [ ] **Step 3: Add module and app wiring**
+- [x] **Step 3: Add module and app wiring**
 
 Create `DepartmentModule` exporting `DepartmentService` only if another module
 needs it. Import `DepartmentModule` in `apps/api/src/app.module.ts`.
 
-- [ ] **Step 4: Run department tests**
+- [x] **Step 4: Run department tests**
 
 Run:
 
@@ -735,7 +735,7 @@ Expected: PASS.
 - Create: `apps/api/src/position/position.controller.spec.ts`
 - Modify: `apps/api/src/app.module.ts`
 
-- [ ] **Step 1: Write failing mapper, service, and controller tests**
+- [x] **Step 1: Write failing mapper, service, and controller tests**
 
 Cover:
 
@@ -776,7 +776,7 @@ pnpm --filter api test -- position
 
 Expected: FAIL because position module files do not exist.
 
-- [ ] **Step 2: Implement constants, DTOs, and mapper**
+- [x] **Step 2: Implement constants, DTOs, and mapper**
 
 Use the same structure as department without tree or parent fields.
 
@@ -803,7 +803,7 @@ createdAt
 updatedAt
 ```
 
-- [ ] **Step 3: Implement service**
+- [x] **Step 3: Implement service**
 
 Implement:
 
@@ -819,7 +819,7 @@ deletePosition(id, actor?, requestMeta?, auditMetadata?)
 Delete must reject when `UserPosition` rows exist. Audit resource type is
 `AUDIT_RESOURCE_TYPES.POSITION`.
 
-- [ ] **Step 4: Implement controller and module**
+- [x] **Step 4: Implement controller and module**
 
 Add routes with operation ids:
 
@@ -837,7 +837,7 @@ OpenAPI operation id assertions are handled in Chunk 3.
 
 Import `PositionModule` in `apps/api/src/app.module.ts`.
 
-- [ ] **Step 5: Run position tests**
+- [x] **Step 5: Run position tests**
 
 Run:
 
@@ -847,7 +847,7 @@ pnpm --filter api test -- position
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit backend CRUD modules**
+- [x] **Step 6: Commit backend CRUD modules**
 
 Run:
 

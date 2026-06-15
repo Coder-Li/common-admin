@@ -5,7 +5,11 @@ import { DepartmentController } from './department.controller';
 import { DepartmentService } from './department.service';
 
 describe('DepartmentController', () => {
-  function controllerMethod(name: keyof DepartmentController) {
+  type ControllerMethod = (...args: unknown[]) => unknown;
+
+  function controllerMethod(
+    name: keyof DepartmentController,
+  ): ControllerMethod {
     const descriptor = Object.getOwnPropertyDescriptor(
       DepartmentController.prototype,
       name,
@@ -15,22 +19,31 @@ describe('DepartmentController', () => {
       throw new Error(`Expected ${String(name)} controller method`);
     }
 
-    return descriptor.value as unknown;
+    return descriptor.value as ControllerMethod;
   }
 
-  function getPermissionsMetadata(method: keyof DepartmentController) {
-    return Reflect.getMetadata(PERMISSIONS_KEY, controllerMethod(method));
+  function getPermissionsMetadata(
+    method: keyof DepartmentController,
+  ): string[] {
+    const metadata = Reflect.getMetadata(
+      PERMISSIONS_KEY,
+      controllerMethod(method),
+    ) as unknown;
+
+    return metadata as string[];
   }
 
-  function getRoutePaths() {
+  function getRoutePaths(): string[] {
     return Object.getOwnPropertyNames(DepartmentController.prototype)
       .filter((name) => name !== 'constructor')
-      .map((name) =>
-        Reflect.getMetadata(
+      .map((name) => {
+        const path = Reflect.getMetadata(
           PATH_METADATA,
           controllerMethod(name as keyof DepartmentController),
-        ),
-      )
+        ) as unknown;
+
+        return path;
+      })
       .filter((path): path is string => typeof path === 'string');
   }
 
@@ -136,9 +149,9 @@ describe('DepartmentController', () => {
 
     await expect(controller.listDepartments(query)).resolves.toBe(listDto);
     await expect(controller.getDepartmentTree()).resolves.toBe(treeDto);
-    await expect(
-      controller.getDepartmentOptions(optionsQuery),
-    ).resolves.toBe(optionDto);
+    await expect(controller.getDepartmentOptions(optionsQuery)).resolves.toBe(
+      optionDto,
+    );
     await expect(controller.getDepartment('dept-1')).resolves.toBe(responseDto);
 
     expect(service.listDepartments).toHaveBeenCalledWith(query);

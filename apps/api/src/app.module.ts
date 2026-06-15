@@ -16,6 +16,7 @@ import { DictionaryModule } from './dictionary/dictionary.module';
 import { FileModule } from './file/file.module';
 import { HealthModule } from './health/health.module';
 import { PermissionModule } from './permission/permission.module';
+import { PositionModule } from './position/position.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { RoleModule } from './role/role.module';
@@ -45,6 +46,7 @@ import { UserSessionModule } from './user-session/user-session.module';
     UserSessionModule,
     AuditLogModule,
     DepartmentModule,
+    PositionModule,
     DictionaryModule,
     FileModule,
     SettingsModule,
