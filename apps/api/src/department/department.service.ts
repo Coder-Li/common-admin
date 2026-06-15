@@ -146,8 +146,12 @@ export class DepartmentService {
   ): Promise<DepartmentResponseDto> {
     try {
       return await this.prisma.$transaction(async (tx) => {
-        if (dto.parentId) {
-          await this.validateSelectableParent(tx, dto.parentId);
+        if (Object.prototype.hasOwnProperty.call(dto, 'parentId')) {
+          this.validateParentIdValue(dto.parentId);
+
+          if (dto.parentId) {
+            await this.validateSelectableParent(tx, dto.parentId);
+          }
         }
 
         const department = await tx.department.create({
@@ -197,6 +201,8 @@ export class DepartmentService {
         const data: Prisma.DepartmentUncheckedUpdateInput = { ...dto };
 
         if (Object.prototype.hasOwnProperty.call(dto, 'parentId')) {
+          this.validateParentIdValue(dto.parentId);
+
           if (dto.parentId === null) {
             data.parentId = null;
           } else if (dto.parentId) {
@@ -385,6 +391,12 @@ export class DepartmentService {
     }
   }
 
+  private validateParentIdValue(parentId: string | null | undefined): void {
+    if (parentId === '') {
+      throw new BadRequestException('Parent department id cannot be blank');
+    }
+  }
+
   private handlePrismaWriteError(error: unknown): never {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
@@ -393,6 +405,12 @@ export class DepartmentService {
 
       if (error.code === 'P2025') {
         throw new NotFoundException('Department not found');
+      }
+
+      if (error.code === 'P2003') {
+        throw new BadRequestException(
+          'Department has invalid or dependent relationships',
+        );
       }
     }
 

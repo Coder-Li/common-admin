@@ -87,6 +87,12 @@ describe('DepartmentService', () => {
       clientVersion: 'test',
     });
 
+  const foreignKeyError = () =>
+    new Prisma.PrismaClientKnownRequestError('Foreign key constraint failed', {
+      code: 'P2003',
+      clientVersion: 'test',
+    });
+
   const auditActor: AuditActor = {
     userId: 'actor-1',
     email: 'actor@example.com',
@@ -356,6 +362,38 @@ describe('DepartmentService', () => {
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
+    it('maps parent foreign-key races to BadRequestException', async () => {
+      const { service, tx } = createService();
+      tx.department.findUnique.mockResolvedValue(
+        makeDepartment({
+          id: 'parent-1',
+          status: DepartmentStatus.ACTIVE,
+        }),
+      );
+      tx.department.create.mockRejectedValue(foreignKeyError());
+
+      await expect(
+        service.createDepartment({
+          code: 'platform',
+          name: 'Platform',
+          parentId: 'parent-1',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects blank parentId before writing', async () => {
+      const { service, tx } = createService();
+
+      await expect(
+        service.createDepartment({
+          code: 'platform',
+          name: 'Platform',
+          parentId: '',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(tx.department.create).not.toHaveBeenCalled();
+    });
+
     it('creates a department and records audit data', async () => {
       const { auditLogService, prisma, service, tx } = createService();
       const createdDepartment = makeDepartment();
@@ -460,6 +498,23 @@ describe('DepartmentService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
+    it('maps parent foreign-key races to BadRequestException', async () => {
+      const { service, tx } = createService();
+      tx.department.findUnique
+        .mockResolvedValueOnce(makeDepartment())
+        .mockResolvedValueOnce(
+          makeDepartment({
+            id: 'parent-1',
+            status: DepartmentStatus.ACTIVE,
+          }),
+        );
+      tx.department.update.mockRejectedValue(foreignKeyError());
+
+      await expect(
+        service.updateDepartment('dept-1', { parentId: 'parent-1' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
     it('updates a department and records audit data', async () => {
       const { auditLogService, prisma, service, tx } = createService();
       const before = makeDepartment({ name: 'Engineering' });
@@ -510,6 +565,16 @@ describe('DepartmentService', () => {
 
       await expect(
         service.updateDepartment('dept-1', { parentId: 'dept-1' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(tx.department.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects blank parentId before writing', async () => {
+      const { service, tx } = createService();
+      tx.department.findUnique.mockResolvedValue(makeDepartment());
+
+      await expect(
+        service.updateDepartment('dept-1', { parentId: '' }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(tx.department.update).not.toHaveBeenCalled();
     });
@@ -607,6 +672,18 @@ describe('DepartmentService', () => {
       );
       expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(auditLogService.record).not.toHaveBeenCalled();
+    });
+
+    it('maps delete dependency races to BadRequestException', async () => {
+      const { prisma, service, tx } = createService();
+      prisma.department.findUnique.mockResolvedValue(makeDepartment());
+      prisma.department.count.mockResolvedValue(0);
+      prisma.userDepartment.count.mockResolvedValue(0);
+      tx.department.delete.mockRejectedValue(foreignKeyError());
+
+      await expect(service.deleteDepartment('dept-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it('deletes a department and records audit data', async () => {
