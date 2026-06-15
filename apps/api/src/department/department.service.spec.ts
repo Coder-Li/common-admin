@@ -652,34 +652,46 @@ describe('DepartmentService', () => {
 
     it('rejects departments with child departments', async () => {
       const { auditLogService, prisma, service } = createService();
-      prisma.department.findUnique.mockResolvedValue(makeDepartment());
-      prisma.department.count.mockResolvedValue(1);
+      const tx = createPrismaMock();
+      prisma.$transaction.mockImplementationOnce(
+        async (callback: (client: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      );
+      tx.department.findUnique.mockResolvedValue(makeDepartment());
+      tx.department.count.mockResolvedValue(1);
 
       await expect(service.deleteDepartment('dept-1')).rejects.toBeInstanceOf(
         BadRequestException,
       );
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.department.delete).not.toHaveBeenCalled();
       expect(auditLogService.record).not.toHaveBeenCalled();
     });
 
     it('rejects departments with assigned users', async () => {
       const { auditLogService, prisma, service } = createService();
-      prisma.department.findUnique.mockResolvedValue(makeDepartment());
-      prisma.department.count.mockResolvedValue(0);
-      prisma.userDepartment.count.mockResolvedValue(1);
+      const tx = createPrismaMock();
+      prisma.$transaction.mockImplementationOnce(
+        async (callback: (client: typeof tx) => Promise<unknown>) =>
+          callback(tx),
+      );
+      tx.department.findUnique.mockResolvedValue(makeDepartment());
+      tx.department.count.mockResolvedValue(0);
+      tx.userDepartment.count.mockResolvedValue(1);
 
       await expect(service.deleteDepartment('dept-1')).rejects.toBeInstanceOf(
         BadRequestException,
       );
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.department.delete).not.toHaveBeenCalled();
       expect(auditLogService.record).not.toHaveBeenCalled();
     });
 
     it('maps delete dependency races to BadRequestException', async () => {
-      const { prisma, service, tx } = createService();
-      prisma.department.findUnique.mockResolvedValue(makeDepartment());
-      prisma.department.count.mockResolvedValue(0);
-      prisma.userDepartment.count.mockResolvedValue(0);
+      const { service, tx } = createService();
+      tx.department.findUnique.mockResolvedValue(makeDepartment());
+      tx.department.count.mockResolvedValue(0);
+      tx.userDepartment.count.mockResolvedValue(0);
       tx.department.delete.mockRejectedValue(foreignKeyError());
 
       await expect(service.deleteDepartment('dept-1')).rejects.toBeInstanceOf(
@@ -690,9 +702,9 @@ describe('DepartmentService', () => {
     it('deletes a department and records audit data', async () => {
       const { auditLogService, prisma, service, tx } = createService();
       const before = makeDepartment();
-      prisma.department.findUnique.mockResolvedValue(before);
-      prisma.department.count.mockResolvedValue(0);
-      prisma.userDepartment.count.mockResolvedValue(0);
+      tx.department.findUnique.mockResolvedValue(before);
+      tx.department.count.mockResolvedValue(0);
+      tx.userDepartment.count.mockResolvedValue(0);
       tx.department.delete.mockResolvedValue(before);
 
       await service.deleteDepartment(
@@ -703,6 +715,16 @@ describe('DepartmentService', () => {
       );
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.department.findUnique).toHaveBeenCalledWith({
+        where: { id: 'dept-1' },
+        include: { parent: { select: { name: true } } },
+      });
+      expect(tx.department.count).toHaveBeenCalledWith({
+        where: { parentId: 'dept-1' },
+      });
+      expect(tx.userDepartment.count).toHaveBeenCalledWith({
+        where: { departmentId: 'dept-1' },
+      });
       expect(tx.department.delete).toHaveBeenCalledWith({
         where: { id: 'dept-1' },
         include: { parent: { select: { name: true } } },

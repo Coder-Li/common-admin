@@ -244,33 +244,35 @@ export class DepartmentService {
     requestMeta?: AuditRequestMeta,
     auditMetadata?: Record<string, unknown>,
   ): Promise<void> {
-    const department = await this.prisma.department.findUnique({
-      where: { id },
-      include: DEPARTMENT_WITH_PARENT,
-    });
-
-    if (!department) {
-      throw new NotFoundException('Department not found');
-    }
-
-    const childCount = await this.prisma.department.count({
-      where: { parentId: id },
-    });
-
-    if (childCount > 0) {
-      throw new BadRequestException('Department still has child departments');
-    }
-
-    const assignedUserCount = await this.prisma.userDepartment.count({
-      where: { departmentId: id },
-    });
-
-    if (assignedUserCount > 0) {
-      throw new BadRequestException('Department still has assigned users');
-    }
-
     try {
       await this.prisma.$transaction(async (tx) => {
+        const department = await tx.department.findUnique({
+          where: { id },
+          include: DEPARTMENT_WITH_PARENT,
+        });
+
+        if (!department) {
+          throw new NotFoundException('Department not found');
+        }
+
+        const childCount = await tx.department.count({
+          where: { parentId: id },
+        });
+
+        if (childCount > 0) {
+          throw new BadRequestException(
+            'Department still has child departments',
+          );
+        }
+
+        const assignedUserCount = await tx.userDepartment.count({
+          where: { departmentId: id },
+        });
+
+        if (assignedUserCount > 0) {
+          throw new BadRequestException('Department still has assigned users');
+        }
+
         const deleted = await tx.department.delete({
           where: { id },
           include: DEPARTMENT_WITH_PARENT,

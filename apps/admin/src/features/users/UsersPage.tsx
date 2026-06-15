@@ -106,6 +106,8 @@ export function UsersPage() {
   const canUpdate = can(permissions, 'user.update')
   const canDelete = can(permissions, 'user.delete')
   const canAssignRoles = can(permissions, 'user.assign_roles')
+  const canReadDepartments = can(permissions, 'department.read')
+  const canReadPositions = can(permissions, 'position.read')
   const canResetPassword = canUpdate
 
   const rolesQueryParams = useMemo(
@@ -178,21 +180,25 @@ export function UsersPage() {
   const departmentOptionsQuery = useQuery({
     queryKey: getGetDepartmentOptionsQueryKey(departmentOptionParams),
     queryFn: () => getDepartmentOptions(departmentOptionParams),
+    enabled: canReadDepartments,
   })
 
   const positionOptionsQuery = useQuery({
     queryKey: getGetPositionOptionsQueryKey(positionOptionParams),
     queryFn: () => getPositionOptions(positionOptionParams),
+    enabled: canReadPositions,
   })
 
   const activeDepartmentOptionsQuery = useQuery({
     queryKey: getGetDepartmentOptionsQueryKey(activeOptionParams),
     queryFn: () => getDepartmentOptions(activeOptionParams),
+    enabled: canReadDepartments,
   })
 
   const activePositionOptionsQuery = useQuery({
     queryKey: getGetPositionOptionsQueryKey(activePositionOptionParams),
     queryFn: () => getPositionOptions(activePositionOptionParams),
+    enabled: canReadPositions,
   })
 
   const departmentOptions = departmentOptionsQuery.data ?? []
@@ -212,8 +218,12 @@ export function UsersPage() {
       >({
         filters: {
           ...(roleCode === allRoleFilter ? {} : { roleCode }),
-          ...(departmentId === allDepartmentFilter ? {} : { departmentId }),
-          ...(positionId === allPositionFilter ? {} : { positionId }),
+          ...(!canReadDepartments || departmentId === allDepartmentFilter
+            ? {}
+            : { departmentId }),
+          ...(!canReadPositions || positionId === allPositionFilter
+            ? {}
+            : { positionId }),
         },
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
@@ -228,6 +238,8 @@ export function UsersPage() {
       roleCode,
       search,
       sorting,
+      canReadDepartments,
+      canReadPositions,
     ],
   )
 
@@ -481,47 +493,51 @@ export function UsersPage() {
                   </select>
                 </label>
 
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <span>{t('users.form.departmentFilter')}</span>
-                  <select
-                    aria-label={t('users.filter.department')}
-                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-                    onChange={(event) =>
-                      handleDepartmentChange(event.target.value)
-                    }
-                    value={departmentId}
-                  >
-                    <option value={allDepartmentFilter}>
-                      {t('users.filter.allDepartments')}
-                    </option>
-                    {activeDepartmentOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
+                {canReadDepartments ? (
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <span>{t('users.form.departmentFilter')}</span>
+                    <select
+                      aria-label={t('users.filter.department')}
+                      className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                      onChange={(event) =>
+                        handleDepartmentChange(event.target.value)
+                      }
+                      value={departmentId}
+                    >
+                      <option value={allDepartmentFilter}>
+                        {t('users.filter.allDepartments')}
                       </option>
-                    ))}
-                  </select>
-                </label>
+                      {activeDepartmentOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
 
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <span>{t('users.form.positionFilter')}</span>
-                  <select
-                    aria-label={t('users.filter.position')}
-                    className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-                    onChange={(event) =>
-                      handlePositionChange(event.target.value)
-                    }
-                    value={positionId}
-                  >
-                    <option value={allPositionFilter}>
-                      {t('users.filter.allPositions')}
-                    </option>
-                    {activePositionOptions.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.name}
+                {canReadPositions ? (
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <span>{t('users.form.positionFilter')}</span>
+                    <select
+                      aria-label={t('users.filter.position')}
+                      className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                      onChange={(event) =>
+                        handlePositionChange(event.target.value)
+                      }
+                      value={positionId}
+                    >
+                      <option value={allPositionFilter}>
+                        {t('users.filter.allPositions')}
                       </option>
-                    ))}
-                  </select>
-                </label>
+                      {activePositionOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
               </>
             }
             onSearchChange={handleSearchChange}
@@ -553,7 +569,10 @@ export function UsersPage() {
                 createMutation.isPending || updateMutation.isPending
               }
               mode={formState.mode}
+              canEditProfile={canUpdate}
               canAssignRoles={canAssignRoles}
+              canEditDepartments={canUpdate && canReadDepartments}
+              canEditPositions={canUpdate && canReadPositions}
               departmentOptions={departmentOptions}
               positionOptions={positionOptions}
               roleOptions={roleOptions}

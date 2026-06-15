@@ -303,6 +303,20 @@ describe('DepartmentsPage', () => {
 
     renderDepartmentsPage()
 
+    const tree = await screen.findByRole('tree', {
+      name: 'Department tree',
+    })
+    const engineeringTreeItem = within(tree).getByRole('treeitem', {
+      name: /Engineering/,
+    })
+    const platformGroup = within(engineeringTreeItem).getAllByRole('group')[0]
+    expect(
+      within(platformGroup).getByRole('treeitem', { name: /Platform/ }),
+    ).toBeInTheDocument()
+    expect(
+      within(platformGroup).getByRole('treeitem', { name: /API/ }),
+    ).toBeInTheDocument()
+
     expect(await screen.findByText('engineering')).toBeInTheDocument()
     expect(screen.getByText('platform')).toBeInTheDocument()
     const platformRow = screen.getByText('platform').closest('tr')

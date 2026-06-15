@@ -91,7 +91,7 @@ export class UserService {
   async findById(id: string): Promise<UserResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: USER_ORGANIZATION_INCLUDE,
+      include: { roles: { include: { role: true } } },
     });
 
     if (!user) {
@@ -346,7 +346,7 @@ export class UserService {
         const user = await tx.user.update({
           where: { id },
           data: { passwordHash },
-          include: { roles: { include: { role: true } } },
+          include: USER_ORGANIZATION_INCLUDE,
         });
 
         await tx.userSession.updateMany({
@@ -419,7 +419,7 @@ export class UserService {
   async findProfileById(id: string): Promise<UserProfile> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { roles: { include: { role: true } } },
+      include: USER_ORGANIZATION_INCLUDE,
     });
 
     if (!user) {
@@ -442,7 +442,7 @@ export class UserService {
   ): Promise<UserResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { roles: { include: { role: true } } },
+      include: USER_ORGANIZATION_INCLUDE,
     });
 
     if (!user) {
@@ -455,7 +455,7 @@ export class UserService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const before = await tx.user.findUnique({
         where: { id },
-        include: { roles: { include: { role: true } } },
+        include: USER_ORGANIZATION_INCLUDE,
       });
 
       if (!before) {
@@ -472,7 +472,7 @@ export class UserService {
 
       const nextUser = await tx.user.findUnique({
         where: { id },
-        include: { roles: { include: { role: true } } },
+        include: USER_ORGANIZATION_INCLUDE,
       });
 
       if (!nextUser) {

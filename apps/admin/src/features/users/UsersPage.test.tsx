@@ -280,6 +280,8 @@ function renderUsersPage(
     'user.update',
     'user.delete',
     'user.assign_roles',
+    'department.read',
+    'position.read',
   ],
 ) {
   const queryClient = new QueryClient({
@@ -319,6 +321,8 @@ function renderUsersRoute(
     'user.update',
     'user.delete',
     'user.assign_roles',
+    'department.read',
+    'position.read',
   ],
 ) {
   const queryClient = new QueryClient({
@@ -725,6 +729,42 @@ describe('UsersPage', () => {
     })
   })
 
+  it('includes departmentIds when only the primary department changes during edit', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listUsers).mockResolvedValue(
+      listResponse([
+        {
+          ...alice,
+          departments: [engineering, platform],
+          primaryDepartment: engineering,
+        },
+      ]),
+    )
+    vi.mocked(updateUser).mockResolvedValue(alice)
+    vi.mocked(replaceUserRoles).mockResolvedValue(alice)
+
+    renderUsersPage()
+    await screen.findByText('alice')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog')
+    await user.selectOptions(
+      within(dialog).getByLabelText('Primary department'),
+      'dept-platform',
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Edit' }))
+
+    await waitFor(() => {
+      expect(updateUser).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining<UpdateUserRequest>({
+          departmentIds: ['dept-engineering', 'dept-platform'],
+          primaryDepartmentId: 'dept-platform',
+        }),
+      )
+    })
+  })
+
   it('preserves disabled assignments when editing unrelated fields', async () => {
     const user = userEvent.setup()
     vi.mocked(listUsers).mockResolvedValue(listResponse([aliceWithOrganization]))
@@ -811,6 +851,26 @@ describe('UsersPage', () => {
         }),
       )
     })
+  })
+
+  it('does not fetch or show department and position controls without organization read permissions', async () => {
+    vi.mocked(listUsers).mockResolvedValue(listResponse([alice]))
+
+    renderUsersPage(['user.read', 'user.create', 'user.update'])
+    await screen.findByText('alice')
+
+    expect(getDepartmentOptions).not.toHaveBeenCalled()
+    expect(getPositionOptions).not.toHaveBeenCalled()
+    expect(
+      screen.queryByLabelText('Filter by department'),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Filter by position')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    expect(screen.queryByLabelText('Departments')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Primary department')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Positions')).not.toBeInTheDocument()
   })
 
   it('renders primary department and position summaries in the table', async () => {
@@ -1013,6 +1073,9 @@ describe('UsersPage', () => {
     await screen.findByText('alice')
 
     await user.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Departments')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Positions')).not.toBeInTheDocument()
     await user.deselectOptions(
       within(screen.getByRole('dialog')).getByLabelText('Role'),
       'admin',

@@ -112,6 +112,85 @@ function withParentDisplayNames(
   })
 }
 
+function DepartmentTreeBrowser({
+  nodes,
+}: {
+  nodes: DepartmentTreeNode[]
+}) {
+  const { t } = useI18n()
+
+  return (
+    <section
+      aria-labelledby="department-tree-heading"
+      className="rounded-lg border border-slate-200 bg-white"
+    >
+      <div className="border-b border-slate-200 px-4 py-3">
+        <h3
+          className="text-sm font-semibold text-slate-950"
+          id="department-tree-heading"
+        >
+          {t('departments.tree.title')}
+        </h3>
+      </div>
+      <div className="max-h-80 overflow-auto px-4 py-3">
+        {nodes.length ? (
+          <ul
+            aria-label={t('departments.tree.title')}
+            className="grid gap-1 text-sm"
+            role="tree"
+          >
+            {nodes.map((node) => (
+              <DepartmentTreeItem key={node.id} node={node} />
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate-500">
+            {t('departments.state.empty')}
+          </p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function DepartmentTreeItem({
+  node,
+}: {
+  node: DepartmentTreeNode
+}) {
+  const hasChildren = node.children.length > 0
+
+  return (
+    <li
+      aria-label={node.name}
+      aria-expanded={hasChildren ? true : undefined}
+      className="min-w-0"
+      role="treeitem"
+    >
+      <div className="flex min-h-8 min-w-0 items-center gap-2 rounded-md px-2 text-slate-700">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-500" />
+        <span className="truncate font-medium text-slate-950">{node.name}</span>
+        <span
+          aria-hidden="true"
+          className="ml-auto rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-500"
+        >
+          {node.status}
+        </span>
+      </div>
+      {hasChildren ? (
+        <ul
+          className="ml-4 grid gap-1 border-l border-slate-200 pl-3"
+          role="group"
+        >
+          {node.children.map((child) => (
+            <DepartmentTreeItem key={child.id} node={child} />
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  )
+}
+
 export function DepartmentsPage() {
   const { t } = useI18n()
   const queryClient = useQueryClient()
@@ -322,6 +401,8 @@ export function DepartmentsPage() {
           </button>
         ) : null}
       </div>
+
+      <DepartmentTreeBrowser nodes={treeQuery.data ?? []} />
 
       <DataTable
         columns={columns}

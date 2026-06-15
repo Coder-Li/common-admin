@@ -255,6 +255,32 @@ describe('UserService', () => {
     ...overrides,
   });
 
+  const organizationAssignments = {
+    departments: [
+      {
+        isPrimary: true,
+        department: {
+          id: 'dept-1',
+          code: 'engineering',
+          name: 'Engineering',
+          status: 'ACTIVE',
+          sortOrder: 10,
+        },
+      },
+    ],
+    positions: [
+      {
+        position: {
+          id: 'pos-1',
+          code: 'developer',
+          name: 'Developer',
+          status: 'ACTIVE',
+          sortOrder: 20,
+        },
+      },
+    ],
+  };
+
   const createPrismaMock = () => ({
     user: {
       findMany: jest.fn(),
@@ -1070,6 +1096,30 @@ describe('UserService', () => {
     expect(response).not.toHaveProperty('passwordHash');
   });
 
+  it('resetPassword returns organization assignments in the user response', async () => {
+    const { service, tx } = createService();
+    tx.user.update.mockResolvedValue(makeUser(organizationAssignments));
+    tx.userSession.updateMany.mockResolvedValue({ count: 0 });
+
+    const response = await service.resetPassword('user-1', 'NewSecure123!');
+
+    expect(tx.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          departments: expect.any(Object),
+          positions: expect.any(Object),
+        }),
+      }),
+    );
+    expect(response.departments).toEqual([
+      expect.objectContaining({ id: 'dept-1', code: 'engineering' }),
+    ]);
+    expect(response.primaryDepartment).toMatchObject({ id: 'dept-1' });
+    expect(response.positions).toEqual([
+      expect.objectContaining({ id: 'pos-1', code: 'developer' }),
+    ]);
+  });
+
   it('resetPassword writes reset_password audit without password fields', async () => {
     const { auditLogService, service, tx } = createService();
     tx.user.update.mockResolvedValue(makeUser());
@@ -1239,6 +1289,43 @@ describe('UserService', () => {
     expect(
       permissionService.invalidateUserPermissionContext,
     ).toHaveBeenCalledWith('user-1');
+  });
+
+  it('replaceRoles returns organization assignments in the user response', async () => {
+    const { prisma, service, tx } = createService();
+    prisma.user.findUnique.mockResolvedValue(makeUser(organizationAssignments));
+    prisma.role.findMany.mockResolvedValue([
+      { id: 'role-admin', code: 'admin' },
+    ]);
+    tx.user.findUnique
+      .mockResolvedValueOnce(makeUser(organizationAssignments))
+      .mockResolvedValueOnce(makeUser(organizationAssignments));
+
+    const response = await service.replaceRoles('user-1', ['admin'], 'actor-1');
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          departments: expect.any(Object),
+          positions: expect.any(Object),
+        }),
+      }),
+    );
+    expect(tx.user.findUnique).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          departments: expect.any(Object),
+          positions: expect.any(Object),
+        }),
+      }),
+    );
+    expect(response.departments).toEqual([
+      expect.objectContaining({ id: 'dept-1', code: 'engineering' }),
+    ]);
+    expect(response.primaryDepartment).toMatchObject({ id: 'dept-1' });
+    expect(response.positions).toEqual([
+      expect.objectContaining({ id: 'pos-1', code: 'developer' }),
+    ]);
   });
 
   it('rejects the business request when audit recording fails inside a Prisma transaction', async () => {

@@ -27,7 +27,10 @@ interface UserFormProps {
   mode: 'create' | 'edit'
   initialValue?: UserRecord
   isSubmitting: boolean
+  canEditProfile: boolean
   canAssignRoles: boolean
+  canEditDepartments: boolean
+  canEditPositions: boolean
   departmentOptions: UserDepartmentOption[]
   positionOptions: UserPositionOption[]
   roleOptions: UserRoleSummary[]
@@ -94,7 +97,10 @@ export function UserForm({
   mode,
   initialValue,
   isSubmitting,
+  canEditProfile,
   canAssignRoles,
+  canEditDepartments,
+  canEditPositions,
   departmentOptions,
   positionOptions,
   roleOptions,
@@ -232,7 +238,18 @@ export function UserForm({
         ...updateValue,
         password: value.password ?? '',
         roleCodes: canAssignRoles ? value.roleCodes : undefined,
-        ...organizationValue,
+        ...(canEditDepartments
+          ? {
+              departmentIds: organizationValue.departmentIds,
+              ...(organizationValue.primaryDepartmentId
+                ? {
+                    primaryDepartmentId:
+                      organizationValue.primaryDepartmentId,
+                  }
+                : {}),
+            }
+          : {}),
+        ...(canEditPositions ? { positionIds: organizationValue.positionIds } : {}),
       })
       return
     }
@@ -247,69 +264,79 @@ export function UserForm({
     const shouldSubmitPrimaryDepartmentId =
       Boolean(submittedPrimaryDepartmentId) &&
       (changedDepartmentIds || changedPrimaryDepartmentId)
+    const shouldSubmitDepartmentIds =
+      canEditDepartments && (changedDepartmentIds || changedPrimaryDepartmentId)
 
     onSubmit({
-      ...updateValue,
+      ...(canEditProfile ? updateValue : {}),
       roleCodes: canAssignRoles ? value.roleCodes : undefined,
-      ...(changedDepartmentIds ? { departmentIds: submittedDepartmentIds } : {}),
-      ...(shouldSubmitPrimaryDepartmentId
+      ...(shouldSubmitDepartmentIds
+        ? { departmentIds: submittedDepartmentIds }
+        : {}),
+      ...(canEditDepartments && shouldSubmitPrimaryDepartmentId
         ? { primaryDepartmentId: submittedPrimaryDepartmentId }
         : {}),
-      ...(changedPositionIds ? { positionIds: submittedPositionIds } : {}),
+      ...(canEditPositions && changedPositionIds
+        ? { positionIds: submittedPositionIds }
+        : {}),
     })
   }
 
   return (
     <form className="grid gap-4" onSubmit={handleSubmit(submitForm)}>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          error={errors.email?.message}
-          label={t('users.form.email')}
-        >
-          <input
-            aria-invalid={Boolean(errors.email)}
-            autoComplete="email"
-            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-            type="email"
-            {...register('email')}
-          />
-        </Field>
+        {canEditProfile ? (
+          <>
+            <Field
+              error={errors.email?.message}
+              label={t('users.form.email')}
+            >
+              <input
+                aria-invalid={Boolean(errors.email)}
+                autoComplete="email"
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                type="email"
+                {...register('email')}
+              />
+            </Field>
 
-        <Field
-          error={errors.username?.message}
-          label={t('users.form.username')}
-        >
-          <input
-            aria-invalid={Boolean(errors.username)}
-            autoComplete="username"
-            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-            {...register('username')}
-          />
-        </Field>
+            <Field
+              error={errors.username?.message}
+              label={t('users.form.username')}
+            >
+              <input
+                aria-invalid={Boolean(errors.username)}
+                autoComplete="username"
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                {...register('username')}
+              />
+            </Field>
 
-        <Field
-          error={errors.firstName?.message}
-          label={t('users.form.firstName')}
-        >
-          <input
-            aria-invalid={Boolean(errors.firstName)}
-            autoComplete="given-name"
-            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-            {...register('firstName')}
-          />
-        </Field>
+            <Field
+              error={errors.firstName?.message}
+              label={t('users.form.firstName')}
+            >
+              <input
+                aria-invalid={Boolean(errors.firstName)}
+                autoComplete="given-name"
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                {...register('firstName')}
+              />
+            </Field>
 
-        <Field
-          error={errors.lastName?.message}
-          label={t('users.form.lastName')}
-        >
-          <input
-            aria-invalid={Boolean(errors.lastName)}
-            autoComplete="family-name"
-            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-            {...register('lastName')}
-          />
-        </Field>
+            <Field
+              error={errors.lastName?.message}
+              label={t('users.form.lastName')}
+            >
+              <input
+                aria-invalid={Boolean(errors.lastName)}
+                autoComplete="family-name"
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                {...register('lastName')}
+              />
+            </Field>
+          </>
+        ) : null}
 
         {isCreate ? (
           <Field
@@ -346,72 +373,78 @@ export function UserForm({
           </Field>
         ) : null}
 
-        <Field label={t('users.form.departments')}>
-          <select
-            aria-label={t('users.form.departments')}
-            className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-            multiple
-            {...register('departmentIds', {
-              onChange: (event) => {
-                setValue('departmentIds', selectedValues(event))
-              },
-            })}
-          >
-            {departmentOptions.map((option) => (
-              <option
-                disabled={option.status === 'DISABLED'}
-                key={option.id}
-                value={option.id}
+        {canEditDepartments ? (
+          <>
+            <Field label={t('users.form.departments')}>
+              <select
+                aria-label={t('users.form.departments')}
+                className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                multiple
+                {...register('departmentIds', {
+                  onChange: (event) => {
+                    setValue('departmentIds', selectedValues(event))
+                  },
+                })}
               >
-                {option.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+                {departmentOptions.map((option) => (
+                  <option
+                    disabled={option.status === 'DISABLED'}
+                    key={option.id}
+                    value={option.id}
+                  >
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-        <Field
-          error={errors.primaryDepartmentId?.message}
-          label={t('users.form.primaryDepartment')}
-        >
-          <select
-            aria-invalid={Boolean(errors.primaryDepartmentId)}
-            aria-label={t('users.form.primaryDepartment')}
-            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-            {...register('primaryDepartmentId')}
-          >
-            <option value="">
-              {t('users.form.primaryDepartmentPlaceholder')}
-            </option>
-            {primaryDepartmentOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label={t('users.form.positions')}>
-          <select
-            aria-label={t('users.form.positions')}
-            className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
-            multiple
-            {...register('positionIds', {
-              onChange: (event) => {
-                setValue('positionIds', selectedValues(event))
-              },
-            })}
-          >
-            {positionOptions.map((option) => (
-              <option
-                disabled={option.status === 'DISABLED'}
-                key={option.id}
-                value={option.id}
+            <Field
+              error={errors.primaryDepartmentId?.message}
+              label={t('users.form.primaryDepartment')}
+            >
+              <select
+                aria-invalid={Boolean(errors.primaryDepartmentId)}
+                aria-label={t('users.form.primaryDepartment')}
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+                {...register('primaryDepartmentId')}
               >
-                {option.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+                <option value="">
+                  {t('users.form.primaryDepartmentPlaceholder')}
+                </option>
+                {primaryDepartmentOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </>
+        ) : null}
+
+        {canEditPositions ? (
+          <Field label={t('users.form.positions')}>
+            <select
+              aria-label={t('users.form.positions')}
+              className="min-h-24 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+              multiple
+              {...register('positionIds', {
+                onChange: (event) => {
+                  setValue('positionIds', selectedValues(event))
+                },
+              })}
+            >
+              {positionOptions.map((option) => (
+                <option
+                  disabled={option.status === 'DISABLED'}
+                  key={option.id}
+                  value={option.id}
+                >
+                  {option.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
       </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
