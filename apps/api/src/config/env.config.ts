@@ -29,6 +29,7 @@ const envSchema = z.object({
   ENABLE_DIAGNOSTIC_ERROR_ENDPOINT: z
     .preprocess(parseExplicitTrue, z.boolean())
     .default(false),
+  DEMO_MODE: z.preprocess(parseExplicitTrue, z.boolean()).default(false),
   PORT: z.coerce.number().int().positive().default(13001),
   DATABASE_URL: z
     .string()

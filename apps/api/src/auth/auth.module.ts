@@ -6,6 +6,7 @@ import {
   AUTH_TOKEN_CONFIG,
   RefreshCookieSameSite,
 } from '../config/auth.config';
+import { DEMO_MODE_CONFIG, createDemoModeConfig } from '../config/demo.config';
 import { PermissionModule } from '../permission/permission.module';
 import { AuthController } from './auth.controller';
 import { AuthOriginGuard } from './auth-origin.guard';
@@ -49,6 +50,11 @@ import { SessionCookieService } from './session-cookie.service';
           'AUTH_REFRESH_COOKIE_DOMAIN',
         ),
       }),
+    },
+    {
+      provide: DEMO_MODE_CONFIG,
+      inject: [ConfigService],
+      useFactory: createDemoModeConfig,
     },
   ],
 })

@@ -59,6 +59,8 @@ describe('validateEnv', () => {
     expect(validateEnv({}).SERVICE_NAME).toBe('api');
     expect(validateEnv({}).APP_ENV).toBe('development');
     expect(validateEnv({}).ENABLE_DIAGNOSTIC_ERROR_ENDPOINT).toBe(false);
+    expect(validateEnv({}).DEMO_MODE).toBe(false);
+    expect(validateEnv({ DEMO_MODE: 'true' }).DEMO_MODE).toBe(true);
     expect(
       validateEnv({ ENABLE_DIAGNOSTIC_ERROR_ENDPOINT: 'true' })
         .ENABLE_DIAGNOSTIC_ERROR_ENDPOINT,

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-function-type, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await, @typescript-eslint/unbound-method */
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
@@ -61,7 +61,7 @@ describe('AuthService', () => {
     });
   });
 
-  function createService() {
+  function createService(demoMode = false) {
     return new AuthService(
       prisma as never,
       jwtService,
@@ -75,6 +75,10 @@ describe('AuthService', () => {
         refreshCookieSecure: false,
         refreshCookieSameSite: 'lax',
         refreshCookieDomain: '',
+      },
+      {
+        demoMode,
+        defaultAdminEmail: 'admin@example.com',
       },
     );
   }
@@ -358,6 +362,34 @@ describe('AuthService', () => {
   });
 
   describe('changePassword', () => {
+    it('rejects default admin password changes in demo mode', async () => {
+      prisma.user.findUnique.mockResolvedValue(user);
+      const service = createService(true);
+
+      await expect(
+        service.changePassword('user-1', 'Admin123!', 'NewAdmin123!'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.userSession.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('allows non-default users to change password in demo mode', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...user,
+        email: 'viewer@example.com',
+      });
+      prisma.userSession.updateMany.mockResolvedValue({ count: 1 });
+      const service = createService(true);
+
+      await service.changePassword('user-1', 'Admin123!', 'NewAdmin123!');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { passwordHash: expect.any(String) },
+      });
+    });
+
     it('rejects incorrect current password', async () => {
       prisma.user.findUnique.mockResolvedValue(user);
       const service = createService();

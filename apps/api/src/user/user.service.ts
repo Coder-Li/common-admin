@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
 import {
   DepartmentStatus,
@@ -37,6 +38,11 @@ import { toUserProfile, toUserResponse } from './user.mapper';
 import { UserProfile } from './user.types';
 import { PermissionService } from '../permission/permission.service';
 import { SYSTEM_ROLE_CODES } from '../permission/permission.constants';
+import {
+  DEMO_MODE_CONFIG,
+  isProtectedDefaultAdminEmail,
+} from '../config/demo.config';
+import type { DemoModeConfig } from '../config/demo.config';
 
 const USER_SORT_FIELDS = new Set([
   'createdAt',
@@ -59,6 +65,8 @@ export class UserService {
     private readonly prisma: PrismaService,
     private readonly permissionService: PermissionService,
     private readonly auditLogService: AuditLogService,
+    @Inject(DEMO_MODE_CONFIG)
+    private readonly demoConfig: DemoModeConfig,
   ) {}
 
   async listUsers(
@@ -343,6 +351,24 @@ export class UserService {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const now = new Date();
+
+        if (this.demoConfig.demoMode) {
+          const before = await tx.user.findUnique({
+            where: { id },
+            select: { email: true },
+          });
+
+          if (!before) {
+            throw new NotFoundException('User not found');
+          }
+
+          if (isProtectedDefaultAdminEmail(before.email, this.demoConfig)) {
+            throw new ForbiddenException(
+              'Default admin password cannot be changed in demo mode',
+            );
+          }
+        }
+
         const user = await tx.user.update({
           where: { id },
           data: { passwordHash },

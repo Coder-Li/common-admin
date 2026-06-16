@@ -334,7 +334,7 @@ describe('UserService', () => {
     invalidateUserPermissionContext: jest.fn(),
   };
 
-  const createService = () => {
+  const createService = (demoMode = false) => {
     const prisma = createPrismaMock();
     const tx = createPrismaMock();
     prisma.$transaction.mockImplementation(async (callback: Function) =>
@@ -347,6 +347,10 @@ describe('UserService', () => {
       prisma as never,
       permissionService as never,
       auditLogService as never,
+      {
+        demoMode,
+        defaultAdminEmail: 'admin@example.com',
+      },
     );
 
     return { auditLogService, prisma, service, tx };
@@ -1066,6 +1070,37 @@ describe('UserService', () => {
       },
       tx,
     );
+  });
+
+  it('resetPassword rejects default admin password resets in demo mode', async () => {
+    const { service, tx } = createService(true);
+    tx.user.findUnique.mockResolvedValue(
+      makeUser({
+        email: 'admin@example.com',
+        username: 'admin',
+      }),
+    );
+
+    await expect(
+      service.resetPassword('user-1', 'NewSecure123!'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(tx.user.update).not.toHaveBeenCalled();
+    expect(tx.userSession.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('resetPassword allows non-default user password resets in demo mode', async () => {
+    const { service, tx } = createService(true);
+    tx.user.findUnique.mockResolvedValue(makeUser());
+    tx.user.update.mockResolvedValue(makeUser());
+
+    await service.resetPassword('user-1', 'NewSecure123!');
+
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { passwordHash: expect.any(String) },
+      include: expect.any(Object),
+    });
   });
 
   it('resetPassword hashes the new password', async () => {

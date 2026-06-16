@@ -1,9 +1,19 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcryptjs';
 import { AUTH_TOKEN_CONFIG } from '../config/auth.config';
 import type { AuthTokenConfig } from '../config/auth.config';
+import {
+  DEMO_MODE_CONFIG,
+  isProtectedDefaultAdminEmail,
+} from '../config/demo.config';
+import type { DemoModeConfig } from '../config/demo.config';
 import { PermissionService } from '../permission/permission.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { toUserProfile } from '../user/user.mapper';
@@ -30,6 +40,8 @@ export class AuthService {
     private readonly refreshTokenService: RefreshTokenService,
     @Inject(AUTH_TOKEN_CONFIG)
     private readonly tokenConfig: AuthTokenConfig,
+    @Inject(DEMO_MODE_CONFIG)
+    private readonly demoConfig: DemoModeConfig,
   ) {}
 
   async login(
@@ -201,11 +213,17 @@ export class AuthService {
   ): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { passwordHash: true },
+      select: { email: true, passwordHash: true },
     });
 
     if (!user) {
       throw new UnauthorizedException();
+    }
+
+    if (isProtectedDefaultAdminEmail(user.email, this.demoConfig)) {
+      throw new ForbiddenException(
+        'Default admin password cannot be changed in demo mode',
+      );
     }
 
     const passwordMatches = await bcrypt.compare(
