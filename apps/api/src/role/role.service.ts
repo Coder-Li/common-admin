@@ -5,7 +5,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PermissionStatus, Prisma, RoleStatus } from '@prisma/client';
+import {
+  DataScope,
+  DepartmentStatus,
+  PermissionStatus,
+  Prisma,
+  RoleStatus,
+} from '@prisma/client';
 import {
   ListResponse,
   createListResponse,
@@ -35,6 +41,11 @@ const ROLE_INCLUDE = {
       permission: true,
     },
   },
+  dataScopeDepartments: {
+    include: {
+      department: true,
+    },
+  },
 } as const;
 
 const ACTIVE_ROLE_PERMISSIONS_INCLUDE = {
@@ -46,6 +57,11 @@ const ACTIVE_ROLE_PERMISSIONS_INCLUDE = {
     },
     include: {
       permission: true,
+    },
+  },
+  dataScopeDepartments: {
+    include: {
+      department: true,
     },
   },
 } as const;
@@ -114,17 +130,38 @@ export class RoleService {
   ): Promise<RoleResponseDto> {
     try {
       const response = await this.prisma.$transaction(async (tx) => {
+        const dataScope = dto.dataScope ?? DataScope.SELF;
+        const departmentIds = await this.resolveDataScopeDepartmentIds(
+          tx,
+          dataScope,
+          dto.dataScopeDepartmentIds,
+        );
+
         if (dto.isDefault) {
           await this.clearOtherDefaults(tx);
         }
 
+        const roleData: Prisma.RoleCreateInput = {
+          code: dto.code,
+          name: dto.name,
+          description: dto.description,
+          isDefault: dto.isDefault ?? false,
+          dataScope,
+          ...(departmentIds.length
+            ? {
+                dataScopeDepartments: {
+                  createMany: {
+                    data: departmentIds.map((departmentId) => ({
+                      departmentId,
+                    })),
+                  },
+                },
+              }
+            : {}),
+        };
+
         const role = await tx.role.create({
-          data: {
-            code: dto.code,
-            name: dto.name,
-            description: dto.description,
-            isDefault: dto.isDefault ?? false,
-          },
+          data: roleData,
           include: ROLE_INCLUDE,
         });
         const response = toRoleResponse(role);
@@ -190,9 +227,39 @@ export class RoleService {
           await this.clearOtherDefaults(tx, id);
         }
 
+        const nextDataScope = dto.dataScope ?? before.dataScope;
+        const submittedDepartmentIds = dto.dataScopeDepartmentIds !== undefined;
+        const dataScopeChanged =
+          dto.dataScope !== undefined && dto.dataScope !== before.dataScope;
+        const roleData = this.toRoleUpdateInput(dto);
+
+        if (nextDataScope === DataScope.CUSTOM_DEPT) {
+          if (submittedDepartmentIds || dataScopeChanged) {
+            const departmentIds = await this.resolveDataScopeDepartmentIds(
+              tx,
+              nextDataScope,
+              dto.dataScopeDepartmentIds,
+            );
+
+            roleData.dataScopeDepartments = {
+              deleteMany: {},
+              createMany: {
+                data: departmentIds.map((departmentId) => ({ departmentId })),
+              },
+            };
+          }
+        } else if (dto.dataScope !== undefined || submittedDepartmentIds) {
+          await this.resolveDataScopeDepartmentIds(
+            tx,
+            nextDataScope,
+            dto.dataScopeDepartmentIds,
+          );
+          roleData.dataScopeDepartments = { deleteMany: {} };
+        }
+
         const role = await tx.role.update({
           where: { id },
-          data: dto,
+          data: roleData,
           include: ROLE_INCLUDE,
         });
         const response = toRoleResponse(role);
@@ -373,6 +440,78 @@ export class RoleService {
     }
 
     return role;
+  }
+
+  private async resolveDataScopeDepartmentIds(
+    tx: Pick<Prisma.TransactionClient, 'department'>,
+    dataScope: DataScope,
+    departmentIds?: string[],
+  ): Promise<string[]> {
+    const submittedDepartmentIds = departmentIds ?? [];
+
+    if (dataScope !== DataScope.CUSTOM_DEPT) {
+      if (submittedDepartmentIds.length > 0) {
+        throw new BadRequestException(
+          'Department ids are only allowed for custom department data scope',
+        );
+      }
+
+      return [];
+    }
+
+    if (submittedDepartmentIds.length === 0) {
+      throw new BadRequestException(
+        'Custom department data scope requires department ids',
+      );
+    }
+
+    const uniqueDepartmentIds = [...new Set(submittedDepartmentIds)];
+
+    if (uniqueDepartmentIds.length !== submittedDepartmentIds.length) {
+      throw new BadRequestException('Duplicate department ids are not allowed');
+    }
+
+    const departments = await tx.department.findMany({
+      where: {
+        id: { in: uniqueDepartmentIds },
+        status: DepartmentStatus.ACTIVE,
+      },
+      select: { id: true },
+    });
+
+    if (departments.length !== uniqueDepartmentIds.length) {
+      throw new BadRequestException(
+        'Custom department data scope requires active departments',
+      );
+    }
+
+    return uniqueDepartmentIds;
+  }
+
+  private toRoleUpdateInput(dto: UpdateRoleDto): Prisma.RoleUpdateInput {
+    const data: Prisma.RoleUpdateInput = {};
+
+    if (dto.name !== undefined) {
+      data.name = dto.name;
+    }
+
+    if (dto.description !== undefined) {
+      data.description = dto.description;
+    }
+
+    if (dto.status !== undefined) {
+      data.status = dto.status;
+    }
+
+    if (dto.isDefault !== undefined) {
+      data.isDefault = dto.isDefault;
+    }
+
+    if (dto.dataScope !== undefined) {
+      data.dataScope = dto.dataScope;
+    }
+
+    return data;
   }
 
   private async hasAnotherActiveDefault(id: string): Promise<boolean> {

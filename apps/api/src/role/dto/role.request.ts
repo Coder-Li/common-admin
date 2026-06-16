@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { RoleStatus } from '@prisma/client';
+import { DataScope, RoleStatus } from '@prisma/client';
 import {
   IsArray,
   IsBoolean,
@@ -43,6 +43,17 @@ export class CreateRoleDto {
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
+
+  @ApiPropertyOptional({ enum: DataScope })
+  @IsOptional()
+  @IsEnum(DataScope)
+  dataScope?: DataScope;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  dataScopeDepartmentIds?: string[];
 }
 
 export class UpdateRoleDto {
@@ -68,6 +79,17 @@ export class UpdateRoleDto {
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
+
+  @ApiPropertyOptional({ enum: DataScope })
+  @IsOptional()
+  @IsEnum(DataScope)
+  dataScope?: DataScope;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  dataScopeDepartmentIds?: string[];
 }
 
 export class ReplaceRolePermissionsDto {

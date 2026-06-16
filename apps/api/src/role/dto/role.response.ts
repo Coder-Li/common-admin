@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { RoleStatus } from '@prisma/client';
+import { DataScope, DepartmentStatus, RoleStatus } from '@prisma/client';
 import { ListResponse } from '../../common/dto/list-response.dto';
 
 export class RolePermissionSummaryDto {
@@ -8,6 +8,20 @@ export class RolePermissionSummaryDto {
 
   @ApiProperty()
   name!: string;
+}
+
+export class RoleDataScopeDepartmentDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  code!: string;
+
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty({ enum: DepartmentStatus })
+  status!: DepartmentStatus;
 }
 
 export class RoleResponseDto {
@@ -31,6 +45,12 @@ export class RoleResponseDto {
 
   @ApiProperty()
   isDefault!: boolean;
+
+  @ApiProperty({ enum: DataScope })
+  dataScope!: DataScope;
+
+  @ApiProperty({ type: [RoleDataScopeDepartmentDto] })
+  dataScopeDepartments!: RoleDataScopeDepartmentDto[];
 
   @ApiProperty({ type: [RolePermissionSummaryDto] })
   permissions!: RolePermissionSummaryDto[];

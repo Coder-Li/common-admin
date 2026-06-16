@@ -1,7 +1,18 @@
 import type { ExecutionContext } from '@nestjs/common';
+import type { EffectiveDataScope } from '../permission/permission.types';
 import { PermissionsGuard } from './permissions.guard';
 
 describe('PermissionsGuard', () => {
+  const allDataScope: EffectiveDataScope = {
+    mode: 'ALL',
+    selfUserIds: [],
+    departmentIds: [],
+  };
+  const emptyLimitedDataScope: EffectiveDataScope = {
+    mode: 'LIMITED',
+    selfUserIds: [],
+    departmentIds: [],
+  };
   const reflector = {
     getAllAndOverride: jest.fn(),
   };
@@ -40,6 +51,7 @@ describe('PermissionsGuard', () => {
       roleCodes: ['super_admin'],
       permissionCodes: [],
       isSuperAdmin: true,
+      dataScope: allDataScope,
     });
 
     await expect(
@@ -54,6 +66,7 @@ describe('PermissionsGuard', () => {
       roleCodes: ['admin'],
       permissionCodes: ['user.read', 'user.update'],
       isSuperAdmin: false,
+      dataScope: emptyLimitedDataScope,
     });
 
     await expect(
@@ -68,6 +81,7 @@ describe('PermissionsGuard', () => {
       roleCodes: ['admin'],
       permissionCodes: ['user.read'],
       isSuperAdmin: false,
+      dataScope: emptyLimitedDataScope,
     });
 
     await expect(
