@@ -2,68 +2,25 @@ import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { SYSTEM_ROLE_CODES } from '../src/permission/permission.constants';
 import { syncPermissions } from './permission-seed';
+import { buildSystemRoleUpserts } from './seed-system-roles';
 
 const prisma = new PrismaClient();
 
 async function main() {
   const passwordHash = await bcrypt.hash('Admin123!', 10);
 
-  await prisma.role.upsert({
-    where: { code: SYSTEM_ROLE_CODES.superAdmin },
-    update: {
-      name: 'Super admin',
-      description: 'Full access to every active permission',
-      status: 'ACTIVE',
-      isSystem: true,
-      isDefault: false,
-    },
-    create: {
-      code: SYSTEM_ROLE_CODES.superAdmin,
-      name: 'Super admin',
-      description: 'Full access to every active permission',
-      status: 'ACTIVE',
-      isSystem: true,
-      isDefault: false,
-    },
-  });
+  for (const systemRole of buildSystemRoleUpserts()) {
+    const { code, ...data } = systemRole;
 
-  await prisma.role.upsert({
-    where: { code: SYSTEM_ROLE_CODES.admin },
-    update: {
-      name: 'Admin',
-      description: 'Default administrator role',
-      status: 'ACTIVE',
-      isSystem: true,
-      isDefault: false,
-    },
-    create: {
-      code: SYSTEM_ROLE_CODES.admin,
-      name: 'Admin',
-      description: 'Default administrator role',
-      status: 'ACTIVE',
-      isSystem: true,
-      isDefault: false,
-    },
-  });
-
-  await prisma.role.upsert({
-    where: { code: SYSTEM_ROLE_CODES.standard },
-    update: {
-      name: 'Standard',
-      description: 'Default role for newly created users',
-      status: 'ACTIVE',
-      isSystem: true,
-      isDefault: true,
-    },
-    create: {
-      code: SYSTEM_ROLE_CODES.standard,
-      name: 'Standard',
-      description: 'Default role for newly created users',
-      status: 'ACTIVE',
-      isSystem: true,
-      isDefault: true,
-    },
-  });
+    await prisma.role.upsert({
+      where: { code },
+      update: data,
+      create: {
+        code,
+        ...data,
+      },
+    });
+  }
 
   await syncPermissions(prisma);
 

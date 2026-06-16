@@ -17,6 +17,14 @@ enum RoleStatus {
   DISABLED
 }
 
+enum DataScope {
+  ALL
+  SELF
+  DEPT
+  DEPT_AND_CHILDREN
+  CUSTOM_DEPT
+}
+
 enum DictionaryStatus {
   ACTIVE
   DISABLED
@@ -87,18 +95,20 @@ model Permission {
 }
 
 model Role {
-  id          String           @id @default(uuid())
-  code        String           @unique @db.VarChar(80)
-  name        String           @db.VarChar(120)
-  description String?          @db.VarChar(500)
-  status      RoleStatus       @default(ACTIVE)
-  isSystem    Boolean          @default(false)
-  isDefault   Boolean          @default(false)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id          String     @id @default(uuid())
+  code        String     @unique @db.VarChar(80)
+  name        String     @db.VarChar(120)
+  description String?    @db.VarChar(500)
+  status      RoleStatus @default(ACTIVE)
+  isSystem    Boolean    @default(false)
+  isDefault   Boolean    @default(false)
+  dataScope   DataScope  @default(SELF)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  users       UserRole[]
-  permissions RolePermission[]
+  users                UserRole[]
+  permissions          RolePermission[]
+  dataScopeDepartments RoleDataScopeDepartment[]
 
   @@index([status])
   @@index([isDefault])
@@ -147,9 +157,10 @@ model Department {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  parent      Department?      @relation("DepartmentTree", fields: [parentId], references: [id])
-  children    Department[]     @relation("DepartmentTree")
-  users       UserDepartment[]
+  parent         Department?               @relation("DepartmentTree", fields: [parentId], references: [id])
+  children       Department[]              @relation("DepartmentTree")
+  users          UserDepartment[]
+  roleDataScopes RoleDataScopeDepartment[]
 
   @@index([parentId, sortOrder])
   @@index([status])
@@ -207,6 +218,18 @@ model RolePermission {
 
   @@id([roleId, permissionId])
   @@index([permissionId])
+}
+
+model RoleDataScopeDepartment {
+  roleId       String
+  departmentId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id])
+
+  @@id([roleId, departmentId])
+  @@index([departmentId])
 }
 
 model ManagedFile {
