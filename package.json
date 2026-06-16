@@ -12,7 +12,7 @@
     "lint": "pnpm -r --if-present lint",
     "quality": "pnpm api:check && pnpm lint && pnpm test && pnpm --filter api test:e2e && pnpm build",
     "format": "pnpm -r --if-present format",
-    "api:generate": "pnpm --filter api openapi:generate && pnpm --filter admin api:generate",
+    "api:generate": "pnpm --filter api db:generate && pnpm --filter api openapi:generate && pnpm --filter admin api:generate",
     "api:check": "pnpm api:generate && git diff --exit-code apps/api/openapi.json apps/admin/src/generated/api",
     "deploy:init": "docker compose --env-file .env.deploy build api && docker compose --env-file .env.deploy run --rm api pnpm --filter api deploy:init",
     "deploy:migrate": "docker compose --env-file .env.deploy build api && docker compose --env-file .env.deploy run --rm api pnpm --filter api deploy:migrate"
