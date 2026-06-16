@@ -7,7 +7,7 @@ import type {
   ChangeEvent,
   ReactNode,
 } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { useI18n } from '../../i18n/useI18n'
 import type {
@@ -155,9 +155,9 @@ export function UserForm({
   const {
     formState: { errors },
     handleSubmit,
+    control,
     register,
     setValue,
-    watch,
   } = useForm<UserFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -173,8 +173,14 @@ export function UserForm({
     },
   })
 
-  const departmentIds = watch('departmentIds')
-  const primaryDepartmentId = watch('primaryDepartmentId')
+  const departmentIds = useWatch({
+    control,
+    name: 'departmentIds',
+  })
+  const primaryDepartmentId = useWatch({
+    control,
+    name: 'primaryDepartmentId',
+  })
   const primaryDepartmentOptions = useMemo(
     () => selectedOptions(departmentOptions, departmentIds),
     [departmentIds, departmentOptions],

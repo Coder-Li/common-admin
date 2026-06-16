@@ -15,20 +15,22 @@ import {
   Upload,
   Users,
 } from 'lucide-react'
-import { PermissionsPage } from '../features/permissions/PermissionsPage'
-import { AuditLogsPage } from '../features/audit-logs/AuditLogsPage'
-import { DepartmentsPage } from '../features/departments/DepartmentsPage'
-import { DictionariesPage } from '../features/dictionaries/DictionariesPage'
-import { FilesPage } from '../features/files/FilesPage'
-import { PositionsPage } from '../features/positions/PositionsPage'
-import { RolesPage } from '../features/roles/RolesPage'
-import { SessionManagementPage } from '../features/session-management/SessionManagementPage'
-import { BasicSettingsPage } from '../features/settings/BasicSettingsPage'
-import { CacheSettingsPage } from '../features/settings/CacheSettingsPage'
-import { SystemInfoPage } from '../features/settings/SystemInfoPage'
-import { UploadSettingsPage } from '../features/settings/UploadSettingsPage'
-import { UsersPage } from '../features/users/UsersPage'
-import { DashboardContent } from '../pages/DashboardContent'
+import {
+  AuditLogsPage,
+  BasicSettingsPage,
+  CacheSettingsPage,
+  DashboardContent,
+  DepartmentsPage,
+  DictionariesPage,
+  FilesPage,
+  PermissionsPage,
+  PositionsPage,
+  RolesPage,
+  SessionManagementPage,
+  SystemInfoPage,
+  UploadSettingsPage,
+  UsersPage,
+} from './admin-route-pages'
 import {
   findAdminRouteById as findRouteById,
   findAdminRouteByPath as findRouteByPath,

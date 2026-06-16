@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, LazyExoticComponent } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { MessageKey } from '../i18n/messages'
 import { canAll } from '../lib/permissions'
@@ -14,7 +14,9 @@ export interface AdminRouteMeta {
   path: string
   labelKey: MessageKey
   requiredPermissions: string[]
-  component: ComponentType<RouteComponentProps>
+  component:
+    | ComponentType<RouteComponentProps>
+    | LazyExoticComponent<ComponentType<RouteComponentProps>>
   icon?: LucideIcon
   breadcrumbKey?: MessageKey
   titleKey?: MessageKey

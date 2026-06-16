@@ -1,5 +1,6 @@
 import { useIsFetching } from '@tanstack/react-query'
 import { Outlet } from '@tanstack/react-router'
+import { Suspense } from 'react'
 import { LoginView } from '../features/auth/LoginView'
 import { AdminShell } from '../layouts/AdminShell'
 import { findAdminRouteByPath } from './admin-route-registry'
@@ -55,6 +56,8 @@ export function AdminRoutePage({ path }: { path: string }) {
   }
 
   return PageComponent ? (
-    <PageComponent isLoading={isLoading} user={user} />
+    <Suspense fallback={<AuthLoadingPage />}>
+      <PageComponent isLoading={isLoading} user={user} />
+    </Suspense>
   ) : null
 }
