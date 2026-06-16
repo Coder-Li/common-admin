@@ -1,0 +1,11 @@
+services:
+  api:
+    image: ${COMMON_ADMIN_API_IMAGE:-ghcr.io/coder-li/common-admin-api}:${COMMON_ADMIN_IMAGE_TAG:-latest}
+    build: !reset null
+    pull_policy: always
+
+  admin:
+    image: ${COMMON_ADMIN_ADMIN_IMAGE:-ghcr.io/coder-li/common-admin-admin}:${COMMON_ADMIN_IMAGE_TAG:-latest}
+    build: !reset null
+    pull_policy: always
+

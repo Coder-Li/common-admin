@@ -58,7 +58,30 @@ Admin123!
 
 部署数据库密码应使用 URL-safe 字符，避免 `@`、`:`、`/`、`#`、`?` 等字符，除非后续调整 Compose 中的数据库 URL 构造方式。
 
+### 镜像发布
+
+`main` 分支的 `Quality` 工作流通过后，GitHub Actions 会把镜像发布到 GHCR：
+
+```text
+ghcr.io/coder-li/common-admin-api
+ghcr.io/coder-li/common-admin-admin
+```
+
+默认发布 `latest` 和 `sha-<短提交号>` 两类 tag。云服务器通常使用
+`COMMON_ADMIN_IMAGE_TAG=latest`；需要回滚或固定版本时，改成对应的
+`sha-<短提交号>`。
+
+如果 GHCR package 是 public，服务器可以匿名拉取。如果 package 是 private，需要先在服务器执行：
+
+```bash
+docker login ghcr.io
+```
+
+登录账号使用 GitHub 用户名，密码使用有 package read 权限的 token。
+
 ### 首次部署
+
+如果希望在服务器本地构建镜像，使用默认 Compose 命令：
 
 ```bash
 cp .env.deploy.example .env.deploy
@@ -67,6 +90,18 @@ cp .env.deploy.example .env.deploy
 docker compose --env-file .env.deploy up -d postgres redis
 pnpm deploy:init
 docker compose --env-file .env.deploy up -d --build
+```
+
+如果希望服务器直接拉取 GitHub Actions 发布的镜像，使用生产覆盖文件：
+
+```bash
+cp .env.deploy.example .env.deploy
+# 修改 .env.deploy 中的密码、JWT secret、域名、端口和 COMMON_ADMIN_IMAGE_TAG
+
+docker compose --env-file .env.deploy -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose --env-file .env.deploy -f docker-compose.yml -f docker-compose.prod.yml up -d postgres redis
+docker compose --env-file .env.deploy -f docker-compose.yml -f docker-compose.prod.yml run --rm api pnpm --filter api deploy:init
+docker compose --env-file .env.deploy -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 访问：
@@ -94,6 +129,14 @@ Admin123!
 docker compose --env-file .env.deploy build api admin
 pnpm deploy:migrate
 docker compose --env-file .env.deploy up -d
+```
+
+使用 GHCR 镜像部署时，先拉新镜像，再执行迁移并重建服务：
+
+```bash
+docker compose --env-file .env.deploy -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose --env-file .env.deploy -f docker-compose.yml -f docker-compose.prod.yml run --rm api pnpm --filter api deploy:migrate
+docker compose --env-file .env.deploy -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 `deploy:init` 会执行 seed，并会把默认管理员密码重置为 `Admin123!`。它只应该用于首次空库初始化；后续升级使用 `deploy:migrate`。
