@@ -360,7 +360,12 @@ describe('PermissionService', () => {
       const { prisma, service } = createService();
       prisma.user.findUnique.mockResolvedValue(
         userWithRoles(
-          [userRole({ code: 'dept-tree-user', dataScope: 'DEPT_AND_CHILDREN' })],
+          [
+            userRole({
+              code: 'dept-tree-user',
+              dataScope: 'DEPT_AND_CHILDREN',
+            }),
+          ],
           [department('dept-parent')],
         ),
       );
@@ -415,7 +420,12 @@ describe('PermissionService', () => {
       const { prisma, service } = createService();
       prisma.user.findUnique.mockResolvedValue(
         userWithRoles(
-          [userRole({ code: 'dept-tree-user', dataScope: 'DEPT_AND_CHILDREN' })],
+          [
+            userRole({
+              code: 'dept-tree-user',
+              dataScope: 'DEPT_AND_CHILDREN',
+            }),
+          ],
           [department('dept-parent')],
         ),
       );

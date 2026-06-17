@@ -1,5 +1,4 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { DataScope } from '@prisma/client';
 import { DataPermissionService } from './data-permission.service';
 
 describe('DataPermissionService', () => {
@@ -45,9 +44,9 @@ describe('DataPermissionService', () => {
       },
     });
 
-    await expect(service.buildUserVisibilityWhere('actor-1')).resolves.toEqual(
-      { OR: [{ id: { in: ['actor-1'] } }] },
-    );
+    await expect(service.buildUserVisibilityWhere('actor-1')).resolves.toEqual({
+      OR: [{ id: { in: ['actor-1'] } }],
+    });
   });
 
   it('returns department visibility for limited departments', async () => {
@@ -60,17 +59,37 @@ describe('DataPermissionService', () => {
       },
     });
 
-    await expect(service.buildUserVisibilityWhere('actor-1')).resolves.toEqual(
-      {
-        OR: [
-          {
-            departments: {
-              some: { departmentId: { in: ['dept-1', 'dept-2'] } },
-            },
+    await expect(service.buildUserVisibilityWhere('actor-1')).resolves.toEqual({
+      OR: [
+        {
+          departments: {
+            some: { departmentId: { in: ['dept-1', 'dept-2'] } },
           },
-        ],
+        },
+      ],
+    });
+  });
+
+  it('returns union visibility for self and department limited scopes', async () => {
+    const { permissionService, service } = createService();
+    permissionService.resolveUserPermissionContext.mockResolvedValue({
+      dataScope: {
+        mode: 'LIMITED',
+        selfUserIds: ['actor-1'],
+        departmentIds: ['dept-1'],
       },
-    );
+    });
+
+    await expect(service.buildUserVisibilityWhere('actor-1')).resolves.toEqual({
+      OR: [
+        { id: { in: ['actor-1'] } },
+        {
+          departments: {
+            some: { departmentId: { in: ['dept-1'] } },
+          },
+        },
+      ],
+    });
   });
 
   it('returns an impossible where clause for an empty limited scope', async () => {
@@ -79,9 +98,9 @@ describe('DataPermissionService', () => {
       dataScope: { mode: 'LIMITED', selfUserIds: [], departmentIds: [] },
     });
 
-    await expect(service.buildUserVisibilityWhere('actor-1')).resolves.toEqual(
-      { id: { in: [] } },
-    );
+    await expect(service.buildUserVisibilityWhere('actor-1')).resolves.toEqual({
+      id: { in: [] },
+    });
   });
 
   it('assertCanAccessUser resolves for visible targets', async () => {

@@ -84,6 +84,20 @@ const roles: RoleRecord[] = [
     createdAt: '2026-06-09T00:00:00.000Z',
     updatedAt: '2026-06-09T00:00:00.000Z',
   },
+  {
+    id: 'role-3',
+    code: 'standard',
+    name: 'Standard',
+    description: null,
+    status: 'ACTIVE',
+    isSystem: true,
+    isDefault: false,
+    dataScope: 'SELF',
+    dataScopeDepartments: [],
+    permissions: [],
+    createdAt: '2026-06-09T00:00:00.000Z',
+    updatedAt: '2026-06-09T00:00:00.000Z',
+  },
 ]
 
 const modules: PermissionModule[] = [
@@ -292,6 +306,28 @@ describe('RolesPage', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('hides update and delete actions without role.update and role.delete', async () => {
+    renderRolesPage(['role.read', 'role.assign_permissions', 'permission.read'])
+
+    const operatorRow = (await screen.findByText('operator')).closest('tr')
+    expect(operatorRow).not.toBeNull()
+    expect(
+      within(operatorRow as HTMLTableRowElement).queryByRole('button', {
+        name: 'Edit',
+      }),
+    ).not.toBeInTheDocument()
+    expect(
+      within(operatorRow as HTMLTableRowElement).queryByRole('button', {
+        name: 'Delete',
+      }),
+    ).not.toBeInTheDocument()
+    expect(
+      within(operatorRow as HTMLTableRowElement).getByRole('button', {
+        name: 'Permissions',
+      }),
+    ).toBeInTheDocument()
+  })
+
   it('hides permission panel without permission.read', async () => {
     renderRolesPage(['role.read'])
 
@@ -355,6 +391,7 @@ describe('RolesPage', () => {
     renderRolesPage()
 
     expect(await screen.findByText('All')).toBeInTheDocument()
+    expect(screen.getByText('Self')).toBeInTheDocument()
     expect(screen.getByText('Custom departments (2)')).toBeInTheDocument()
   })
 

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { ReactNode } from 'react'
 import { useMemo } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 import { useI18n } from '../../i18n/useI18n'
 import type {
@@ -91,10 +91,10 @@ export function RoleForm({
   )
 
   const {
+    control,
     formState: { errors },
     handleSubmit,
     register,
-    watch,
   } = useForm<RoleFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -110,7 +110,7 @@ export function RoleForm({
           .map((department) => department.id) ?? [],
     },
   })
-  const selectedDataScope = watch('dataScope')
+  const selectedDataScope = useWatch({ control, name: 'dataScope' })
   const activeDepartmentOptions = departmentOptions.filter(
     (department) => department.status === 'ACTIVE',
   )

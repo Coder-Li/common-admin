@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-function-type, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
 import { NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { UserController } from './user.controller';
@@ -170,10 +171,9 @@ describe('UserService data permissions', () => {
       'actor-1',
     );
 
-    expect(dataPermissionService.assertCanAssignDepartments).toHaveBeenCalledWith(
-      'actor-1',
-      ['dept-1'],
-    );
+    expect(
+      dataPermissionService.assertCanAssignDepartments,
+    ).toHaveBeenCalledWith('actor-1', ['dept-1']);
   });
 
   it('create without departments does not call assignment assertion', async () => {
@@ -317,7 +317,12 @@ describe('UserController data permission actor wiring', () => {
       user,
       request as never,
     );
-    await controller.updateUser('user-1', { firstName: 'Augusta' }, user, request as never);
+    await controller.updateUser(
+      'user-1',
+      { firstName: 'Augusta' },
+      user,
+      request as never,
+    );
     await controller.resetPassword(
       'user-1',
       { newPassword: 'NewSecure123!' },

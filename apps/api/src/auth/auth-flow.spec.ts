@@ -1325,9 +1325,11 @@ describe('Auth flow', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200)
       .expect((response: Response) => {
-        expect(userListBody(response).items.map((user) => user.id).sort()).toEqual(
-          ['marketing-1', 'super-1'],
-        );
+        expect(
+          userListBody(response)
+            .items.map((user) => user.id)
+            .sort(),
+        ).toEqual(['marketing-1', 'super-1']);
       });
 
     await request(httpServer)

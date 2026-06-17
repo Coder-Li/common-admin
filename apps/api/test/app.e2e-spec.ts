@@ -10,6 +10,7 @@ import { configureApp } from './../src/app.setup';
 import { PermissionService } from './../src/permission/permission.service';
 import { PrismaService } from './../src/prisma/prisma.service';
 import { REDIS_CLIENT } from './../src/redis/redis.constants';
+import type { EffectiveDataScope } from './../src/permission/permission.types';
 
 type PersistedUser = {
   id: string;
@@ -40,6 +41,7 @@ type PermissionContext = {
   roleCodes: string[];
   permissionCodes: string[];
   isSuperAdmin: boolean;
+  dataScope: EffectiveDataScope;
 };
 
 type LoginResponseBody = {
@@ -339,6 +341,7 @@ describe('Common Admin API (e2e)', () => {
         roleCodes: [],
         permissionCodes: [],
         isSuperAdmin: false,
+        dataScope: { mode: 'LIMITED', selfUserIds: [], departmentIds: [] },
       };
 
       return Promise.resolve({ userId, ...context });
@@ -355,6 +358,11 @@ describe('Common Admin API (e2e)', () => {
       roleCodes: user.roles.map(({ role }) => role.code),
       permissionCodes: permissions,
       isSuperAdmin: false,
+      dataScope: {
+        mode: 'LIMITED',
+        selfUserIds: [user.id],
+        departmentIds: [],
+      },
     });
     prisma.user.findFirst.mockResolvedValueOnce(user);
     prisma.user.findUnique.mockResolvedValue(user);

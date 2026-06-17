@@ -105,10 +105,7 @@ export class UserService {
     );
   }
 
-  async findById(
-    id: string,
-    actorUserId?: string,
-  ): Promise<UserResponseDto> {
+  async findById(id: string, actorUserId?: string): Promise<UserResponseDto> {
     if (actorUserId) {
       await this.dataPermissionService.assertCanAccessUser(actorUserId, id);
     }
