@@ -9,6 +9,7 @@ import request from 'supertest';
 import type { Response } from 'supertest';
 import { AppModule } from '../app.module';
 import { PermissionService } from '../permission/permission.service';
+import type { EffectiveDataScope } from '../permission/permission.types';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface LoginResponseBody {
@@ -142,6 +143,7 @@ describe('Auth flow', () => {
       roleCodes: string[];
       permissionCodes: string[];
       isSuperAdmin: boolean;
+      dataScope?: EffectiveDataScope;
     }
   >();
   const sessions = new Map<string, SessionRecord>();
@@ -152,9 +154,14 @@ describe('Auth flow', () => {
         roleCodes: [],
         permissionCodes: [],
         isSuperAdmin: false,
+        dataScope: { mode: 'LIMITED', selfUserIds: [], departmentIds: [] },
       };
 
-      return { userId, ...context };
+      return {
+        userId,
+        dataScope: { mode: 'LIMITED', selfUserIds: [], departmentIds: [] },
+        ...context,
+      };
     }),
     invalidateUserPermissionContext: jest.fn(),
     invalidateAllPermissionContexts: jest.fn(),
@@ -179,6 +186,105 @@ describe('Auth flow', () => {
       ...overrides,
       roles,
     };
+  }
+
+  function departmentAssignment(departmentId: string) {
+    return {
+      isPrimary: false,
+      departmentId,
+      department: {
+        id: departmentId,
+        code: departmentId,
+        name: departmentId,
+        status: 'ACTIVE',
+        sortOrder: 1,
+      },
+    };
+  }
+
+  function userMatchesWhere(
+    user: ReturnType<typeof persistedUser>,
+    where?: Record<string, unknown>,
+  ): boolean {
+    if (!where || Object.keys(where).length === 0) {
+      return true;
+    }
+
+    if (Array.isArray(where.AND)) {
+      return where.AND.every((clause) =>
+        userMatchesWhere(user, clause as Record<string, unknown>),
+      );
+    }
+
+    if (Array.isArray(where.OR)) {
+      return where.OR.some((clause) =>
+        userMatchesWhere(user, clause as Record<string, unknown>),
+      );
+    }
+
+    const id = where.id as { in?: string[] } | string | undefined;
+    if (typeof id === 'string' && user.id !== id) {
+      return false;
+    }
+    if (typeof id === 'object' && id.in && !id.in.includes(user.id)) {
+      return false;
+    }
+
+    const departments = where.departments as
+      | { some?: { departmentId?: { in?: string[] } | string } }
+      | undefined;
+    const departmentIdFilter = departments?.some?.departmentId;
+    if (typeof departmentIdFilter === 'string') {
+      return (
+        (
+          user.departments as
+            | Array<{ departmentId?: string; department?: { id: string } }>
+            | undefined
+        )?.some(
+          (department) =>
+            department.departmentId === departmentIdFilter ||
+            department.department?.id === departmentIdFilter,
+        ) ?? false
+      );
+    }
+    if (departmentIdFilter?.in) {
+      return (
+        (
+          user.departments as
+            | Array<{ departmentId?: string; department?: { id: string } }>
+            | undefined
+        )?.some(
+          (department) =>
+            departmentIdFilter.in?.includes(department.departmentId ?? '') ||
+            departmentIdFilter.in?.includes(department.department?.id ?? ''),
+        ) ?? false
+      );
+    }
+
+    return true;
+  }
+
+  function mockUsers(users: Array<ReturnType<typeof persistedUser>>) {
+    prisma.user.findMany.mockImplementation(
+      async ({ where }: { where?: Record<string, unknown> }) =>
+        users.filter((user) => userMatchesWhere(user, where)),
+    );
+    prisma.user.count.mockImplementation(
+      async ({ where }: { where?: Record<string, unknown> }) =>
+        users.filter((user) => userMatchesWhere(user, where)).length,
+    );
+    prisma.user.findFirst.mockImplementation(
+      async ({ where }: { where?: Record<string, unknown> }) =>
+        users.find((user) => userMatchesWhere(user, where)) ?? null,
+    );
+    prisma.user.findUnique.mockImplementation(
+      async ({ where }: { where: { id?: string; email?: string } }) =>
+        users.find(
+          (user) =>
+            (where.id && user.id === where.id) ||
+            (where.email && user.email === where.email),
+        ) ?? null,
+    );
   }
 
   async function signIn(user: ReturnType<typeof persistedUser>) {
@@ -610,6 +716,7 @@ describe('Auth flow', () => {
       roleCodes: ['admin'],
       permissionCodes: ['user.update'],
       isSuperAdmin: false,
+      dataScope: { mode: 'ALL', selfUserIds: [], departmentIds: [] },
     });
     permissionContexts.set('target-1', {
       roleCodes: ['standard'],
@@ -618,6 +725,7 @@ describe('Auth flow', () => {
     });
     const targetAccessToken = await signIn(targetUser);
     const adminAccessToken = await signIn(adminUser);
+    mockUsers([adminUser, targetUser]);
     prisma.user.update.mockImplementationOnce(
       async ({
         where,
@@ -1094,13 +1202,183 @@ describe('Auth flow', () => {
       skip: 5,
       take: 5,
       orderBy: { email: 'asc' },
-      where: {},
+      where: { AND: [{}, { id: { in: [] } }] },
       include: {
         roles: { include: { role: true } },
         departments: { include: { department: true } },
         positions: { include: { position: true } },
       },
     });
+  });
+
+  it('self-scoped user list returns only the actor row', async () => {
+    const selfUser = persistedUser({
+      id: 'self-1',
+      email: 'self@example.com',
+      username: 'self',
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+    });
+    const marketingTarget = persistedUser({
+      id: 'marketing-1',
+      email: 'marketing@example.com',
+      username: 'marketing',
+      departments: [departmentAssignment('marketing')],
+    });
+    permissionContexts.set('self-1', {
+      roleCodes: ['standard'],
+      permissionCodes: ['user.read'],
+      isSuperAdmin: false,
+      dataScope: {
+        mode: 'LIMITED',
+        selfUserIds: ['self-1'],
+        departmentIds: [],
+      },
+    });
+    mockUsers([selfUser, marketingTarget]);
+    const accessToken = await signIn(selfUser);
+
+    await request(httpServer)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(userListBody(response).items.map((user) => user.id)).toEqual([
+          'self-1',
+        ]);
+        expect(userListBody(response).total).toBe(1);
+      });
+  });
+
+  it('out-of-scope user update returns 404 and does not mutate', async () => {
+    const deptUser = persistedUser({
+      id: 'dept-user-1',
+      email: 'dept-user@example.com',
+      username: 'dept-user',
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+      departments: [departmentAssignment('engineering')],
+    });
+    const marketingTarget = persistedUser({
+      id: 'marketing-1',
+      email: 'marketing@example.com',
+      username: 'marketing',
+      departments: [departmentAssignment('marketing')],
+    });
+    permissionContexts.set('dept-user-1', {
+      roleCodes: ['dept-user'],
+      permissionCodes: ['user.update'],
+      isSuperAdmin: false,
+      dataScope: {
+        mode: 'LIMITED',
+        selfUserIds: [],
+        departmentIds: ['engineering'],
+      },
+    });
+    mockUsers([deptUser, marketingTarget]);
+    const accessToken = await signIn(deptUser);
+
+    await request(httpServer)
+      .patch('/api/users/marketing-1')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ firstName: 'Blocked' })
+      .expect(404)
+      .expect((response: Response) => {
+        expect(response.body).toMatchObject({ message: 'User not found' });
+      });
+
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('super admin can read and mutate all users', async () => {
+    const superAdmin = persistedUser({
+      id: 'super-1',
+      email: 'super@example.com',
+      username: 'super',
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+      roles: [{ role: { code: 'super_admin', name: 'Super admin' } }],
+    });
+    const marketingTarget = persistedUser({
+      id: 'marketing-1',
+      email: 'marketing@example.com',
+      username: 'marketing',
+      departments: [departmentAssignment('marketing')],
+    });
+    permissionContexts.set('super-1', {
+      roleCodes: ['super_admin'],
+      permissionCodes: ['user.read', 'user.update'],
+      isSuperAdmin: true,
+      dataScope: { mode: 'ALL', selfUserIds: [], departmentIds: [] },
+    });
+    mockUsers([superAdmin, marketingTarget]);
+    prisma.user.update.mockImplementationOnce(
+      async ({
+        where,
+        data,
+      }: {
+        where: { id: string };
+        data: Partial<ReturnType<typeof persistedUser>>;
+      }) => persistedUser({ ...marketingTarget, id: where.id, ...data }),
+    );
+    const accessToken = await signIn(superAdmin);
+
+    await request(httpServer)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200)
+      .expect((response: Response) => {
+        expect(userListBody(response).items.map((user) => user.id).sort()).toEqual(
+          ['marketing-1', 'super-1'],
+        );
+      });
+
+    await request(httpServer)
+      .patch('/api/users/marketing-1')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ firstName: 'Updated' })
+      .expect(200)
+      .expect((response: Response) => {
+        expect(response.body).toMatchObject({
+          id: 'marketing-1',
+          firstName: 'Updated',
+        });
+      });
+
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'marketing-1' } }),
+    );
+  });
+
+  it('missing RBAC permission still returns 403 before data scope checks', async () => {
+    const customUser = persistedUser({
+      id: 'custom-1',
+      email: 'custom@example.com',
+      username: 'custom',
+      passwordHash: await bcrypt.hash('Admin123!', 4),
+      departments: [departmentAssignment('platform')],
+    });
+    permissionContexts.set('custom-1', {
+      roleCodes: ['custom-user'],
+      permissionCodes: ['dashboard.view'],
+      isSuperAdmin: false,
+      dataScope: {
+        mode: 'LIMITED',
+        selfUserIds: [],
+        departmentIds: ['platform'],
+      },
+    });
+    mockUsers([customUser]);
+    const accessToken = await signIn(customUser);
+
+    await request(httpServer)
+      .get('/api/users')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(403);
+
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
+    expect(
+      prisma.user.findFirst.mock.calls.some((call) =>
+        JSON.stringify(call[0]).includes('departmentId'),
+      ),
+    ).toBe(false);
   });
 
   it('allows active super_admin through permission guard', async () => {

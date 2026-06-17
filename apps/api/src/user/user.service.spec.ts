@@ -333,6 +333,11 @@ describe('UserService', () => {
     resolveUserPermissionContext: jest.fn(),
     invalidateUserPermissionContext: jest.fn(),
   };
+  const dataPermissionService = {
+    buildUserVisibilityWhere: jest.fn().mockResolvedValue({}),
+    assertCanAccessUser: jest.fn().mockResolvedValue(undefined),
+    assertCanAssignDepartments: jest.fn().mockResolvedValue(undefined),
+  };
 
   const createService = (demoMode = false) => {
     const prisma = createPrismaMock();
@@ -346,6 +351,7 @@ describe('UserService', () => {
     const service = new UserService(
       prisma as never,
       permissionService as never,
+      dataPermissionService as never,
       auditLogService as never,
       {
         demoMode,
@@ -353,7 +359,7 @@ describe('UserService', () => {
       },
     );
 
-    return { auditLogService, prisma, service, tx };
+    return { auditLogService, dataPermissionService, prisma, service, tx };
   };
 
   const auditActor: AuditActor = {

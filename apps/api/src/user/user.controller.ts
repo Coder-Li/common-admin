@@ -60,8 +60,11 @@ export class UserController {
   @ApiOperation({ operationId: 'listUsers' })
   @Permissions('user.read')
   @Get()
-  listUsers(@Query() query: UserListQueryDto): Promise<UserListResponseDto> {
-    return this.userService.listUsers(query);
+  listUsers(
+    @Query() query: UserListQueryDto,
+    @CurrentUser() user: JwtUserPayload,
+  ): Promise<UserListResponseDto> {
+    return this.userService.listUsers(query, user.sub);
   }
 
   @ApiOkResponse({ type: UserResponseDto })
@@ -70,8 +73,11 @@ export class UserController {
   @ApiOperation({ operationId: 'getUser' })
   @Permissions('user.read')
   @Get(':id')
-  getUser(@Param('id') id: string): Promise<UserResponseDto> {
-    return this.userService.findById(id);
+  getUser(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtUserPayload,
+  ): Promise<UserResponseDto> {
+    return this.userService.findById(id, user.sub);
   }
 
   @ApiCreatedResponse({ type: UserResponseDto })
@@ -91,6 +97,7 @@ export class UserController {
       buildAuditActor(user),
       getAuditRequestMeta(request),
       withAuditRequestId(undefined, requestId),
+      user.sub,
     );
   }
 
@@ -114,6 +121,7 @@ export class UserController {
       buildAuditActor(user),
       getAuditRequestMeta(request),
       withAuditRequestId(undefined, requestId),
+      user.sub,
     );
   }
 
@@ -137,6 +145,7 @@ export class UserController {
       buildAuditActor(user),
       getAuditRequestMeta(request),
       withAuditRequestId(undefined, requestId),
+      user.sub,
     );
   }
 
@@ -183,6 +192,7 @@ export class UserController {
       buildAuditActor(user),
       getAuditRequestMeta(request),
       withAuditRequestId(undefined, requestId),
+      user.sub,
     );
   }
 }

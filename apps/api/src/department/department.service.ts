@@ -19,6 +19,7 @@ import type {
   AuditActor,
   AuditRequestMeta,
 } from '../audit-log/audit-log.types';
+import { PermissionService } from '../permission/permission.service';
 import {
   DEPARTMENT_DEFAULT_SORT,
   DEPARTMENT_SORT_FIELDS,
@@ -49,6 +50,7 @@ export class DepartmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
+    private readonly permissionService: PermissionService,
   ) {}
 
   async listDepartments(
@@ -145,7 +147,7 @@ export class DepartmentService {
     auditMetadata?: Record<string, unknown>,
   ): Promise<DepartmentResponseDto> {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const response = await this.prisma.$transaction(async (tx) => {
         if (Object.prototype.hasOwnProperty.call(dto, 'parentId')) {
           this.validateParentIdValue(dto.parentId);
 
@@ -175,6 +177,10 @@ export class DepartmentService {
 
         return response;
       });
+
+      await this.permissionService.invalidateAllPermissionContexts();
+
+      return response;
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
@@ -188,7 +194,7 @@ export class DepartmentService {
     auditMetadata?: Record<string, unknown>,
   ): Promise<DepartmentResponseDto> {
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const response = await this.prisma.$transaction(async (tx) => {
         const before = await tx.department.findUnique({
           where: { id },
           include: DEPARTMENT_WITH_PARENT,
@@ -233,6 +239,10 @@ export class DepartmentService {
 
         return response;
       });
+
+      await this.permissionService.invalidateAllPermissionContexts();
+
+      return response;
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
@@ -291,6 +301,8 @@ export class DepartmentService {
           tx,
         );
       });
+
+      await this.permissionService.invalidateAllPermissionContexts();
     } catch (error) {
       this.handlePrismaWriteError(error);
     }

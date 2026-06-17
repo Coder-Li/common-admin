@@ -97,6 +97,7 @@ describe('UserController', () => {
       auditActor,
       auditRequestMeta,
       auditMetadata,
+      'actor-1',
     );
   });
 
@@ -116,6 +117,7 @@ describe('UserController', () => {
       auditActor,
       auditRequestMeta,
       auditMetadata,
+      'actor-1',
     );
   });
 
@@ -139,6 +141,7 @@ describe('UserController', () => {
       auditActor,
       auditRequestMeta,
       auditMetadata,
+      'actor-1',
     );
   });
 
@@ -180,6 +183,7 @@ describe('UserController', () => {
       auditActor,
       auditRequestMeta,
       auditMetadata,
+      'actor-1',
     );
     expect(
       Reflect.getMetadata(HTTP_CODE_METADATA, controllerMethod('deleteUser')),

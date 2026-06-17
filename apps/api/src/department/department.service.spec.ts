@@ -56,13 +56,21 @@ describe('DepartmentService', () => {
     const auditLogService = {
       record: jest.fn(),
     };
+    const permissionService = {
+      invalidateAllPermissionContexts: jest.fn(),
+    };
     const ServiceCtor = DepartmentService as unknown as new (
       prisma: never,
       auditLogService: never,
+      permissionService: never,
     ) => DepartmentService;
-    const service = new ServiceCtor(prisma as never, auditLogService as never);
+    const service = new ServiceCtor(
+      prisma as never,
+      auditLogService as never,
+      permissionService as never,
+    );
 
-    return { auditLogService, prisma, service, tx };
+    return { auditLogService, permissionService, prisma, service, tx };
   };
 
   function firstMockArg<TArg>(mock: { mock: { calls: unknown[][] } }): TArg {
@@ -396,7 +404,8 @@ describe('DepartmentService', () => {
     });
 
     it('creates a department and records audit data', async () => {
-      const { auditLogService, prisma, service, tx } = createService();
+      const { auditLogService, permissionService, prisma, service, tx } =
+        createService();
       const createdDepartment = makeDepartment();
       tx.department.create.mockResolvedValue(createdDepartment);
 
@@ -434,6 +443,25 @@ describe('DepartmentService', () => {
         },
         tx,
       );
+      expect(
+        permissionService.invalidateAllPermissionContexts,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not invalidate permission contexts when create fails', async () => {
+      const { permissionService, service, tx } = createService();
+      tx.department.create.mockRejectedValue(uniqueConstraintError());
+
+      await expect(
+        service.createDepartment({
+          code: 'engineering',
+          name: 'Engineering',
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(
+        permissionService.invalidateAllPermissionContexts,
+      ).not.toHaveBeenCalled();
     });
 
     it('allows explicit parentId null to create a root department', async () => {
@@ -517,7 +545,8 @@ describe('DepartmentService', () => {
     });
 
     it('updates a department and records audit data', async () => {
-      const { auditLogService, prisma, service, tx } = createService();
+      const { auditLogService, permissionService, prisma, service, tx } =
+        createService();
       const before = makeDepartment({ name: 'Engineering' });
       const after = makeDepartment({ name: 'Engineering Group' });
       tx.department.findUnique.mockResolvedValue(before);
@@ -558,6 +587,48 @@ describe('DepartmentService', () => {
         },
         tx,
       );
+      expect(
+        permissionService.invalidateAllPermissionContexts,
+      ).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [{ status: DepartmentStatus.DISABLED }],
+      [{ parentId: 'parent-1' }],
+    ])(
+      'invalidates permission contexts after successful update %p',
+      async (dto) => {
+        const { permissionService, service, tx } = createService();
+        tx.department.findUnique
+          .mockResolvedValueOnce(makeDepartment())
+          .mockResolvedValueOnce(
+            makeDepartment({
+              id: 'parent-1',
+              status: DepartmentStatus.ACTIVE,
+            }),
+          );
+        tx.department.update.mockResolvedValue(makeDepartment(dto));
+
+        await service.updateDepartment('dept-1', dto);
+
+        expect(
+          permissionService.invalidateAllPermissionContexts,
+        ).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('does not invalidate permission contexts when update fails', async () => {
+      const { permissionService, service, tx } = createService();
+      tx.department.findUnique.mockResolvedValue(makeDepartment());
+      tx.department.update.mockRejectedValue(notFoundError());
+
+      await expect(
+        service.updateDepartment('missing-dept', { name: 'Missing' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(
+        permissionService.invalidateAllPermissionContexts,
+      ).not.toHaveBeenCalled();
     });
 
     it('rejects self parent', async () => {
@@ -688,7 +759,7 @@ describe('DepartmentService', () => {
     });
 
     it('maps delete dependency races to BadRequestException', async () => {
-      const { service, tx } = createService();
+      const { permissionService, service, tx } = createService();
       tx.department.findUnique.mockResolvedValue(makeDepartment());
       tx.department.count.mockResolvedValue(0);
       tx.userDepartment.count.mockResolvedValue(0);
@@ -697,10 +768,14 @@ describe('DepartmentService', () => {
       await expect(service.deleteDepartment('dept-1')).rejects.toBeInstanceOf(
         BadRequestException,
       );
+      expect(
+        permissionService.invalidateAllPermissionContexts,
+      ).not.toHaveBeenCalled();
     });
 
     it('deletes a department and records audit data', async () => {
-      const { auditLogService, prisma, service, tx } = createService();
+      const { auditLogService, permissionService, prisma, service, tx } =
+        createService();
       const before = makeDepartment();
       tx.department.findUnique.mockResolvedValue(before);
       tx.department.count.mockResolvedValue(0);
@@ -743,6 +818,9 @@ describe('DepartmentService', () => {
         },
         tx,
       );
+      expect(
+        permissionService.invalidateAllPermissionContexts,
+      ).toHaveBeenCalledTimes(1);
     });
   });
 });

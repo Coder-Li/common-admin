@@ -27,6 +27,7 @@ import type {
   AuditActor,
   AuditRequestMeta,
 } from '../audit-log/audit-log.types';
+import { DataPermissionService } from '../data-permission/data-permission.service';
 import {
   CreateUserDto,
   ReplaceUserRolesDto,
@@ -64,6 +65,7 @@ export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissionService: PermissionService,
+    private readonly dataPermissionService: DataPermissionService,
     private readonly auditLogService: AuditLogService,
     @Inject(DEMO_MODE_CONFIG)
     private readonly demoConfig: DemoModeConfig,
@@ -71,11 +73,18 @@ export class UserService {
 
   async listUsers(
     query: UserListQueryDto,
+    actorUserId?: string,
   ): Promise<ListResponse<UserResponseDto>> {
     const { field, direction } = this.parseSort(query.sort);
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
-    const where = this.buildUserWhere(query);
+    const baseWhere = this.buildUserWhere(query);
+    const visibilityWhere = actorUserId
+      ? await this.dataPermissionService.buildUserVisibilityWhere(actorUserId)
+      : {};
+    const where: Prisma.UserWhereInput = actorUserId
+      ? { AND: [baseWhere, visibilityWhere] }
+      : baseWhere;
 
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
@@ -96,7 +105,14 @@ export class UserService {
     );
   }
 
-  async findById(id: string): Promise<UserResponseDto> {
+  async findById(
+    id: string,
+    actorUserId?: string,
+  ): Promise<UserResponseDto> {
+    if (actorUserId) {
+      await this.dataPermissionService.assertCanAccessUser(actorUserId, id);
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: USER_ORGANIZATION_INCLUDE,
@@ -114,9 +130,10 @@ export class UserService {
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
     auditMetadata?: Record<string, unknown>,
+    actorUserId?: string,
   ): Promise<UserResponseDto> {
     if (
-      Object.prototype.hasOwnProperty.call(dto, 'primaryDepartmentId') &&
+      dto.primaryDepartmentId !== undefined &&
       dto.departmentIds === undefined
     ) {
       throw new BadRequestException(
@@ -135,8 +152,15 @@ export class UserService {
     const passwordHash = await bcrypt.hash(password, 10);
     const roles = await this.resolveCreateRoles(roleCodes);
 
+    if (actorUserId && departmentIds?.length) {
+      await this.dataPermissionService.assertCanAssignDepartments(
+        actorUserId,
+        departmentIds,
+      );
+    }
+
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const response = await this.prisma.$transaction(async (tx) => {
         const departmentAssignment =
           departmentIds !== undefined
             ? await this.normalizeDepartmentAssignment({
@@ -216,6 +240,14 @@ export class UserService {
 
         return response;
       });
+
+      if (actorUserId && departmentIds?.length) {
+        await this.permissionService.invalidateUserPermissionContext(
+          response.id,
+        );
+      }
+
+      return response;
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
@@ -227,9 +259,10 @@ export class UserService {
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
     auditMetadata?: Record<string, unknown>,
+    actorUserId?: string,
   ): Promise<UserResponseDto> {
     if (
-      Object.prototype.hasOwnProperty.call(dto, 'primaryDepartmentId') &&
+      dto.primaryDepartmentId !== undefined &&
       dto.departmentIds === undefined
     ) {
       throw new BadRequestException(
@@ -238,7 +271,11 @@ export class UserService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      if (actorUserId) {
+        await this.dataPermissionService.assertCanAccessUser(actorUserId, id);
+      }
+
+      const response = await this.prisma.$transaction(async (tx) => {
         const before = await tx.user.findUnique({
           where: { id },
           include: USER_ORGANIZATION_INCLUDE,
@@ -334,6 +371,12 @@ export class UserService {
 
         return response;
       });
+
+      if (actorUserId && dto.departmentIds !== undefined) {
+        await this.permissionService.invalidateUserPermissionContext(id);
+      }
+
+      return response;
     } catch (error) {
       this.handlePrismaWriteError(error);
     }
@@ -345,10 +388,15 @@ export class UserService {
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
     auditMetadata?: Record<string, unknown>,
+    actorUserId?: string,
   ): Promise<UserResponseDto> {
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
     try {
+      if (actorUserId) {
+        await this.dataPermissionService.assertCanAccessUser(actorUserId, id);
+      }
+
       return await this.prisma.$transaction(async (tx) => {
         const now = new Date();
 
@@ -411,8 +459,13 @@ export class UserService {
     actor?: AuditActor,
     requestMeta?: AuditRequestMeta,
     auditMetadata?: Record<string, unknown>,
+    actorUserId?: string,
   ): Promise<void> {
     try {
+      if (actorUserId) {
+        await this.dataPermissionService.assertCanAccessUser(actorUserId, id);
+      }
+
       await this.prisma.$transaction(async (tx) => {
         const before = await tx.user.findUnique({
           where: { id },
@@ -466,6 +519,8 @@ export class UserService {
     requestMeta?: AuditRequestMeta,
     auditMetadata?: Record<string, unknown>,
   ): Promise<UserResponseDto> {
+    await this.dataPermissionService.assertCanAccessUser(actorUserId, id);
+
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: USER_ORGANIZATION_INCLUDE,
