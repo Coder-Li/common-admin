@@ -5,7 +5,9 @@
  * API for the common admin starter template
  * OpenAPI spec version: 0.1.0
  */
+import type { RoleDataScopeDepartmentDto } from "./roleDataScopeDepartmentDto";
 import type { RolePermissionSummaryDto } from "./rolePermissionSummaryDto";
+import type { RoleResponseDtoDataScope } from "./roleResponseDtoDataScope";
 import type { RoleResponseDtoStatus } from "./roleResponseDtoStatus";
 
 export interface RoleResponseDto {
@@ -17,6 +19,8 @@ export interface RoleResponseDto {
   status: RoleResponseDtoStatus;
   isSystem: boolean;
   isDefault: boolean;
+  dataScope: RoleResponseDtoDataScope;
+  dataScopeDepartments: RoleDataScopeDepartmentDto[];
   permissions: RolePermissionSummaryDto[];
   createdAt: string;
   updatedAt: string;

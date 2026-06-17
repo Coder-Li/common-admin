@@ -3326,6 +3326,33 @@
         "type": "object",
         "properties": {}
       },
+      "RoleDataScopeDepartmentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status"
+        ]
+      },
       "RolePermissionSummaryDto": {
         "type": "object",
         "properties": {
@@ -3370,6 +3397,22 @@
           "isDefault": {
             "type": "boolean"
           },
+          "dataScope": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "SELF",
+              "DEPT",
+              "DEPT_AND_CHILDREN",
+              "CUSTOM_DEPT"
+            ]
+          },
+          "dataScopeDepartments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleDataScopeDepartmentDto"
+            }
+          },
           "permissions": {
             "type": "array",
             "items": {
@@ -3390,6 +3433,8 @@
           "status",
           "isSystem",
           "isDefault",
+          "dataScope",
+          "dataScopeDepartments",
           "permissions",
           "createdAt",
           "updatedAt"
@@ -3441,6 +3486,22 @@
           },
           "isDefault": {
             "type": "boolean"
+          },
+          "dataScope": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "SELF",
+              "DEPT",
+              "DEPT_AND_CHILDREN",
+              "CUSTOM_DEPT"
+            ]
+          },
+          "dataScopeDepartmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -3469,6 +3530,22 @@
           },
           "isDefault": {
             "type": "boolean"
+          },
+          "dataScope": {
+            "type": "string",
+            "enum": [
+              "ALL",
+              "SELF",
+              "DEPT",
+              "DEPT_AND_CHILDREN",
+              "CUSTOM_DEPT"
+            ]
+          },
+          "dataScopeDepartmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

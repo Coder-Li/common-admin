@@ -3,6 +3,7 @@ import type {
   ListRolesParams as GeneratedListRolesParams,
   PermissionModuleResponseDto,
   PermissionResponseDto,
+  DepartmentOptionDto,
   RoleListResponseDto,
   RolePermissionSummaryDto,
   RoleResponseDto,
@@ -11,6 +12,7 @@ import type {
 
 export type RoleStatus = RoleResponseDto['status']
 export type PermissionStatus = PermissionResponseDto['status']
+export type RoleDataScope = RoleResponseDto['dataScope']
 
 export type RolePermissionSummary = RolePermissionSummaryDto
 
@@ -33,3 +35,5 @@ export interface RoleListQuery
 export type PermissionRecord = PermissionResponseDto
 
 export type PermissionModule = PermissionModuleResponseDto
+
+export type DepartmentOption = DepartmentOptionDto

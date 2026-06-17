@@ -5,6 +5,7 @@
  * API for the common admin starter template
  * OpenAPI spec version: 0.1.0
  */
+import type { CreateRoleDtoDataScope } from "./createRoleDtoDataScope";
 
 export interface CreateRoleDto {
   /**
@@ -17,4 +18,6 @@ export interface CreateRoleDto {
   /** @maxLength 500 */
   description?: string;
   isDefault?: boolean;
+  dataScope?: CreateRoleDtoDataScope;
+  dataScopeDepartmentIds?: string[];
 }

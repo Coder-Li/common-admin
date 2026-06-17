@@ -4,6 +4,9 @@ import type { RoleRecord } from './roles.types'
 export interface RoleColumnLabels {
   actions: string
   code: string
+  dataScope: string
+  dataScopes: Record<RoleRecord['dataScope'], string>
+  customDataScopeCount: string
   delete: string
   edit: string
   isDefault: string
@@ -44,6 +47,14 @@ export function createRoleColumns(
       accessorKey: 'status',
       header: labels.status,
       size: 120,
+    },
+    {
+      accessorKey: 'dataScope',
+      header: labels.dataScope,
+      cell: ({ row }) =>
+        row.original.dataScope === 'CUSTOM_DEPT'
+          ? `${labels.customDataScopeCount} (${row.original.dataScopeDepartments.length})`
+          : labels.dataScopes[row.original.dataScope],
     },
     {
       accessorKey: 'isSystem',

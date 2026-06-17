@@ -11,6 +11,10 @@ import type {
   SortingState,
 } from '../../components/data-table/DataTable'
 import {
+  getDepartmentOptions,
+  getGetDepartmentOptionsQueryKey,
+} from '../../generated/api/endpoints/departments/departments'
+import {
   getListPermissionModulesQueryKey,
   listPermissionModules,
 } from '../../generated/api/endpoints/permissions/permissions'
@@ -111,6 +115,55 @@ export function RolesPage() {
     queryFn: () => listPermissionModules(),
   })
 
+  const departmentIncludeIds =
+    formState?.mode === 'edit'
+      ? formState.role.dataScopeDepartments
+          .map((department) => department.id)
+          .join(',')
+      : undefined
+
+  const departmentOptionsQuery = useQuery({
+    queryKey: getGetDepartmentOptionsQueryKey({
+      status: 'ACTIVE',
+      includeIds: departmentIncludeIds,
+    }),
+    enabled: Boolean(formState),
+    queryFn: () =>
+      getDepartmentOptions({
+        status: 'ACTIVE',
+        includeIds: departmentIncludeIds,
+      }),
+  })
+
+  const departmentOptions = useMemo(() => {
+    const optionsById = new Map<
+      string,
+      { value: string; label: string; status: 'ACTIVE' | 'DISABLED' }
+    >()
+
+    for (const department of departmentOptionsQuery.data ?? []) {
+      optionsById.set(department.id, {
+        value: department.id,
+        label: department.name,
+        status: department.status,
+      })
+    }
+
+    if (formState?.mode === 'edit') {
+      for (const department of formState.role.dataScopeDepartments) {
+        if (!optionsById.has(department.id)) {
+          optionsById.set(department.id, {
+            value: department.id,
+            label: department.name,
+            status: department.status,
+          })
+        }
+      }
+    }
+
+    return [...optionsById.values()]
+  }, [departmentOptionsQuery.data, formState])
+
   const invalidateRoles = () =>
     queryClient.invalidateQueries({ queryKey: getListRolesQueryKey() })
 
@@ -172,6 +225,7 @@ export function RolesPage() {
         {
           actions: t('roles.column.actions'),
           code: t('roles.column.code'),
+          dataScope: t('roles.column.dataScope'),
           delete: t('roles.action.delete'),
           edit: t('roles.action.edit'),
           isDefault: t('roles.column.default'),
@@ -179,6 +233,14 @@ export function RolesPage() {
           name: t('roles.column.name'),
           permissions: t('roles.action.permissions'),
           status: t('roles.column.status'),
+          dataScopes: {
+            ALL: t('roles.dataScope.ALL'),
+            SELF: t('roles.dataScope.SELF'),
+            DEPT: t('roles.dataScope.DEPT'),
+            DEPT_AND_CHILDREN: t('roles.dataScope.DEPT_AND_CHILDREN'),
+            CUSTOM_DEPT: t('roles.dataScope.CUSTOM_DEPT'),
+          },
+          customDataScopeCount: t('roles.dataScope.customCount'),
           yes: t('roles.value.yes'),
           no: t('roles.value.no'),
         },
@@ -289,9 +351,11 @@ export function RolesPage() {
                 : t('roles.action.edit')}
             </h3>
             <RoleForm
+              departmentOptions={departmentOptions}
               initialValue={
                 formState.mode === 'edit' ? formState.role : undefined
               }
+              isDepartmentOptionsLoading={departmentOptionsQuery.isLoading}
               isSubmitting={
                 createMutation.isPending || updateMutation.isPending
               }

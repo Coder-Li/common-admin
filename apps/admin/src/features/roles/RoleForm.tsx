@@ -4,11 +4,23 @@ import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { useI18n } from '../../i18n/useI18n'
-import type { CreateRoleRequest, RoleRecord, UpdateRoleRequest } from './roles.types'
+import type {
+  CreateRoleRequest,
+  DepartmentOption,
+  RoleDataScope,
+  RoleRecord,
+  UpdateRoleRequest,
+} from './roles.types'
 
 interface RoleFormProps {
   mode: 'create' | 'edit'
+  departmentOptions: Array<{
+    value: string
+    label: string
+    status: DepartmentOption['status']
+  }>
   initialValue?: RoleRecord
+  isDepartmentOptionsLoading: boolean
   isSubmitting: boolean
   onCancel: () => void
   onSubmit: (value: CreateRoleRequest | UpdateRoleRequest) => void
@@ -20,6 +32,8 @@ interface RoleFormValues {
   description: string
   status: 'ACTIVE' | 'DISABLED'
   isDefault: boolean
+  dataScope: RoleDataScope
+  dataScopeDepartmentIds: string[]
 }
 
 function descriptionToFormValue(
@@ -29,8 +43,10 @@ function descriptionToFormValue(
 }
 
 export function RoleForm({
+  departmentOptions,
   mode,
   initialValue,
+  isDepartmentOptionsLoading,
   isSubmitting,
   onCancel,
   onSubmit,
@@ -51,6 +67,25 @@ export function RoleForm({
         description: z.string(),
         status: z.enum(['ACTIVE', 'DISABLED']),
         isDefault: z.boolean(),
+        dataScope: z.enum([
+          'ALL',
+          'SELF',
+          'DEPT',
+          'DEPT_AND_CHILDREN',
+          'CUSTOM_DEPT',
+        ]),
+        dataScopeDepartmentIds: z.array(z.string()),
+      }).superRefine((value, context) => {
+        if (
+          value.dataScope === 'CUSTOM_DEPT' &&
+          value.dataScopeDepartmentIds.length === 0
+        ) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: t('roles.validation.dataScopeDepartments'),
+            path: ['dataScopeDepartmentIds'],
+          })
+        }
       }),
     [isCreate, t],
   )
@@ -59,6 +94,7 @@ export function RoleForm({
     formState: { errors },
     handleSubmit,
     register,
+    watch,
   } = useForm<RoleFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -67,14 +103,36 @@ export function RoleForm({
       description: descriptionToFormValue(initialValue?.description),
       status: initialValue?.status ?? 'ACTIVE',
       isDefault: initialValue?.isDefault ?? false,
+      dataScope: initialValue?.dataScope ?? 'SELF',
+      dataScopeDepartmentIds:
+        initialValue?.dataScopeDepartments
+          .filter((department) => department.status === 'ACTIVE')
+          .map((department) => department.id) ?? [],
     },
   })
+  const selectedDataScope = watch('dataScope')
+  const activeDepartmentOptions = departmentOptions.filter(
+    (department) => department.status === 'ACTIVE',
+  )
+  const disabledLinkedDepartments =
+    initialValue?.dataScopeDepartments.filter(
+      (department) => department.status !== 'ACTIVE',
+    ) ?? []
 
   function submitForm(value: RoleFormValues) {
     const description = value.description.trim()
+    const activeOptionIds = new Set(
+      activeDepartmentOptions.map((department) => department.value),
+    )
+    const dataScopeDepartmentIds =
+      value.dataScope === 'CUSTOM_DEPT'
+        ? value.dataScopeDepartmentIds.filter((id) => activeOptionIds.has(id))
+        : undefined
     const payload = {
       name: value.name,
       isDefault: value.isDefault,
+      dataScope: value.dataScope,
+      ...(dataScopeDepartmentIds ? { dataScopeDepartmentIds } : {}),
     }
 
     if (isCreate) {
@@ -124,6 +182,26 @@ export function RoleForm({
           </select>
         </Field>
 
+        <Field
+          error={errors.dataScopeDepartmentIds?.message}
+          label={t('roles.form.dataScope')}
+        >
+          <select
+            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition focus:border-cyan-500"
+            {...register('dataScope')}
+          >
+            <option value="ALL">{t('roles.dataScope.ALL')}</option>
+            <option value="SELF">{t('roles.dataScope.SELF')}</option>
+            <option value="DEPT">{t('roles.dataScope.DEPT')}</option>
+            <option value="DEPT_AND_CHILDREN">
+              {t('roles.dataScope.DEPT_AND_CHILDREN')}
+            </option>
+            <option value="CUSTOM_DEPT">
+              {t('roles.dataScope.CUSTOM_DEPT')}
+            </option>
+          </select>
+        </Field>
+
         <label className="flex min-h-9 items-center gap-2 self-end text-sm font-medium text-slate-700">
           <input className="size-4" type="checkbox" {...register('isDefault')} />
           {t('roles.form.isDefault')}
@@ -136,6 +214,57 @@ export function RoleForm({
           />
         </Field>
       </div>
+
+      {selectedDataScope === 'CUSTOM_DEPT' ? (
+        <fieldset className="grid gap-3 rounded-md border border-slate-200 p-3">
+          <legend className="px-1 text-sm font-medium text-slate-700">
+            {t('roles.form.dataScopeDepartments')}
+          </legend>
+          {isDepartmentOptionsLoading ? (
+            <p className="text-sm text-slate-500">
+              {t('roles.form.loadingDepartments')}
+            </p>
+          ) : (
+            <>
+              <div className="grid gap-2">
+                {activeDepartmentOptions.map((department) => (
+                  <label
+                    className="flex min-h-7 items-center gap-2 text-sm text-slate-700"
+                    key={department.value}
+                  >
+                    <input
+                      className="size-4"
+                      type="checkbox"
+                      value={department.value}
+                      {...register('dataScopeDepartmentIds')}
+                    />
+                    {department.label}
+                  </label>
+                ))}
+              </div>
+              {disabledLinkedDepartments.length ? (
+                <div className="grid gap-2 border-t border-slate-200 pt-3">
+                  {disabledLinkedDepartments.map((department) => (
+                    <label
+                      className="flex min-h-7 items-center gap-2 text-sm text-slate-500"
+                      key={department.id}
+                    >
+                      <input
+                        checked
+                        className="size-4"
+                        disabled
+                        readOnly
+                        type="checkbox"
+                      />
+                      {department.name}
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          )}
+        </fieldset>
+      ) : null}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <button

@@ -7,6 +7,7 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../i18n/I18nProvider'
 import { useAuthStore } from '../../stores/auth-store'
+import { getDepartmentOptions } from '../../generated/api/endpoints/departments/departments'
 import { listPermissionModules } from '../../generated/api/endpoints/permissions/permissions'
 import {
   createRole,
@@ -21,6 +22,13 @@ import type { PermissionModule, RoleRecord } from './roles.types'
 vi.mock('../../generated/api/endpoints/permissions/permissions', () => ({
   getListPermissionModulesQueryKey: vi.fn(() => ['/permissions/modules']),
   listPermissionModules: vi.fn(),
+}))
+
+vi.mock('../../generated/api/endpoints/departments/departments', () => ({
+  getDepartmentOptions: vi.fn(),
+  getGetDepartmentOptionsQueryKey: vi.fn((params?: unknown) =>
+    params ? ['/departments/options', params] : ['/departments/options'],
+  ),
 }))
 
 vi.mock('../../generated/api/endpoints/roles/roles', () => ({
@@ -43,6 +51,8 @@ const roles: RoleRecord[] = [
     status: 'ACTIVE',
     isSystem: true,
     isDefault: false,
+    dataScope: 'ALL',
+    dataScopeDepartments: [],
     permissions: [{ code: 'user.read', name: 'View users' }],
     createdAt: '2026-06-09T00:00:00.000Z',
     updatedAt: '2026-06-09T00:00:00.000Z',
@@ -55,6 +65,21 @@ const roles: RoleRecord[] = [
     status: 'ACTIVE',
     isSystem: false,
     isDefault: true,
+    dataScope: 'CUSTOM_DEPT',
+    dataScopeDepartments: [
+      {
+        id: 'dept-1',
+        code: 'engineering',
+        name: 'Engineering',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'dept-2',
+        code: 'legacy',
+        name: 'Legacy',
+        status: 'DISABLED',
+      },
+    ],
     permissions: [{ code: 'file.read', name: 'View files' }],
     createdAt: '2026-06-09T00:00:00.000Z',
     updatedAt: '2026-06-09T00:00:00.000Z',
@@ -147,6 +172,15 @@ describe('RolesPage', () => {
       pageSize: 20,
     })
     vi.mocked(listPermissionModules).mockResolvedValue(modules)
+    vi.mocked(getDepartmentOptions).mockResolvedValue([
+      {
+        id: 'dept-1',
+        code: 'engineering',
+        name: 'Engineering',
+        parentId: null,
+        status: 'ACTIVE',
+      },
+    ])
     vi.mocked(createRole).mockResolvedValue(roles[1])
     vi.mocked(updateRole).mockResolvedValue(roles[1])
     vi.mocked(deleteRole).mockResolvedValue(undefined)
@@ -263,5 +297,91 @@ describe('RolesPage', () => {
 
     expect(await screen.findByText('Admin')).toBeInTheDocument()
     expect(screen.queryByText('View users')).not.toBeInTheDocument()
+  })
+
+  it('submits SELF by default on create', async () => {
+    const user = userEvent.setup()
+    renderRolesPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Create role' }))
+    await user.type(screen.getByLabelText('Code'), 'auditor')
+    await user.type(screen.getByLabelText('Name'), 'Auditor')
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Create role',
+      }),
+    )
+
+    expect(vi.mocked(createRole)).toHaveBeenCalledWith(
+      expect.objectContaining({ dataScope: 'SELF' }),
+    )
+  })
+
+  it('shows custom department checkboxes only for CUSTOM_DEPT roles', async () => {
+    const user = userEvent.setup()
+    renderRolesPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Create role' }))
+    expect(
+      screen.queryByRole('checkbox', { name: 'Engineering' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('submits selected active custom departments on create', async () => {
+    const user = userEvent.setup()
+    renderRolesPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Create role' }))
+    await user.type(screen.getByLabelText('Code'), 'platform_admin')
+    await user.type(screen.getByLabelText('Name'), 'Platform admin')
+    await user.selectOptions(screen.getByLabelText('Data scope'), 'CUSTOM_DEPT')
+    expect(await screen.findByRole('checkbox', { name: 'Engineering' })).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: 'Engineering' }))
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Create role',
+      }),
+    )
+
+    expect(vi.mocked(createRole)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dataScope: 'CUSTOM_DEPT',
+        dataScopeDepartmentIds: ['dept-1'],
+      }),
+    )
+  })
+
+  it('shows role data scope in the table', async () => {
+    renderRolesPage()
+
+    expect(await screen.findByText('All')).toBeInTheDocument()
+    expect(screen.getByText('Custom departments (2)')).toBeInTheDocument()
+  })
+
+  it('shows disabled linked departments in edit mode without submitting them', async () => {
+    const user = userEvent.setup()
+    renderRolesPage()
+
+    await user.click(
+      within((await screen.findByText('operator')).closest('tr') as HTMLTableRowElement).getByRole(
+        'button',
+        { name: 'Edit' },
+      ),
+    )
+    expect(screen.getByRole('checkbox', { name: 'Engineering' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Legacy' })).toBeDisabled()
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: 'Edit',
+      }),
+    )
+
+    expect(vi.mocked(updateRole)).toHaveBeenCalledWith(
+      'role-2',
+      expect.objectContaining({
+        dataScope: 'CUSTOM_DEPT',
+        dataScopeDepartmentIds: ['dept-1'],
+      }),
+    )
   })
 })
