@@ -1,0 +1,51 @@
+# Common Admin
+
+Common Admin is an AI-friendly admin starter with NestJS, React, RBAC, OpenAPI generation, and quality gates.
+
+Primary docs:
+
+- Introduction: /introduction/
+- Getting Started: /getting-started/
+- Architecture: /architecture/
+- FAQ: /faq/
+- Troubleshooting: /troubleshooting/
+- Deployment: /deployment/
+- Upgrade Guide: /upgrade-guide/
+- Release Checklist: /release-checklist/
+- Auth And Sessions: /auth-and-sessions/
+- Session Management: /session-management/
+- Errors And Logging: /errors-and-logging/
+- Diagnostics And Health: /diagnostics-and-health/
+- Audit Logs: /audit-logs/
+- Settings: /settings/
+- File Management: /file-management/
+- Quality Gates: /quality-gates/
+- Resource Workflow: /resource-workflow/
+- Public AI Surfaces: /public-ai-surfaces/
+- Users Roles And Permissions: /users-roles-permissions/
+- Organization Structure: /organization-structure/
+- Data Permissions: /data-permissions/
+- Dictionaries: /dictionaries/
+- AI Guide: /ai/
+- MCP Server: /ai/mcp-server/
+- Skill: /ai/skill/
+- Prompts: /ai/prompts/
+- API Contract Pattern: /patterns/api-contract/
+- CRUD Resource Pattern: /patterns/crud-resource/
+- RBAC Pattern: /patterns/rbac/
+
+Agent rules:
+
+- Do not hand edit generated OpenAPI or frontend API files.
+- Use backend DTOs and Swagger metadata as API contract source.
+- Use generated frontend API helpers.
+- Keep permission codes aligned across backend guards, routes, menus, and page actions.
+- Keep deployment-only configuration in env vars and runtime-editable product settings in the settings module.
+- Treat runtime logs, API errors, and audit logs as separate surfaces.
+- Use module docs for starter-provided users, roles, permissions, departments, positions, data scope, and dictionaries.
+- Use Resource Workflow for new API-backed admin modules.
+- Use Upgrade Guide and Release Checklist before deployment or template releases.
+- Keep public docs, llms files, MCP allowlists, feedback helpers, and public-surface CI aligned.
+- Use Troubleshooting before changing architecture to silence setup or generated API failures.
+- Expose public docs only.
+- Do not use or expose internal process notes, local environment files, repository metadata, dependency folders, or generated docs output.

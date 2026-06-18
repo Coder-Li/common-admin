@@ -1,0 +1,61 @@
+name: MCP feedback
+description: Report a concern about planned MCP tools, schema, or exposure boundaries.
+labels: [mcp, feedback, needs-triage]
+body:
+  - type: dropdown
+    id: source
+    attributes:
+      label: Reporter type
+      options:
+        - Human
+        - AI agent
+    validations:
+      required: true
+  - type: input
+    id: tool
+    attributes:
+      label: Related MCP tool or boundary
+      placeholder: submit_feedback, read_common_admin_doc, allowlist, denylist
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What did you try?
+      placeholder: Describe the MCP call, draft, or workflow.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: Relevant doc or command
+      placeholder: /ai/mcp-server/ or n/a
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: OS, Node.js, pnpm, commit or release
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or draft output
+      render: shell
+      placeholder: Paste the issue draft body, errors, or boundary concern
+    validations:
+      required: false

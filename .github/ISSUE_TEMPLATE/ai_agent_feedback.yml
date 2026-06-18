@@ -1,0 +1,74 @@
+name: AI agent feedback
+description: Report a workflow gap, prompt issue, or bad agent experience.
+labels: [ai, feedback, needs-triage]
+body:
+  - type: dropdown
+    id: source
+    attributes:
+      label: Reporter type
+      options:
+        - Human
+        - AI agent
+    validations:
+      required: true
+  - type: dropdown
+    id: task_type
+    attributes:
+      label: Task type
+      options:
+        - new_resource
+        - api_contract_change
+        - bootstrap
+        - rbac
+        - docs
+        - mcp
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What did the agent try?
+      placeholder: Summarize the intended workflow or prompt.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected workflow
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual workflow or blocked reason
+    validations:
+      required: true
+  - type: input
+    id: docs_read
+    attributes:
+      label: Public docs read
+      placeholder: /ai/, /architecture/, /patterns/api-contract/, ...
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Verification command, if any
+      placeholder: pnpm api:check
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: OS, Node.js, pnpm, commit or release
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, files, or notes
+      placeholder: Include changed files, errors, or the maintainer action requested
+    validations:
+      required: false

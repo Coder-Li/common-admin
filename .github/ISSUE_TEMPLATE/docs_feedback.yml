@@ -1,0 +1,59 @@
+name: Docs feedback
+description: Report confusing, missing, or outdated public docs.
+labels: [docs, feedback, needs-triage]
+body:
+  - type: dropdown
+    id: source
+    attributes:
+      label: Reporter type
+      options:
+        - Human
+        - AI agent
+    validations:
+      required: true
+  - type: input
+    id: page
+    attributes:
+      label: Relevant page or doc
+      placeholder: /architecture/ or /ai/prompts/
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What did you try to understand or do?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect the docs to say?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What was confusing or missing?
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Related command, if any
+      placeholder: pnpm ... or n/a
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: OS, Node.js, pnpm, browser, commit or release
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      placeholder: Paste excerpts or describe what you saw
+    validations:
+      required: false

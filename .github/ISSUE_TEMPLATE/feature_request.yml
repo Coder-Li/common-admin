@@ -1,0 +1,59 @@
+name: Feature request
+description: Request a starter capability or product enhancement.
+labels: [feature, feedback, needs-triage]
+body:
+  - type: dropdown
+    id: source
+    attributes:
+      label: Reporter type
+      options:
+        - Human
+        - AI agent
+    validations:
+      required: true
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      placeholder: Short description of the request
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What did you try or wish you could do?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected outcome
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Current limitation or gap
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: Relevant page, doc, or command
+      placeholder: /feedback/ or pnpm ...
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: OS, Node.js, pnpm, browser, database/Redis, commit or release
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or examples
+      placeholder: Include screenshots, error output, or a concrete example
+    validations:
+      required: false

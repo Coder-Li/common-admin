@@ -1,0 +1,263 @@
+# Common Admin AI Context
+
+Common Admin is a reusable production admin starter for humans and AI agents.
+
+It contains:
+
+- NestJS API.
+- Prisma persistence.
+- React admin app.
+- RBAC permissions.
+- Refresh-token session handling.
+- OpenAPI generation.
+- Generated frontend API helpers.
+- File management.
+- Audit logs.
+- Runtime settings.
+- Users, roles, permissions, and session management.
+- Health checks and diagnostic request-flow validation.
+- Departments, positions, data-permission visibility, and dictionaries.
+- Structured errors and logs.
+- Docker Compose deployment shape.
+- Upgrade and release readiness workflows.
+- Quality gates.
+- Public documentation in `apps/docs`.
+
+## Architecture
+
+Backend contracts are the source of truth:
+
+```text
+Prisma schema
+  -> NestJS service / mapper / DTO / controller metadata
+  -> apps/api/openapi.json
+  -> Orval
+  -> apps/admin/src/generated/api/
+  -> React Query hooks / endpoint functions / schema types
+  -> Admin feature pages
+```
+
+Generated artifacts must not be edited by hand.
+
+Source-of-truth files and directories include:
+
+- `apps/api/prisma/schema.prisma`
+- `apps/api/src/openapi.ts`
+- `apps/api/scripts/generate-openapi.ts`
+- `apps/admin/orval.config.ts`
+- `apps/admin/src/app/api-mutator.ts`
+- `apps/admin/src/app/api-refresh-coordinator.ts`
+- `apps/admin/src/routes/admin-route-registry.tsx`
+- `apps/admin/src/routes/route-meta.ts`
+- `apps/api/src/permission/permission.registry.ts`
+- `apps/api/prisma/seed.ts`
+- `apps/docs/src/content/docs/`
+
+Generated artifacts are committed but read-only:
+
+- `apps/api/openapi.json`
+- `apps/admin/src/generated/api/`
+
+## Agent Workflow
+
+Before modifying the project:
+
+1. Read the AI guide.
+2. Read architecture.
+3. Read the relevant pattern guide.
+4. Inspect current source code.
+5. Make small scoped changes.
+6. Run focused verification while iterating.
+7. Run broad quality gates before claiming completion.
+
+Stop and ask a maintainer when the API contract is unclear, permission naming is ambiguous, a migration could be destructive, or a requested change would expose internal files.
+
+## Pattern Summary
+
+API contract:
+
+- Backend DTOs, validation, mappers, controller metadata, and Swagger decorators define the public contract.
+- `apps/api/openapi.json` is generated from backend source.
+- Orval generates frontend endpoint functions, hooks, query keys, and schema types into `apps/admin/src/generated/api/`.
+- Run `pnpm api:generate` after contract source changes and `pnpm api:check` before finishing.
+
+CRUD resource:
+
+- Standard resources span `apps/api/src/<resource>/` and `apps/admin/src/features/<resource>/`.
+- Add persistence first when needed, then backend DTOs, mapper, service, controller, module wiring, permissions, Swagger operation ids, generated API, frontend page, route/menu metadata, i18n, and tests.
+- List endpoints should use server-side pagination, validated filters, allowed sort fields, and public response DTOs.
+
+RBAC:
+
+- Use stable lowercase `module.action` permission codes.
+- Keep the same permission code aligned across backend `@Permissions()`, permission registry/seed behavior, frontend route/menu metadata, and page actions.
+- Do not add role-name checks for admin capabilities.
+
+Errors, logging, audit, and settings:
+
+- API errors should use the common error envelope and request IDs.
+- Runtime logs are structured stdout/stderr diagnostics and are separate from audit logs.
+- Audit logs record sensitive administrative operations and must sanitize secrets.
+- Runtime-editable product settings belong in the settings module; deployment-only configuration stays in environment variables.
+
+Auth and sessions:
+
+- Login creates a user session, returns an access token, and sets a refresh cookie.
+- Refresh validates and rotates the refresh token, then returns a new access token.
+- Logout clears the refresh cookie and revokes the identified session when possible.
+- Frontend API calls use the shared mutator and refresh coordinator.
+- 401 replay is skipped for login, refresh, and logout and should not recurse forever.
+
+Session management:
+
+- Admin session APIs use `user_session.read` and `user_session.revoke`.
+- Session revocation blocks current-session revocation and inactive sessions.
+- Revocation should record audit metadata and request id correlation.
+
+Files:
+
+- Uploads use `multipart/form-data` with explicit Swagger metadata.
+- Downloads should be described as binary responses so generated frontend code handles Blob downloads.
+- Upload size and MIME type policy is constrained by deployment env and runtime settings.
+- File upload, update, and delete actions should be audited with sanitized payloads.
+
+Users, roles, permissions, and sessions:
+
+- User management uses `user.read`, `user.create`, `user.update`, `user.delete`, and `user.assign_roles`.
+- Role management uses `role.read`, `role.create`, `role.update`, `role.delete`, and `role.assign_permissions`.
+- Permission catalog endpoints use `permission.read`.
+- Session management uses `user_session.read` and `user_session.revoke`.
+- Do not replace permission checks with role-name checks.
+
+Organization, data permissions, and dictionaries:
+
+- Departments and positions are API-backed admin resources with generated frontend usage.
+- Data permissions apply record visibility rules after RBAC permits an action.
+- Dictionary management uses `dictionary.read`, `dictionary.create`, `dictionary.update`, and `dictionary.delete`.
+- Dictionary option endpoints provide safe generated API access for forms and filters.
+- Keep dictionary codes and values stable after product features depend on them.
+
+Deployment:
+
+- Docker Compose runs admin, API, Postgres, Redis, and an upload volume.
+- Only the admin HTTP port is exposed by default.
+- `deploy:init` runs migrations and seed data for an empty database.
+- `deploy:migrate` runs production migrations for upgrades.
+- Secrets, environment files, refresh cookies, tokens, and database dumps must not be exposed.
+
+Upgrade and release:
+
+- Review migrations, permission registry changes, API contract drift, generated frontend API changes, auth/session behavior, settings, deployment variables, docs, and MCP allowlists.
+- Back up shared or production data before applying migrations.
+- Use `deploy:migrate` for deployment upgrades and `deploy:init` only for empty database initialization.
+- Run `pnpm quality` for implementation branch readiness.
+- For docs and public AI surface changes, run docs build plus MCP test and typecheck.
+
+Diagnostics and health:
+
+- Health checks are runtime reachability checks.
+- Diagnostic error endpoints are deployment-gated and validate error envelope, request id, and logging behavior.
+- The admin app should not depend on diagnostic endpoints for normal operation.
+
+Resource workflow:
+
+- Confirm fields, filters, sort fields, sensitive data, and permissions before implementation.
+- Implement backend contract first, regenerate OpenAPI and frontend API artifacts, then build the admin page with generated helpers.
+- Align route/menu metadata and page actions with backend permission guards.
+- Run API drift checks before finishing.
+
+Public AI surfaces:
+
+- Public docs, llms files, MCP allowlists, feedback draft behavior, issue templates, and CI should stay consistent.
+- Add public docs to MCP only through explicit allowlists.
+- Do not expose internal process notes, environment files, repository metadata, dependency folders, or generated docs output.
+
+Troubleshooting:
+
+- Start from local service health, env configuration, and narrow package tests.
+- Inspect generated drift with `git diff -- apps/api/openapi.json apps/admin/src/generated/api`.
+- Fix backend DTOs, Swagger metadata, OpenAPI generation, or Orval config instead of editing generated artifacts.
+- Use request IDs to correlate API failures with logs.
+
+## Prompt Summary
+
+Use `/ai/prompts/` for task prompts.
+
+- Add an admin resource: use for a new API-backed module with persistence, permissions, generated API usage, frontend page, and tests.
+- Change an API contract: use for endpoint, DTO, operation id, request, response, generated function, or generated schema changes.
+- Bootstrap a new project: use when deriving a product from the starter while preserving auth, RBAC, generated API flow, and quality gates.
+- Update docs / AI entry surfaces: use when changing public docs, llms files, MCP docs, skill docs, or prompt docs.
+
+## Feedback Schema
+
+Useful feedback should include:
+
+- What the user tried to build.
+- Which command, page, or document was confusing.
+- What the agent or developer expected.
+- What actually happened.
+- Any relevant error output or broken generated code.
+
+Suggested labels include `docs`, `ai`, `mcp`, `starter`, `bug`, and `feature`.
+
+The MCP `submit_feedback` tool generates a draft issue only. It does not automatically create a GitHub issue.
+
+## Verification
+
+Common commands:
+
+```bash
+pnpm api:check
+pnpm lint
+pnpm test
+pnpm --filter api test:e2e
+pnpm build
+```
+
+Branch readiness:
+
+```bash
+pnpm quality
+```
+
+Docs-only verification:
+
+```bash
+pnpm --filter docs build
+```
+
+## Public Docs
+
+- `/introduction/`
+- `/getting-started/`
+- `/architecture/`
+- `/faq/`
+- `/troubleshooting/`
+- `/deployment/`
+- `/upgrade-guide/`
+- `/release-checklist/`
+- `/auth-and-sessions/`
+- `/session-management/`
+- `/errors-and-logging/`
+- `/diagnostics-and-health/`
+- `/audit-logs/`
+- `/settings/`
+- `/file-management/`
+- `/quality-gates/`
+- `/resource-workflow/`
+- `/public-ai-surfaces/`
+- `/users-roles-permissions/`
+- `/organization-structure/`
+- `/data-permissions/`
+- `/dictionaries/`
+- `/ai/`
+- `/ai/mcp-server/`
+- `/ai/skill/`
+- `/ai/prompts/`
+- `/patterns/api-contract/`
+- `/patterns/crud-resource/`
+- `/patterns/rbac/`
+
+## Public Boundary
+
+Only public docs should be summarized here. Internal process notes, local environment files, repository metadata, dependency folders, and generated docs output must not be used as public docs, llms content, MCP content, or installable skill content.
