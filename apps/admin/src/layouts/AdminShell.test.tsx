@@ -232,6 +232,35 @@ describe('AdminShell i18n', () => {
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
   })
 
+  it('renders project links before the theme switcher', async () => {
+    renderAdminShell()
+
+    const githubLink = await screen.findByRole('link', { name: 'GitHub' })
+    const docsLink = screen.getByRole('link', { name: 'Docs' })
+    const themeSwitcher = screen.getByRole('button', {
+      name: 'Switch to dark theme',
+    })
+
+    expect(githubLink).toHaveAttribute(
+      'href',
+      'https://github.com/Coder-Li/common-admin',
+    )
+    expect(docsLink).toHaveAttribute(
+      'href',
+      'https://coder-li.github.io/common-admin/introduction/',
+    )
+    expect(githubLink).toHaveAttribute('target', '_blank')
+    expect(docsLink).toHaveAttribute('target', '_blank')
+    expect(githubLink).toHaveAttribute('rel', 'noreferrer')
+    expect(docsLink).toHaveAttribute('rel', 'noreferrer')
+    expect(githubLink.compareDocumentPosition(themeSwitcher)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    expect(docsLink.compareDocumentPosition(themeSwitcher)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+  })
+
   it('renders Chinese shell and dashboard copy from a saved locale', async () => {
     window.localStorage.setItem(LOCALE_STORAGE_KEY, 'zh-CN')
 

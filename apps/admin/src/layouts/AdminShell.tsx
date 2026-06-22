@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router'
-import { Circle, KeyRound, Lock, LogOut } from 'lucide-react'
+import { BookOpen, Circle, GitBranch, KeyRound, Lock, LogOut } from 'lucide-react'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { toast } from 'sonner'
@@ -35,6 +35,9 @@ function navItemClass(isActive: boolean) {
       : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]',
   ].join(' ')
 }
+
+const externalLinkClass =
+  'inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] sm:px-3'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object')
@@ -226,6 +229,28 @@ export function AdminShell() {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <a
+              aria-label="GitHub"
+              className={externalLinkClass}
+              href="https://github.com/Coder-Li/common-admin"
+              rel="noreferrer"
+              target="_blank"
+              title="GitHub"
+            >
+              <GitBranch aria-hidden="true" size={16} />
+              <span className="hidden sm:inline">GitHub</span>
+            </a>
+            <a
+              aria-label="Docs"
+              className={externalLinkClass}
+              href="https://coder-li.github.io/common-admin/introduction/"
+              rel="noreferrer"
+              target="_blank"
+              title="Docs"
+            >
+              <BookOpen aria-hidden="true" size={16} />
+              <span className="hidden sm:inline">Docs</span>
+            </a>
             <ThemeSwitcher />
             <LanguageSwitcher
               className="border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-text-muted)]"
