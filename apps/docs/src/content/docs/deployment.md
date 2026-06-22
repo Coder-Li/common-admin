@@ -66,6 +66,24 @@ docker compose --env-file .env.deploy -f docker-compose.yml -f docker-compose.pr
 `deploy:init` runs database migrations and seed data. Use it for the first empty
 database initialization only. For later upgrades, use the migration-only flow.
 
+## Docs Site
+
+The public documentation site deploys from GitHub Actions to GitHub Pages when
+changes are pushed to `main`. The workflow builds the Astro Starlight app with:
+
+```bash
+pnpm --filter docs build
+```
+
+The Pages artifact is `apps/docs/dist`.
+
+The Astro config currently uses `site: 'https://common-admin.dev'`, which is
+appropriate when GitHub Pages serves the docs through the `common-admin.dev`
+custom domain. If you deploy through the default GitHub Pages project URL, set
+the Astro `site` to that URL and add the matching `base` path before deploying
+so canonical URLs, sitemap output, and generated asset links match the public
+address.
+
 ## Upgrades
 
 When a new version includes Prisma migrations, deploy the new API image, run the
