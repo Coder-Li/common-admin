@@ -11,13 +11,13 @@ form, or admin CRUD module.
 
 Before implementation, read:
 
-- [Architecture](/architecture/)
-- [API Contract](/patterns/api-contract/)
-- [CRUD Resource](/patterns/crud-resource/)
-- [RBAC](/patterns/rbac/)
-- [Users Roles And Permissions](/users-roles-permissions/) when the resource
+- [Architecture](./architecture/)
+- [API Contract](./patterns/api-contract/)
+- [CRUD Resource](./patterns/crud-resource/)
+- [RBAC](./patterns/rbac/)
+- [Users Roles And Permissions](./users-roles-permissions/) when the resource
   touches identity or access control
-- [Quality Gates](/quality-gates/)
+- [Quality Gates](./quality-gates/)
 
 ## Suggested Order
 

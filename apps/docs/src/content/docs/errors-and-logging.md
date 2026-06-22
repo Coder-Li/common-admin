@@ -101,7 +101,7 @@ Use audit logs for administrative changes that need an accountability trail:
 who changed what, when, from where, and with which sanitized before/after
 payloads.
 
-Do not rely on runtime logs as a durable audit trail. See [Audit Logs](/audit-logs/).
+Do not rely on runtime logs as a durable audit trail. See [Audit Logs](./audit-logs/).
 
 ## Verification
 

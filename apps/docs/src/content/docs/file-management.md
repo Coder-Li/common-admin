@@ -92,7 +92,7 @@ deployment environment values:
 - `FILE_ALLOWED_MIME_TYPES`;
 - runtime upload settings.
 
-See [Settings](/settings/) for the settings boundary.
+See [Settings](./settings/) for the settings boundary.
 
 ## Audit Expectations
 

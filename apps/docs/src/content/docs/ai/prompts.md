@@ -14,11 +14,11 @@ Use this when adding a new API-backed admin module with persistence, list/detail
 
 ### Required Docs
 
-- [Architecture](/architecture/)
-- [CRUD Resource](/patterns/crud-resource/)
-- [API Contract](/patterns/api-contract/)
-- [RBAC](/patterns/rbac/)
-- [AI Guide](/ai/)
+- [Architecture](../architecture/)
+- [CRUD Resource](../patterns/crud-resource/)
+- [API Contract](../patterns/api-contract/)
+- [RBAC](../patterns/rbac/)
+- [AI Guide](../ai/)
 
 ### Prompt
 
@@ -51,9 +51,9 @@ Use this when changing an existing endpoint, DTO, operation id, request query, r
 
 ### Required Docs
 
-- [Architecture](/architecture/)
-- [API Contract](/patterns/api-contract/)
-- [AI Guide](/ai/)
+- [Architecture](../architecture/)
+- [API Contract](../patterns/api-contract/)
+- [AI Guide](../ai/)
 - The affected feature code and generated API usages.
 
 ### Prompt
@@ -86,10 +86,10 @@ Use this when deriving a product from Common Admin and renaming or configuring t
 
 ### Required Docs
 
-- [Introduction](/introduction/)
-- [Getting Started](/getting-started/)
-- [Architecture](/architecture/)
-- [AI Guide](/ai/)
+- [Introduction](../introduction/)
+- [Getting Started](../getting-started/)
+- [Architecture](../architecture/)
+- [AI Guide](../ai/)
 
 ### Prompt
 
@@ -122,12 +122,12 @@ Use this when changing public documentation, `llms.txt`, `llms-full.txt`, planne
 
 ### Required Docs
 
-- [Introduction](/introduction/)
-- [Architecture](/architecture/)
-- [AI Guide](/ai/)
-- [MCP Server](/ai/mcp-server/)
-- [Skill](/ai/skill/)
-- [Feedback](/feedback/)
+- [Introduction](../introduction/)
+- [Architecture](../architecture/)
+- [AI Guide](../ai/)
+- [MCP Server](../ai/mcp-server/)
+- [Skill](../ai/skill/)
+- [Feedback](../feedback/)
 
 ### Prompt
 

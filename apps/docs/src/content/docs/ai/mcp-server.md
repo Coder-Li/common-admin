@@ -202,7 +202,7 @@ Unknown prompt ids are rejected.
 ## `submit_feedback`
 
 `submit_feedback` only generates a draft. It accepts the public feedback shape
-from [/feedback/](/feedback/) and returns:
+from [/feedback/](../feedback/) and returns:
 
 - `title`
 - `body`

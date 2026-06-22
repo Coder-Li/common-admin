@@ -3,7 +3,8 @@ import sitemap from '@astrojs/sitemap'
 import starlight from '@astrojs/starlight'
 
 export default defineConfig({
-  site: 'https://common-admin.dev',
+  site: 'https://coder-li.github.io',
+  base: '/common-admin',
   integrations: [
     starlight({
       title: 'Common Admin',

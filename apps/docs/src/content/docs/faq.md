@@ -76,15 +76,15 @@ Check auth lifecycle boundaries:
 - refresh succeeds and rotates the token;
 - the user has the required permission.
 
-See [Auth And Sessions](/auth-and-sessions/) and [Troubleshooting](/troubleshooting/).
+See [Auth And Sessions](./auth-and-sessions/) and [Troubleshooting](./troubleshooting/).
 
 ## How do I add a new admin module?
 
-Start with [Resource Workflow](/resource-workflow/), then read:
+Start with [Resource Workflow](./resource-workflow/), then read:
 
-- [CRUD Resource](/patterns/crud-resource/)
-- [API Contract](/patterns/api-contract/)
-- [RBAC](/patterns/rbac/)
+- [CRUD Resource](./patterns/crud-resource/)
+- [API Contract](./patterns/api-contract/)
+- [RBAC](./patterns/rbac/)
 
 Implement backend contract first, regenerate API artifacts, build the frontend
 with generated helpers, and run the relevant gates.
@@ -113,7 +113,7 @@ No. Public AI surfaces should use stable public docs and source files relevant
 to the task. They must not expose internal process notes, environment files,
 repository metadata, dependency folders, or generated docs output.
 
-See [Public AI Surfaces](/public-ai-surfaces/).
+See [Public AI Surfaces](./public-ai-surfaces/).
 
 ## What should I run before a branch is ready?
 

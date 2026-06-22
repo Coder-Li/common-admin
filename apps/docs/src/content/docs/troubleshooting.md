@@ -51,7 +51,7 @@ pnpm --filter admin test -- api-mutator
 pnpm --filter admin test -- api-refresh-coordinator
 ```
 
-See [Auth And Sessions](/auth-and-sessions/).
+See [Auth And Sessions](./auth-and-sessions/).
 
 ## API Drift
 
@@ -78,7 +78,7 @@ pnpm api:generate
 pnpm api:check
 ```
 
-See [API Contract](/patterns/api-contract/).
+See [API Contract](./patterns/api-contract/).
 
 ## Migrations And Seed
 
@@ -114,7 +114,7 @@ If a page is missing from the menu:
 If direct URL access returns `/403`, the route guard is working. Check the
 permission assignment instead of bypassing the guard.
 
-See [RBAC](/patterns/rbac/).
+See [RBAC](./patterns/rbac/).
 
 ## Uploads And Downloads
 
@@ -132,7 +132,7 @@ If downloads are not saved as files:
 - confirm the generated frontend function is used;
 - confirm the browser file-save wrapper handles the Blob and filename.
 
-See [File Management](/file-management/).
+See [File Management](./file-management/).
 
 ## Docs Build
 

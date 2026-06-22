@@ -77,12 +77,12 @@ pnpm --filter docs build
 
 The Pages artifact is `apps/docs/dist`.
 
-The Astro config currently uses `site: 'https://common-admin.dev'`, which is
-appropriate when GitHub Pages serves the docs through the `common-admin.dev`
-custom domain. If you deploy through the default GitHub Pages project URL, set
-the Astro `site` to that URL and add the matching `base` path before deploying
-so canonical URLs, sitemap output, and generated asset links match the public
-address.
+The Astro config currently targets the default GitHub Pages project URL with
+`site: 'https://coder-li.github.io'` and `base: '/common-admin'`. If you later
+serve the docs from a custom domain such as `common-admin.dev`, remove the
+project-page `base` and set `site` to the custom-domain origin before
+deploying so canonical URLs, sitemap output, and generated asset links match
+the public address.
 
 ## Upgrades
 
@@ -118,7 +118,7 @@ Deployment-only configuration belongs in environment variables. Examples:
 - Logging and service identity settings.
 
 Runtime-editable product settings belong in the settings module instead. See
-[Settings](/settings/) for the boundary.
+[Settings](./settings/) for the boundary.
 
 ## Cookie And Origin Rules
 

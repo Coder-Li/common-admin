@@ -29,7 +29,7 @@ Session management does not:
 - expose refresh tokens;
 - revoke the current session when the service forbids it.
 
-Use [Auth And Sessions](/auth-and-sessions/) for the login, refresh, logout,
+Use [Auth And Sessions](./auth-and-sessions/) for the login, refresh, logout,
 and password-change lifecycle.
 
 ## List Behavior

@@ -101,31 +101,31 @@ permission registry
 
 Use stable `module.action` permission codes such as `user.read`, `role.update`, or `file.delete`.
 
-See [Users Roles And Permissions](/users-roles-permissions/) and [RBAC](/patterns/rbac/).
+See [Users Roles And Permissions](./users-roles-permissions/) and [RBAC](./patterns/rbac/).
 
 ## Organization And Data Scope
 
 Departments and positions provide organization structure for user assignment and future business modules. Data permissions apply department-scoped visibility rules after RBAC answers whether an action is allowed.
 
-See [Organization Structure](/organization-structure/) and [Data Permissions](/data-permissions/).
+See [Organization Structure](./organization-structure/) and [Data Permissions](./data-permissions/).
 
 ## Dictionaries
 
 Dictionaries provide admin-managed option lists for product features. Management endpoints are permission-protected, while option endpoints provide safe generated API access for forms and filters.
 
-See [Dictionaries](/dictionaries/).
+See [Dictionaries](./dictionaries/).
 
 ## Auth And Sessions
 
 The admin app uses access tokens for API requests and refresh-token session behavior for continuity. The API auth module, refresh cookie settings, frontend API mutator, and refresh coordinator are one lifecycle. Changes to login, refresh, logout, password changes, 401 replay, cookies, or token cleanup should be tested as session behavior, not isolated one-line edits.
 
-See [Auth And Sessions](/auth-and-sessions/).
+See [Auth And Sessions](./auth-and-sessions/).
 
 ## Session Management
 
 Admin session management lists user sessions and revokes active sessions through guarded endpoints. It is separate from login/refresh behavior and should audit revocation actions.
 
-See [Session Management](/session-management/).
+See [Session Management](./session-management/).
 
 ## Errors And Logging
 
@@ -133,43 +133,43 @@ API errors should flow through the common exception mapping and filter layer. Va
 
 When adding new secret-like fields, make sure logging redaction still protects them.
 
-See [Errors And Logging](/errors-and-logging/).
+See [Errors And Logging](./errors-and-logging/).
 
 ## Diagnostics And Health
 
 Health checks verify runtime reachability. Diagnostic endpoints are gated by deployment configuration and exist for validating the global error and logging pipeline.
 
-See [Diagnostics And Health](/diagnostics-and-health/).
+See [Diagnostics And Health](./diagnostics-and-health/).
 
 ## Audit Logs
 
 Audit logs are database records for sensitive administrative operations. They answer who changed what, not whether the server was healthy. Audit payloads should be sanitized so passwords, tokens, secrets, and private metadata are not stored.
 
-See [Audit Logs](/audit-logs/).
+See [Audit Logs](./audit-logs/).
 
 ## Settings
 
 Runtime-editable product settings belong behind the settings module. Deployment-only configuration remains in environment variables. Do not move secrets into runtime settings just to make them editable from the admin UI.
 
-See [Settings](/settings/).
+See [Settings](./settings/).
 
 ## Files
 
 File management uses permission-protected upload, download, update, and delete endpoints with multipart Swagger metadata and generated frontend API helpers. Upload policy is runtime-editable only within deployment-defined limits.
 
-See [File Management](/file-management/).
+See [File Management](./file-management/).
 
 ## Deployment
 
 Docker Compose is the production-like local deployment shape. Keep deployment secrets in local environment files, use migration-only commands for upgrades, and avoid exposing Postgres, Redis, or API internals unless your deployment deliberately requires it.
 
-See [Deployment](/deployment/).
+See [Deployment](./deployment/).
 
 ## Upgrade And Release
 
 Upgrades should account for migrations, generated API drift, permissions, deployment configuration, and rollback planning. Release readiness should include contract, security, docs, AI surface, and quality checks.
 
-See [Upgrade Guide](/upgrade-guide/) and [Release Checklist](/release-checklist/).
+See [Upgrade Guide](./upgrade-guide/) and [Release Checklist](./release-checklist/).
 
 ## Quality Gates
 
@@ -191,28 +191,28 @@ pnpm build
 
 Run narrower commands while iterating, but use the broader gate before treating a feature branch as ready.
 
-See [Quality Gates](/quality-gates/).
+See [Quality Gates](./quality-gates/).
 
 ## Resource Workflow
 
 New API-backed admin modules should follow the backend-first contract flow, regenerate generated API artifacts, use generated frontend helpers, align RBAC, and add focused tests.
 
-See [Resource Workflow](/resource-workflow/).
+See [Resource Workflow](./resource-workflow/).
 
 ## Public AI Surfaces
 
 Public docs, llms files, MCP tools, feedback helpers, issue templates, and CI checks are maintained together. Keep them stable and avoid exposing internal files or generated output.
 
-See [Public AI Surfaces](/public-ai-surfaces/).
+See [Public AI Surfaces](./public-ai-surfaces/).
 
 ## Troubleshooting
 
 When setup, auth, generated API drift, migrations, permissions, uploads, or docs builds fail, start with the narrow troubleshooting checks before changing architecture.
 
-See [Troubleshooting](/troubleshooting/).
+See [Troubleshooting](./troubleshooting/).
 
 ## FAQ
 
 Use FAQ for short answers about generated APIs, RBAC, settings, logs, AI access, and readiness commands.
 
-See [FAQ](/faq/).
+See [FAQ](./faq/).
